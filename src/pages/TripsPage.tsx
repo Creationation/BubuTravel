@@ -76,6 +76,11 @@ export default function TripsPage() {
                     <div className="p-5">
                       <h2 className="display-sm text-xl">{trip.title}</h2>
                       <p className="mt-1.5 text-[13px] text-text-muted">
+                        {trip.status === 'planning' && (
+                          <span className="mr-1.5 rounded-full border border-line px-1.5 py-0.5 text-[10px]">
+                            a preparer
+                          </span>
+                        )}
                         {formatRange(trip.start_date, trip.end_date)}
                       </p>
                       <p className="mt-3 text-[13px] text-text-soft">

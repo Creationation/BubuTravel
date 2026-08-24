@@ -21,7 +21,7 @@ type Panel =
   | { kind: 'track'; id: string }
 
 export default function MapPage() {
-  const { places, tracks, loading, pushTrack } = usePlaces()
+  const { places, visited, wishlist, tracks, loading, pushTrack } = usePlaces()
   const { recording } = useTracker()
   const [params, setParams] = useSearchParams()
   const [panel, setPanel] = useState<Panel>({ kind: 'none' })
@@ -40,6 +40,17 @@ export default function MapPage() {
     () => (panel.kind === 'track' ? (tracks.find((t) => t.id === panel.id) ?? null) : null),
     [panel, tracks],
   )
+
+  // Arrivee depuis la bucketlist : le formulaire s'ouvre en mode envie
+  const wantWish = params.get('envie')
+  useEffect(() => {
+    if (!wantWish) return
+    setDraft({ ...emptyDraft, status: 'wishlist' })
+    setPanel({ kind: 'new' })
+    setPicking(true)
+    params.delete('envie')
+    setParams(params, { replace: true })
+  }, [wantWish, params, setParams])
 
   // Ouverture directe d'un lieu depuis la timeline du carnet
   const wanted = params.get('lieu')
@@ -137,7 +148,14 @@ export default function MapPage() {
 
   const points = useMemo(
     () =>
-      places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, name: p.name, country: p.country })),
+      places.map((p) => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.name,
+        country: p.country,
+        wish: p.status === 'wishlist',
+      })),
     [places],
   )
   const trackLines = useMemo(
@@ -154,16 +172,25 @@ export default function MapPage() {
             <p className="mt-1 text-[13px] text-text-soft">
               {loading
                 ? 'Chargement du carnet...'
-                : `${places.length} lieu${places.length > 1 ? 'x' : ''}${
-                    tracks.length > 0
-                      ? `, ${tracks.length} parcours`
-                      : ''
-                  }`}
+                : `${visited.length} lieu${visited.length > 1 ? 'x' : ''}${
+                    wishlist.length > 0 ? `, ${wishlist.length} a visiter` : ''
+                  }${tracks.length > 0 ? `, ${tracks.length} parcours` : ''}`}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void scanHere()} className="btn" disabled={scanning}>
               {scanning ? 'Reperage...' : 'Je suis ici'}
+            </button>
+            <button
+              onClick={() => {
+                setDraft({ ...emptyDraft, status: 'wishlist' })
+                setGps(null)
+                setPanel({ kind: 'new' })
+                setPicking(true)
+              }}
+              className="btn"
+            >
+              Ajouter une envie
             </button>
             <button onClick={openNew} className="btn btn-accent">
               Ajouter un lieu

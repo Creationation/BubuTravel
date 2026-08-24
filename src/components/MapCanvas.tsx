@@ -12,10 +12,18 @@ import {
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import type { ReactNode } from 'react'
 import { useTheme } from '../context/ThemeContext'
-import { activeIcon, clusterIcon, draftIcon, placeIcon } from './mapIcon'
+import { activeIcon, clusterIcon, draftIcon, placeIcon, wishIcon } from './mapIcon'
 import type { TrackPoint } from '../lib/types'
 
-type Point = { id: string; lat: number; lng: number; name: string; country: string }
+type Point = {
+  id: string
+  lat: number
+  lng: number
+  name: string
+  country: string
+  /** Lieu de la bucketlist : marqueur creux au lieu du marqueur plein. */
+  wish?: boolean
+}
 type TrackLine = { id: string; name: string; points: TrackPoint[] }
 
 type Props = {
@@ -72,7 +80,7 @@ export default function MapCanvas({
     <Marker
       key={p.id}
       position={[p.lat, p.lng]}
-      icon={activeId === p.id ? activeIcon : placeIcon}
+      icon={activeId === p.id ? activeIcon : p.wish ? wishIcon : placeIcon}
       eventHandlers={onSelect ? { click: () => onSelect(p.id) } : undefined}
     >
       <Tooltip direction="top" offset={[0, -14]} opacity={1}>

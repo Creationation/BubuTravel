@@ -1,5 +1,7 @@
 import { AVATARS_BUCKET, PHOTOS_BUCKET, supabase } from './supabase'
 import type {
+  Category,
+  NewCategory,
   NewPlace,
   NewTrack,
   NewTrip,
@@ -344,4 +346,66 @@ export async function updateTrack(id: string, patch: Partial<NewTrack>): Promise
 export async function deleteTrack(id: string): Promise<void> {
   const { error } = await supabase.from('tracks').delete().eq('id', id)
   if (error) throw error
+}
+
+/* -------------------------------------------------------------------------- */
+/* Categories                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** Proposees en un clic au premier passage, puis librement modifiables. */
+export const DEFAULT_CATEGORIES: { name: string; color: string }[] = [
+  { name: 'Ville', color: '#c4653d' },
+  { name: 'Nature', color: '#7f8f7a' },
+  { name: 'Plage', color: '#3f8fa3' },
+  { name: 'Musee', color: '#9a6ea8' },
+  { name: 'Restaurant', color: '#c9a227' },
+  { name: 'Hebergement', color: '#8a7a68' },
+]
+
+export async function fetchCategories(userId: string): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createCategory(input: NewCategory): Promise<Category> {
+  const { data, error } = await supabase.from('categories').insert(input).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateCategory(
+  id: string,
+  patch: Partial<NewCategory>,
+): Promise<Category> {
+  const { data, error } = await supabase
+    .from('categories')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/** Les lieux ne sont pas supprimes, ils perdent seulement leur categorie. */
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('categories').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function seedCategories(userId: string): Promise<Category[]> {
+  const rows = DEFAULT_CATEGORIES.map((c) => ({
+    user_id: userId,
+    name: c.name,
+    color: c.color,
+    icon: null,
+  }))
+  const { data, error } = await supabase.from('categories').insert(rows).select()
+  if (error) throw error
+  return data ?? []
 }

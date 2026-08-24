@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { readPhotoMeta } from '../lib/exif'
 import { reverseGeocode } from '../lib/geocode'
 import { uploadPhoto } from '../lib/api'
-import type { Place } from '../lib/types'
+import type { Place, PlaceStatus } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 
 export type Draft = {
@@ -18,6 +18,8 @@ export type Draft = {
   visit_date: string
   notes: string
   trip_id: string
+  category_id: string
+  status: PlaceStatus
 }
 
 export const emptyDraft: Draft = {
@@ -29,6 +31,8 @@ export const emptyDraft: Draft = {
   visit_date: '',
   notes: '',
   trip_id: '',
+  category_id: '',
+  status: 'visited',
 }
 
 export type GpsInfo = {
@@ -58,7 +62,7 @@ export default function PlaceForm({
   onCancel,
   gps = null,
 }: Props) {
-  const { add, trips, bumpPhotoCount } = usePlaces()
+  const { add, trips, categories, addCategory, bumpPhotoCount } = usePlaces()
   const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<GeoResult[]>([])
@@ -69,6 +73,7 @@ export default function PlaceForm({
   const [pending, setPending] = useState<File[]>([])
   const [exifNote, setExifNote] = useState<string | null>(null)
   const [gpsConfirmed, setGpsConfirmed] = useState(false)
+  const [newCategory, setNewCategory] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const touchedRef = useRef(false)
   const searchRef = useRef<HTMLInputElement | null>(null)
@@ -174,6 +179,9 @@ export default function PlaceForm({
         visit_date: draft.visit_date || null,
         notes: draft.notes.trim() || null,
         trip_id: draft.trip_id || null,
+        category_id: draft.category_id || null,
+        status: draft.status,
+        planned_order: null,
       })
 
       if (pending.length > 0 && user) {
@@ -196,8 +204,12 @@ export default function PlaceForm({
     <aside className="panel-enter flex max-h-[68vh] w-full shrink-0 flex-col border-t border-line bg-bg md:max-h-none md:w-[25rem] md:border-l md:border-t-0">
       <header className="flex items-center justify-between border-b border-line px-6 pb-5 pt-6">
         <div>
-          <p className="eyebrow">{gps ? 'Releve sur place' : 'Nouvelle etape'}</p>
-          <h2 className="display-sm mt-2 text-3xl">{gps ? 'Je suis ici' : 'Ajouter un lieu'}</h2>
+          <p className="eyebrow">
+            {gps ? 'Releve sur place' : draft.status === 'wishlist' ? 'Bucketlist' : 'Nouvelle etape'}
+          </p>
+          <h2 className="display-sm mt-2 text-3xl">
+            {gps ? 'Je suis ici' : draft.status === 'wishlist' ? 'Ajouter une envie' : 'Ajouter un lieu'}
+          </h2>
         </div>
         <button onClick={onCancel} className="btn btn-icon btn-quiet" aria-label="Fermer">
           ✕
@@ -205,6 +217,24 @@ export default function PlaceForm({
       </header>
 
       <form onSubmit={onSubmit} className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+        {/* Deja vu, ou envie a garder sous le coude */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onDraftChange({ ...draft, status: 'visited' })}
+            className={`pill justify-center ${draft.status === 'visited' ? 'pill-active' : ''}`}
+          >
+            Deja visite
+          </button>
+          <button
+            type="button"
+            onClick={() => onDraftChange({ ...draft, status: 'wishlist' })}
+            className={`pill justify-center ${draft.status === 'wishlist' ? 'pill-active' : ''}`}
+          >
+            A visiter
+          </button>
+        </div>
+
         {/* Verification de l'adresse : le GPS se trompe souvent en ville */}
         {gps && !gpsConfirmed && (
           <div className="rounded-xl border border-line bg-surface-2 p-4">
@@ -356,7 +386,9 @@ export default function PlaceForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Date de visite</label>
+            <label className="label">
+              {draft.status === 'wishlist' ? 'Date visee' : 'Date de visite'}
+            </label>
             <input
               className="field"
               type="date"
@@ -375,9 +407,52 @@ export default function PlaceForm({
               {trips.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
+                  {t.status === 'planning' ? ' (a preparer)' : ''}
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Categorie</label>
+          {categories.length > 0 && (
+            <select
+              className="field"
+              value={draft.category_id}
+              onChange={(e) => onDraftChange({ ...draft, category_id: e.target.value })}
+            >
+              <option value="">Sans categorie</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="mt-2 flex gap-2">
+            <input
+              className="field"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="Creer une categorie"
+            />
+            <button
+              type="button"
+              className="btn btn-xs"
+              disabled={!newCategory.trim() || busy}
+              onClick={() => {
+                const label = newCategory.trim()
+                void addCategory(label, '#c4653d')
+                  .then((created) => {
+                    onDraftChange({ ...draft, category_id: created.id })
+                    setNewCategory('')
+                  })
+                  .catch((err) => setError(errorMessage(err)))
+              }}
+            >
+              Creer
+            </button>
           </div>
         </div>
 

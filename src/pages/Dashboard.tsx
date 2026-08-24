@@ -10,7 +10,7 @@ import Reveal from '../components/Reveal'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
-  const { places, trips, countries, stats, loading, error } = usePlaces()
+  const { places, visited, wishlist, trips, countries, stats, loading, error } = usePlaces()
   const [covers, setCovers] = useState<Record<string, string>>({})
 
   const name = profile?.display_name || user?.email?.split('@')[0] || 'Voyageur'
@@ -41,12 +41,12 @@ export default function Dashboard() {
     }
   }, [user])
 
-  const years = useMemo(() => groupByYear(places), [places])
+  const years = useMemo(() => groupByYear(visited), [visited])
   const topCountries = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const p of places) counts.set(p.country, (counts.get(p.country) ?? 0) + 1)
+    for (const p of visited) counts.set(p.country, (counts.get(p.country) ?? 0) + 1)
     return [...counts.entries()].sort((a, b) => b[1] - a[1])
-  }, [places])
+  }, [visited])
 
   const empty = !loading && places.length === 0
 
@@ -81,6 +81,9 @@ export default function Dashboard() {
               </Link>
               <Link to="/voyages" className="btn">
                 Mes voyages
+              </Link>
+              <Link to="/bucketlist" className="btn">
+                Envies{wishlist.length > 0 ? ` (${wishlist.length})` : ''}
               </Link>
               <Link to="/galerie" className="btn">
                 Galerie

@@ -10,6 +10,7 @@ import MapPage from './pages/MapPage'
 import TripsPage from './pages/TripsPage'
 import TripView from './pages/TripView'
 import GalleryPage from './pages/GalleryPage'
+import BucketlistPage from './pages/BucketlistPage'
 import ProfilePage from './pages/ProfilePage'
 import SharePage from './pages/SharePage'
 
@@ -71,6 +72,14 @@ export default function App() {
               element={
                 <Protected>
                   <TripView />
+                </Protected>
+              }
+            />
+            <Route
+              path="/bucketlist"
+              element={
+                <Protected>
+                  <BucketlistPage />
                 </Protected>
               }
             />

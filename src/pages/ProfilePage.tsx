@@ -5,6 +5,7 @@ import { disableShare, enableShare, fetchShare, rotateShare, updateDisplayName, 
 import type { PublicShare } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
+import CategoryManager from '../components/CategoryManager'
 import { useTheme } from '../context/ThemeContext'
 import { errorMessage } from '../lib/errors'
 
@@ -161,6 +162,20 @@ export default function ProfilePage() {
               >
                 Clair
               </button>
+            </div>
+          </section>
+        </Reveal>
+
+        {/* Categories */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">Categories</h2>
+            <p className="lede mt-2 text-[14px]">
+              Pour ranger les lieux : ville, nature, restaurant, ce que vous voulez. Elles servent
+              de filtre dans la bucketlist et dans la galerie.
+            </p>
+            <div className="mt-6">
+              <CategoryManager />
             </div>
           </section>
         </Reveal>

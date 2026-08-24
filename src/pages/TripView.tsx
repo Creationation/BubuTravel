@@ -9,6 +9,7 @@ import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
 import Reveal from '../components/Reveal'
 import TripForm from '../components/TripForm'
+import TripPlanner from '../components/TripPlanner'
 import Lightbox from '../components/Lightbox'
 
 export default function TripView() {
@@ -93,7 +94,10 @@ export default function TripView() {
             </Link>
             <div className="mt-5 flex flex-wrap items-end justify-between gap-5">
               <div>
-                <p className="eyebrow">{formatRange(trip.start_date, trip.end_date)}</p>
+                <p className="eyebrow">
+                  {trip.status === 'planning' ? 'En preparation · ' : ''}
+                  {formatRange(trip.start_date, trip.end_date)}
+                </p>
                 <h1 className="display mt-3 text-[clamp(2.2rem,6vw,4.2rem)]">{trip.title}</h1>
               </div>
               <div className="flex gap-2">
@@ -173,8 +177,14 @@ export default function TripView() {
           </section>
         )}
 
+        {trip.status === 'planning' && (
+          <div className="mt-12">
+            <TripPlanner trip={trip} />
+          </div>
+        )}
+
         {/* Timeline des etapes */}
-        <section className="mt-14">
+        <section className={`mt-14 ${trip.status === 'planning' ? 'hidden' : ''}`}>
           <Reveal className="mb-8">
             <p className="eyebrow">Deroule</p>
             <h2 className="display-sm mt-2 text-3xl">Etape par etape</h2>

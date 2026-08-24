@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { usePlaces } from '../context/PlacesContext'
-import type { Trip } from '../lib/types'
+import type { Trip, TripStatus } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 
 type Props = {
@@ -17,6 +17,7 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
   const [end, setEnd] = useState(trip?.end_date ?? '')
   const [cover, setCover] = useState(trip?.cover_url ?? '')
   const [notes, setNotes] = useState(trip?.notes ?? '')
+  const [status, setStatus] = useState<TripStatus>(trip?.status ?? 'planning')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,6 +36,8 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
         end_date: end || null,
         cover_url: cover.trim() || null,
         notes: notes.trim() || null,
+        status,
+        checklist: trip?.checklist ?? [],
       }
       const result = trip ? await editTrip(trip.id, payload) : await addTrip(payload)
       onDone(result)
@@ -47,6 +50,26 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="panel space-y-4 p-6">
+      <div>
+        <label className="label">Ce voyage</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setStatus('planning')}
+            className={`pill justify-center ${status === 'planning' ? 'pill-active' : ''}`}
+          >
+            A preparer
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatus('done')}
+            className={`pill justify-center ${status === 'done' ? 'pill-active' : ''}`}
+          >
+            Deja fait
+          </button>
+        </div>
+      </div>
+
       <div>
         <label className="label">Titre du voyage</label>
         <input

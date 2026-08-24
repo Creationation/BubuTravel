@@ -490,6 +490,12 @@ body {
     0 8px 18px -6px rgba(0, 0, 0, 0.7);
 }
 
+.pin-wish .pin-dot {
+  background: transparent;
+  border: 2px solid var(--color-sand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sand) 18%, transparent);
+}
+
 .pin-draft .pin-dot {
   background: transparent;
   border: 2px dashed var(--accent);

@@ -19,6 +19,7 @@ function pin(extra = ''): L.DivIcon {
 export const placeIcon = pin()
 export const activeIcon = pin('pin-active')
 export const draftIcon = pin('pin-draft')
+export const wishIcon = pin('pin-wish')
 
 /** Grappe : le diametre suit le nombre de points, sans jamais devenir enorme. */
 export function clusterIcon(count: number): L.DivIcon {

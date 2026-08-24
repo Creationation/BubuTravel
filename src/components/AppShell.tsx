@@ -7,6 +7,7 @@ const NAV = [
   { to: '/', label: 'Carnet', end: true },
   { to: '/voyages', label: 'Voyages' },
   { to: '/carte', label: 'Carte' },
+  { to: '/bucketlist', label: 'Envies' },
   { to: '/galerie', label: 'Galerie' },
 ]
 

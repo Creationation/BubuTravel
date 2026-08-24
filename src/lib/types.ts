@@ -5,6 +5,10 @@ export type Profile = {
   created_at: string
 }
 
+export type TripStatus = 'planning' | 'done'
+
+export type ChecklistItem = { id: string; text: string; done: boolean }
+
 export type Trip = {
   id: string
   user_id: string
@@ -13,13 +17,28 @@ export type Trip = {
   end_date: string | null
   cover_url: string | null
   notes: string | null
+  status: TripStatus
+  checklist: ChecklistItem[]
   created_at: string
 }
+
+export type Category = {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  icon: string | null
+  created_at: string
+}
+
+/** 'visited' alimente le carnet, 'wishlist' alimente la bucketlist. */
+export type PlaceStatus = 'visited' | 'wishlist'
 
 export type Place = {
   id: string
   user_id: string
   trip_id: string | null
+  category_id: string | null
   name: string
   country: string
   city: string | null
@@ -27,6 +46,9 @@ export type Place = {
   lng: number
   visit_date: string | null
   notes: string | null
+  status: PlaceStatus
+  /** Rang de l'etape dans un voyage en preparation. */
+  planned_order: number | null
   created_at: string
 }
 
@@ -64,12 +86,14 @@ export type PublicShare = {
 export type NewPlace = Omit<Place, 'id' | 'created_at'>
 export type NewTrip = Omit<Trip, 'id' | 'created_at'>
 export type NewTrack = Omit<Track, 'id' | 'created_at'>
+export type NewCategory = Omit<Category, 'id' | 'created_at'>
 
 /** Vues renvoyees par les fonctions de partage, sans user_id ni email. */
 export type SharedPlace = Omit<Place, 'user_id' | 'created_at'>
 export type SharedTrip = Omit<Trip, 'user_id' | 'created_at'>
 export type SharedPhoto = Pick<Photo, 'id' | 'place_id' | 'url' | 'uploaded_at'>
 export type SharedTrack = Omit<Track, 'user_id' | 'created_at'>
+export type SharedCategory = Omit<Category, 'user_id' | 'created_at'>
 
 /**
  * Typage minimal pour createClient. Il decrit uniquement ce que l'app utilise,
@@ -97,6 +121,12 @@ export type Database = {
         Row: Track
         Insert: NewTrack
         Update: Partial<NewTrack>
+        Relationships: []
+      }
+      categories: {
+        Row: Category
+        Insert: NewCategory
+        Update: Partial<NewCategory>
         Relationships: []
       }
       places: {
@@ -139,6 +169,10 @@ export type Database = {
       shared_tracks: {
         Args: { share_token: string }
         Returns: SharedTrack[]
+      }
+      shared_categories: {
+        Args: { share_token: string }
+        Returns: SharedCategory[]
       }
     }
     Enums: Record<string, never>

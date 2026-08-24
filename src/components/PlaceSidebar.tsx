@@ -15,7 +15,7 @@ type Props = {
 
 export default function PlaceSidebar({ place, onClose }: Props) {
   const { user } = useAuth()
-  const { remove, edit, trips, bumpPhotoCount } = usePlaces()
+  const { remove, edit, trips, categories, categoryOf, bumpPhotoCount } = usePlaces()
   const [photos, setPhotos] = useState<Photo[]>([])
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -30,6 +30,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
     city: place.city ?? '',
     visit_date: place.visit_date ?? '',
     notes: place.notes ?? '',
+    category_id: place.category_id ?? '',
   })
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
       city: place.city ?? '',
       visit_date: place.visit_date ?? '',
       notes: place.notes ?? '',
+      category_id: place.category_id ?? '',
     })
 
     fetchPhotos(place.id)
@@ -61,7 +63,15 @@ export default function PlaceSidebar({ place, onClose }: Props) {
     return () => {
       active = false
     }
-  }, [place.id, place.name, place.country, place.city, place.visit_date, place.notes])
+  }, [
+    place.id,
+    place.name,
+    place.country,
+    place.city,
+    place.visit_date,
+    place.notes,
+    place.category_id,
+  ])
 
   async function saveEdits() {
     setBusy(true)
@@ -73,6 +83,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         city: form.city.trim() || null,
         visit_date: form.visit_date || null,
         notes: form.notes.trim() || null,
+        category_id: form.category_id || null,
       })
       setEditing(false)
     } catch (err) {
@@ -137,7 +148,10 @@ export default function PlaceSidebar({ place, onClose }: Props) {
       <header className="border-b border-line px-6 pb-5 pt-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="eyebrow">{place.country}</p>
+            <p className="eyebrow">
+              {place.country}
+              {categoryOf(place) && ` · ${categoryOf(place)!.name}`}
+            </p>
             <h2 className="display-sm mt-2 text-3xl leading-tight">{place.name}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -160,6 +174,27 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           <span className="font-mono text-[11px]">
             {place.lat.toFixed(3)}, {place.lng.toFixed(3)}
           </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            onClick={() =>
+              void edit(place.id, { status: 'visited' }).catch((err) => setError(errorMessage(err)))
+            }
+            className={`pill justify-center ${place.status !== 'wishlist' ? 'pill-active' : ''}`}
+            disabled={busy}
+          >
+            Visite
+          </button>
+          <button
+            onClick={() =>
+              void edit(place.id, { status: 'wishlist' }).catch((err) => setError(errorMessage(err)))
+            }
+            className={`pill justify-center ${place.status === 'wishlist' ? 'pill-active' : ''}`}
+            disabled={busy}
+          >
+            A visiter
+          </button>
         </div>
       </header>
 
@@ -203,6 +238,27 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 onChange={(e) => setForm({ ...form, visit_date: e.target.value })}
               />
             </div>
+            <div>
+              <label className="label">Categorie</label>
+              <select
+                className="field"
+                value={form.category_id}
+                onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+              >
+                <option value="">Sans categorie</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {categories.length === 0 && (
+                <p className="mt-1.5 text-[11px] text-text-muted">
+                  Aucune categorie creee. Elles se gerent dans le profil.
+                </p>
+              )}
+            </div>
+
             <div>
               <label className="label">Notes</label>
               <textarea

@@ -2,27 +2,38 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react'
 import {
   countPhotos,
+  createCategory,
   createPlace,
   createTrip,
+  deleteCategory,
   deletePlace,
   deleteTrack,
   deleteTrip,
+  fetchCategories,
   fetchPlaces,
   fetchTracks,
   fetchTrips,
+  seedCategories,
+  updateCategory,
   updatePlace,
   updateTrip,
 } from '../lib/api'
-import type { NewPlace, NewTrip, Place, Track, Trip } from '../lib/types'
+import type { Category, NewPlace, NewTrip, Place, Track, Trip } from '../lib/types'
 import { buildStats } from '../lib/stats'
 import type { Stats } from '../lib/stats'
 import { useAuth } from './AuthContext'
 import { friendlyError } from '../lib/errors'
 
 type PlacesValue = {
+  /** Tous les lieux, visites et souhaites confondus. */
   places: Place[]
+  /** Uniquement les lieux deja visites : c'est le carnet. */
+  visited: Place[]
+  /** Uniquement les lieux a visiter : c'est la bucketlist. */
+  wishlist: Place[]
   trips: Trip[]
   tracks: Track[]
+  categories: Category[]
   loading: boolean
   error: string | null
   countries: string[]
@@ -36,6 +47,11 @@ type PlacesValue = {
   removeTrip: (id: string) => Promise<void>
   pushTrack: (track: Track) => void
   removeTrack: (id: string) => Promise<void>
+  addCategory: (name: string, color: string) => Promise<Category>
+  editCategory: (id: string, patch: { name?: string; color?: string }) => Promise<Category>
+  removeCategory: (id: string) => Promise<void>
+  seedDefaultCategories: () => Promise<void>
+  categoryOf: (place: Place) => Category | null
   bumpPhotoCount: (delta: number) => void
   reload: () => Promise<void>
 }
@@ -47,6 +63,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const [places, setPlaces] = useState<Place[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [tracks, setTracks] = useState<Track[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [photoCount, setPhotoCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,6 +73,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       setPlaces([])
       setTrips([])
       setTracks([])
+      setCategories([])
       setPhotoCount(0)
       setLoading(false)
       return
@@ -63,15 +81,17 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [p, t, k, c] = await Promise.all([
+      const [p, t, k, cat, c] = await Promise.all([
         fetchPlaces(user.id),
         fetchTrips(user.id),
         fetchTracks(user.id),
+        fetchCategories(user.id),
         countPhotos(user.id),
       ])
       setPlaces(p)
       setTrips(t)
       setTracks(k)
+      setCategories(cat)
       setPhotoCount(c)
     } catch (err) {
       setError(friendlyError(err))
@@ -89,16 +109,23 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       a.localeCompare(b, 'fr'),
     )
 
+    const visited = places.filter((p) => p.status !== 'wishlist')
+    const wishlist = places.filter((p) => p.status === 'wishlist')
+    const byId = new Map(categories.map((c) => [c.id, c]))
+
     return {
       places,
+      visited,
+      wishlist,
       trips,
       tracks,
+      categories,
       loading,
       error,
       countries,
-      stats: buildStats(places, photoCount),
-      placesOfTrip: (tripId) =>
-        sortPlaces(places.filter((p) => p.trip_id === tripId)).reverse(),
+      // Les compteurs du carnet ne comptent que ce qui a ete reellement visite
+      stats: buildStats(visited, photoCount),
+      placesOfTrip: (tripId) => sortPlaces(places.filter((p) => p.trip_id === tripId)).reverse(),
       async add(input) {
         if (!user) throw new Error('Non connecte')
         const created = await createPlace({ ...input, user_id: user.id })
@@ -137,6 +164,35 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         await deleteTrack(id)
         setTracks((prev) => prev.filter((t) => t.id !== id))
       },
+      async addCategory(name, color) {
+        if (!user) throw new Error('Non connecte')
+        const created = await createCategory({ user_id: user.id, name, color, icon: null })
+        setCategories((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'fr')))
+        return created
+      },
+      async editCategory(id, patch) {
+        const updated = await updateCategory(id, patch)
+        setCategories((prev) =>
+          prev.map((c) => (c.id === id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+        )
+        return updated
+      },
+      async removeCategory(id) {
+        await deleteCategory(id)
+        setCategories((prev) => prev.filter((c) => c.id !== id))
+        // Les lieux gardent leur ligne, ils perdent juste la categorie
+        setPlaces((prev) =>
+          prev.map((p) => (p.category_id === id ? { ...p, category_id: null } : p)),
+        )
+      },
+      async seedDefaultCategories() {
+        if (!user) throw new Error('Non connecte')
+        const created = await seedCategories(user.id)
+        setCategories((prev) =>
+          [...prev, ...created].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+        )
+      },
+      categoryOf: (place) => (place.category_id ? (byId.get(place.category_id) ?? null) : null),
       bumpPhotoCount: (delta) => setPhotoCount((c) => Math.max(0, c + delta)),
       reload,
     }
@@ -149,7 +205,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         // Le compteur n'est pas critique, on ne casse pas l'ecran pour ca
       }
     }
-  }, [places, trips, tracks, photoCount, loading, error, user, reload])
+  }, [places, trips, tracks, categories, photoCount, loading, error, user, reload])
 
   return <PlacesContext.Provider value={value}>{children}</PlacesContext.Provider>
 }
