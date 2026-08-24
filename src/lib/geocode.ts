@@ -31,12 +31,20 @@ export type GeoResult = {
   label: string
   name: string
   country: string
+  city: string
   lat: number
   lng: number
 }
 
 function toResult(p: NominatimPlace): GeoResult {
   const country = p.address?.country ?? ''
+  const city =
+    p.address?.city ||
+    p.address?.town ||
+    p.address?.village ||
+    p.address?.municipality ||
+    p.address?.county ||
+    ''
   const name =
     p.name ||
     p.address?.city ||
@@ -50,6 +58,7 @@ function toResult(p: NominatimPlace): GeoResult {
     label: p.display_name,
     name,
     country,
+    city,
     lat: Number(p.lat),
     lng: Number(p.lon),
   }

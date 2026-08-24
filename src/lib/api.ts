@@ -1,7 +1,24 @@
 import { AVATARS_BUCKET, PHOTOS_BUCKET, supabase } from './supabase'
-import type { NewPlace, Photo, Place, Profile } from './types'
+import type {
+  NewPlace,
+  NewTrack,
+  NewTrip,
+  Photo,
+  Place,
+  Profile,
+  PublicShare,
+  SharedPhoto,
+  SharedPlace,
+  SharedTrip,
+  Track,
+  Trip,
+} from './types'
 
 const SIGNED_URL_TTL = 60 * 60 // 1 h
+
+/* -------------------------------------------------------------------------- */
+/* Lieux                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export async function fetchPlaces(userId: string): Promise<Place[]> {
   const { data, error } = await supabase
@@ -44,6 +61,46 @@ export async function deletePlace(place: Place): Promise<void> {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Voyages                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchTrips(userId: string): Promise<Trip[]> {
+  const { data, error } = await supabase
+    .from('trips')
+    .select('*')
+    .eq('user_id', userId)
+    .order('start_date', { ascending: false, nullsFirst: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createTrip(trip: NewTrip): Promise<Trip> {
+  const { data, error } = await supabase.from('trips').insert(trip).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateTrip(id: string, patch: Partial<NewTrip>): Promise<Trip> {
+  const { data, error } = await supabase.from('trips').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+/** Les lieux du voyage ne sont pas supprimes, ils redeviennent isoles. */
+export async function deleteTrip(id: string): Promise<void> {
+  const { error } = await supabase.from('trips').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function assignPlaceToTrip(placeId: string, tripId: string | null): Promise<Place> {
+  return updatePlace(placeId, { trip_id: tripId })
+}
+
+/* -------------------------------------------------------------------------- */
+/* Photos                                                                     */
+/* -------------------------------------------------------------------------- */
+
 export async function fetchPhotos(placeId: string): Promise<Photo[]> {
   const { data, error } = await supabase
     .from('photos')
@@ -54,16 +111,44 @@ export async function fetchPhotos(placeId: string): Promise<Photo[]> {
   return data ?? []
 }
 
-/** Le bucket est prive, chaque affichage passe par une URL signee. */
+/** Toutes les photos du compte, pour la galerie globale. */
+export async function fetchAllPhotos(userId: string): Promise<Photo[]> {
+  const { data, error } = await supabase
+    .from('photos')
+    .select('*')
+    .eq('user_id', userId)
+    .order('uploaded_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function countPhotos(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  if (error) throw error
+  return count ?? 0
+}
+
+/**
+ * Le bucket est prive, chaque affichage passe par une URL signee.
+ * L'API accepte une centaine de chemins par appel, on decoupe par lots pour
+ * que la galerie globale ne tombe pas en erreur quand elle grossit.
+ */
 export async function signPhotoUrls(paths: string[]): Promise<Record<string, string>> {
   if (paths.length === 0) return {}
-  const { data, error } = await supabase.storage
-    .from(PHOTOS_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL)
-  if (error) throw error
   const map: Record<string, string> = {}
-  for (const item of data ?? []) {
-    if (item.signedUrl && item.path) map[item.path] = item.signedUrl
+  const BATCH = 90
+  for (let i = 0; i < paths.length; i += BATCH) {
+    const slice = paths.slice(i, i + BATCH)
+    const { data, error } = await supabase.storage
+      .from(PHOTOS_BUCKET)
+      .createSignedUrls(slice, SIGNED_URL_TTL)
+    if (error) throw error
+    for (const item of data ?? []) {
+      if (item.signedUrl && item.path) map[item.path] = item.signedUrl
+    }
   }
   return map
 }
@@ -101,6 +186,10 @@ export async function deletePhoto(photo: Photo): Promise<void> {
   await supabase.storage.from(PHOTOS_BUCKET).remove([photo.url])
 }
 
+/* -------------------------------------------------------------------------- */
+/* Profil                                                                     */
+/* -------------------------------------------------------------------------- */
+
 export async function uploadAvatar(userId: string, file: File): Promise<Profile> {
   const path = `${userId}/avatar.${extensionOf(file)}`
   const { error: uploadError } = await supabase.storage
@@ -131,4 +220,128 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
     .single()
   if (error) throw error
   return data
+}
+
+/* -------------------------------------------------------------------------- */
+/* Partage public en lecture seule                                            */
+/* -------------------------------------------------------------------------- */
+
+function makeToken(): string {
+  // 22 caracteres tires du generateur cryptographique, sans ambiguite visuelle
+  const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(22))
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')
+}
+
+export async function fetchShare(userId: string): Promise<PublicShare | null> {
+  const { data, error } = await supabase
+    .from('public_shares')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** Cree le partage au premier appel, puis se contente de l'activer. */
+export async function enableShare(userId: string): Promise<PublicShare> {
+  const existing = await fetchShare(userId)
+  if (existing) {
+    const { data, error } = await supabase
+      .from('public_shares')
+      .update({ is_active: true })
+      .eq('user_id', userId)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+  const { data, error } = await supabase
+    .from('public_shares')
+    .insert({ user_id: userId, token: makeToken(), is_active: true })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function disableShare(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('public_shares')
+    .update({ is_active: false })
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+/** Regenere le jeton : l'ancien lien cesse immediatement de fonctionner. */
+export async function rotateShare(userId: string): Promise<PublicShare> {
+  const { data, error } = await supabase
+    .from('public_shares')
+    .update({ token: makeToken(), is_active: true })
+    .eq('user_id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export type SharedData = {
+  profile: { display_name: string | null; avatar_url: string | null } | null
+  places: SharedPlace[]
+  trips: SharedTrip[]
+  photos: SharedPhoto[]
+}
+
+/**
+ * Lecture cote visiteur, sans compte. Les quatre fonctions sont security
+ * definer et exigent le jeton, la RLS n'est pas assouplie pour autant.
+ */
+export async function fetchSharedData(token: string): Promise<SharedData> {
+  const [profile, places, trips, photos] = await Promise.all([
+    supabase.rpc('shared_profile', { share_token: token }),
+    supabase.rpc('shared_places', { share_token: token }),
+    supabase.rpc('shared_trips', { share_token: token }),
+    supabase.rpc('shared_photos', { share_token: token }),
+  ])
+
+  const firstError = profile.error ?? places.error ?? trips.error ?? photos.error
+  if (firstError) throw firstError
+
+  return {
+    profile: profile.data?.[0] ?? null,
+    places: places.data ?? [],
+    trips: trips.data ?? [],
+    photos: photos.data ?? [],
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Traces GPS                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchTracks(userId: string): Promise<Track[]> {
+  const { data, error } = await supabase
+    .from('tracks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false, nullsFirst: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createTrack(track: NewTrack): Promise<Track> {
+  const { data, error } = await supabase.from('tracks').insert(track).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateTrack(id: string, patch: Partial<NewTrack>): Promise<Track> {
+  const { data, error } = await supabase.from('tracks').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTrack(id: string): Promise<void> {
+  const { error } = await supabase.from('tracks').delete().eq('id', id)
+  if (error) throw error
 }
