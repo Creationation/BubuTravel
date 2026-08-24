@@ -105,7 +105,7 @@ export default function GalleryPage() {
         {loading ? (
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-square animate-pulse rounded-2xl bg-surface-2" />
+              <div key={i} className="arch-soft aspect-[4/5] animate-pulse bg-surface-2" />
             ))}
           </div>
         ) : visible.length === 0 ? (
@@ -124,7 +124,7 @@ export default function GalleryPage() {
                 <Reveal key={photo.id} delay={Math.min(i * 25, 300)}>
                   <button
                     onClick={() => setZoom(i)}
-                    className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-line bg-surface-2"
+                    className="arch-soft group relative block aspect-[4/5] w-full border border-line bg-surface-2"
                   >
                     {url ? (
                       <img

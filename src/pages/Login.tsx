@@ -48,7 +48,9 @@ export default function Login() {
 
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
-          <span className="mx-auto mb-6 block h-2 w-2 rounded-full bg-accent" />
+          <span className="mx-auto mb-7 flex h-16 w-12 items-end justify-center rounded-t-full border border-line bg-surface-2 pb-3">
+            <span className="h-2 w-2 rotate-45 border border-accent" />
+          </span>
           <h1 className="display text-[clamp(2.6rem,10vw,3.6rem)]">BuBuTravel</h1>
           <p className="lede mt-4">Le carnet de nos voyages, pays par pays, photo par photo.</p>
         </div>

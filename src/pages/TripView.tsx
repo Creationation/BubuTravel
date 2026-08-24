@@ -226,7 +226,7 @@ export default function TripView() {
                           <button
                             key={url}
                             onClick={() => setZoom({ urls, index: k })}
-                            className="aspect-[4/3] overflow-hidden rounded-xl border border-line"
+                            className="arch-soft aspect-[4/5] border border-line"
                           >
                             <img
                               src={url}

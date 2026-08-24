@@ -59,7 +59,7 @@ export default function TripsPage() {
               return (
                 <Reveal key={trip.id} delay={i * 60}>
                   <Link to={`/voyages/${trip.id}`} className="panel lift block overflow-hidden">
-                    <div className="aspect-[16/10] overflow-hidden bg-surface-2">
+                    <div className="arch aspect-[16/11] bg-surface-2">
                       {trip.cover_url ? (
                         <img
                           src={trip.cover_url}

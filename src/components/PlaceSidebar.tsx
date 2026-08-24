@@ -348,7 +348,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               {photos.map((photo, i) => (
                 <div
                   key={photo.id}
-                  className="group relative aspect-square overflow-hidden rounded-xl border border-line bg-surface-2"
+                  className="arch-soft group relative aspect-[4/5] border border-line bg-surface-2"
                 >
                   {urls[photo.url] ? (
                     <img

@@ -131,7 +131,7 @@ export default function SharePage() {
               {data.trips.map((trip, i) => (
                 <Reveal key={trip.id} delay={i * 60}>
                   <div className="panel overflow-hidden">
-                    <div className="aspect-[16/10] bg-surface-2">
+                    <div className="arch aspect-[16/11] bg-surface-2">
                       {trip.cover_url && (
                         <img
                           src={trip.cover_url}
@@ -159,7 +159,9 @@ export default function SharePage() {
             <div key={year}>
               <Reveal className="mb-5 flex items-center gap-4">
                 <h3 className="display text-4xl text-text-muted">{year}</h3>
-                <span className="h-px flex-1 bg-line" />
+                <span className="ornament flex-1">
+                  <span className="ornament-dot" />
+                </span>
               </Reveal>
               <div className="space-y-8">
                 {items.map((place, i) => {
@@ -186,7 +188,7 @@ export default function SharePage() {
                               <button
                                 key={url}
                                 onClick={() => setZoom({ urls: gallery, index: k })}
-                                className="aspect-[4/3] overflow-hidden rounded-xl border border-line"
+                                className="arch-soft aspect-[4/5] border border-line"
                               >
                                 <img
                                   src={url}

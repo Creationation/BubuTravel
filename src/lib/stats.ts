@@ -61,6 +61,11 @@ export function buildStats(places: Place[], photoCount: number): Stats {
   }
 }
 
+/** Accord au pluriel, avec la forme irreguliere passee au besoin. */
+export function plural(n: number, one: string, many?: string): string {
+  return `${n} ${n > 1 ? (many ?? `${one}s`) : one}`
+}
+
 export function formatKm(km: number): string {
   if (km >= 1000) return `${(km / 1000).toFixed(km >= 10000 ? 0 : 1).replace('.', ',')} k`
   return String(km)

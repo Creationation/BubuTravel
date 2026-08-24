@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePlaces } from '../context/PlacesContext'
 import { fetchAllPhotos, signPhotoUrls } from '../lib/api'
-import { formatDate, formatKm, formatRange, groupByYear } from '../lib/stats'
+import { formatDate, formatKm, formatRange, groupByYear, plural } from '../lib/stats'
 import type { Place } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
@@ -70,7 +70,9 @@ export default function Dashboard() {
             </div>
             <p className="lede mt-6 max-w-xl">
               {stats.countries > 0
-                ? `${stats.countries} pays, ${stats.cities} villes, ${formatKm(stats.km)} kilometres parcourus${
+                ? `${plural(stats.countries, 'pays', 'pays')}, ${plural(stats.cities, 'ville')}, ${formatKm(
+                    stats.km,
+                  )} ${stats.km > 1 ? 'kilometres parcourus' : 'kilometre parcouru'}${
                     stats.firstYear ? ` depuis ${stats.firstYear}` : ''
                   }.`
                 : 'Tout commence par un premier lieu sur la carte.'}
@@ -138,7 +140,7 @@ export default function Dashboard() {
                       to={`/voyages/${trip.id}`}
                       className="panel lift block overflow-hidden"
                     >
-                      <div className="aspect-[16/10] overflow-hidden bg-surface-2">
+                      <div className="arch aspect-[16/11] bg-surface-2">
                         {trip.cover_url ? (
                           <img
                             src={trip.cover_url}
@@ -157,9 +159,7 @@ export default function Dashboard() {
                         <p className="mt-1.5 text-[13px] text-text-muted">
                           {formatRange(trip.start_date, trip.end_date)}
                         </p>
-                        <p className="mt-3 text-[13px] text-text-soft">
-                          {count} lieu{count > 1 ? 'x' : ''}
-                        </p>
+                        <p className="mt-3 text-[13px] text-text-soft">{plural(count, 'lieu', 'lieux')}</p>
                       </div>
                     </Link>
                   </Reveal>
@@ -175,7 +175,7 @@ export default function Dashboard() {
             <Reveal className="mb-6">
               <p className="eyebrow">Passeport</p>
               <h2 className="display-sm mt-2 text-3xl">
-                {countries.length} pays visite{countries.length > 1 ? 's' : ''}
+                {plural(countries.length, 'pays visite', 'pays visites')}
               </h2>
             </Reveal>
             <Reveal className="flex flex-wrap gap-2">
@@ -202,9 +202,11 @@ export default function Dashboard() {
                 <div key={year}>
                   <Reveal className="mb-5 flex items-center gap-4">
                     <h3 className="display text-4xl text-text-muted">{year}</h3>
-                    <span className="h-px flex-1 bg-line" />
+                    <span className="ornament flex-1">
+                      <span className="ornament-dot" />
+                    </span>
                     <span className="text-[13px] text-text-muted">
-                      {items.length} lieu{items.length > 1 ? 'x' : ''}
+                      {plural(items.length, 'lieu', 'lieux')}
                     </span>
                   </Reveal>
 
@@ -268,7 +270,7 @@ function TimelineRow({
         to={`/carte?lieu=${place.id}`}
         className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-surface sm:gap-5 sm:px-6"
       >
-        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-2 sm:h-16 sm:w-16">
+        <span className="arch-soft h-14 w-14 shrink-0 border border-line bg-surface-2 sm:h-16 sm:w-16">
           {cover ? (
             <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
           ) : (

@@ -1,65 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Karla:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'leaflet/dist/leaflet.css';
 @import 'leaflet.markercluster/dist/MarkerCluster.css';
 
 /* ==========================================================================
    BuBuTravel  |  systeme de design
-   Magazine de voyage haut de gamme : serif a taille optique pour les titres,
-   sans-serif neutre pour le texte, accents terracotta et sable, beaucoup
-   d'air. Deux themes complets, sombre par defaut, clair disponible.
-   Le theme suit la preference systeme au premier passage, puis le choix
-   memorise dans localStorage.
+   Boho premium : terres cuites, ocre, sable et olive, formes en arche,
+   grain de papier, serif douce pour les titres et humanist sans pour le
+   texte. Deux themes, jour sable et nuit terre brulee, qui suivent la
+   preference systeme tant que rien n'est choisi.
    ========================================================================== */
 
 @theme {
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-sans: 'Karla', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 
   /* Constantes de marque, identiques dans les deux themes */
-  --color-terracotta: #c4653d;
-  --color-terracotta-soft: #e08a5f;
-  --color-sand: #e3d5c0;
-  --color-sage: #7f8f7a;
+  --color-clay: #c0653f;
+  --color-clay-soft: #dd8a5e;
+  --color-ochre: #d8a24a;
+  --color-olive: #7c8767;
+  --color-sand: #e6d6bd;
+  --color-rose-dust: #c99a8a;
+
+  /* Arche boho : moitie haute arrondie, base posee */
+  --radius-arch: 999px 999px 28px 28px;
 }
 
-/* Theme sombre, valeurs par defaut */
+/* Nuit terre brulee, par defaut */
 :root,
 :root[data-theme='dark'] {
-  --bg: #0c0b0a;
-  --bg-deep: #070605;
-  --surface: #15130f;
-  --surface-2: #1d1a15;
-  --line: #2b2620;
-  --line-strong: #3a342c;
-  --text: #f3efe8;
-  --text-soft: #c3bab0;
-  --text-muted: #8e857a;
-  --accent: #d9764c;
-  --accent-ink: #120d09;
-  --halo: rgba(217, 118, 76, 0.16);
-  --shadow-lg: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
-  --shadow-md: 0 16px 32px -20px rgba(0, 0, 0, 0.8);
-  --map-filter: none;
+  --bg: #17120e;
+  --bg-deep: #100c09;
+  --surface: #201914;
+  --surface-2: #2a211a;
+  --line: #3a2e25;
+  --line-strong: #4d3d31;
+  --text: #f5ece0;
+  --text-soft: #d5c5b2;
+  --text-muted: #9d8b78;
+  --accent: #d9895c;
+  --accent-ink: #1a120c;
+  --halo: rgba(217, 137, 92, 0.18);
+  --grain: 0.05;
+  --shadow-lg: 0 34px 70px -34px rgba(0, 0, 0, 0.85);
+  --shadow-md: 0 18px 36px -22px rgba(0, 0, 0, 0.75);
   color-scheme: dark;
 }
 
+/* Jour sable */
 :root[data-theme='light'] {
-  --bg: #f7f3ec;
-  --bg-deep: #efe9df;
-  --surface: #fffdfa;
-  --surface-2: #f4eee4;
-  --line: #e2d8c9;
-  --line-strong: #d0c3b0;
-  --text: #191512;
-  --text-soft: #4e4740;
-  --text-muted: #857b6e;
-  --accent: #b1552c;
-  --accent-ink: #fffdfa;
-  --halo: rgba(177, 85, 44, 0.12);
-  --shadow-lg: 0 30px 60px -34px rgba(60, 44, 28, 0.35);
-  --shadow-md: 0 16px 32px -22px rgba(60, 44, 28, 0.3);
-  --map-filter: none;
+  --bg: #f6efe3;
+  --bg-deep: #ece1cf;
+  --surface: #fdf9f2;
+  --surface-2: #f2e8d8;
+  --line: #e0d2ba;
+  --line-strong: #cbb794;
+  --text: #2c221a;
+  --text-soft: #5b4c3d;
+  --text-muted: #8d7a64;
+  --accent: #b0562f;
+  --accent-ink: #fdf9f2;
+  --halo: rgba(176, 86, 47, 0.14);
+  --grain: 0.045;
+  --shadow-lg: 0 34px 70px -38px rgba(90, 62, 36, 0.4);
+  --shadow-md: 0 18px 36px -24px rgba(90, 62, 36, 0.32);
   color-scheme: light;
 }
 
@@ -91,11 +96,29 @@ body {
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-feature-settings: 'cv02', 'cv03', 'cv04';
   -webkit-font-smoothing: antialiased;
   transition:
     background-color 0.4s ease,
     color 0.4s ease;
+}
+
+/*
+ * Grain de papier. Le bruit est genere en SVG plutot qu'en image : aucun
+ * fichier a charger, et il suit la densite d'ecran sans devenir flou.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 ::selection {
@@ -103,7 +126,6 @@ body {
   color: var(--accent-ink);
 }
 
-/* Barre de defilement discrete, accordee au theme */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
@@ -126,30 +148,31 @@ body {
   .display {
     font-family: var(--font-display);
     font-weight: 400;
-    font-variation-settings: 'opsz' 100, 'SOFT' 0, 'WONK' 0;
-    letter-spacing: -0.02em;
-    line-height: 1.02;
+    /* SOFT adoucit les angles de Fraunces : c'est ce qui donne le cote boho */
+    font-variation-settings: 'opsz' 120, 'SOFT' 40, 'WONK' 0;
+    letter-spacing: -0.015em;
+    line-height: 1.04;
   }
 
   .display-sm {
     font-family: var(--font-display);
     font-weight: 400;
-    font-variation-settings: 'opsz' 24, 'SOFT' 0, 'WONK' 0;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
+    font-variation-settings: 'opsz' 28, 'SOFT' 40, 'WONK' 0;
+    letter-spacing: -0.005em;
+    line-height: 1.18;
   }
 
   .eyebrow {
     font-size: 0.6875rem;
     font-weight: 600;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
 
   .lede {
-    font-size: 1rem;
-    line-height: 1.7;
+    font-size: 1.0625rem;
+    line-height: 1.75;
     color: var(--text-soft);
   }
 
@@ -159,7 +182,7 @@ body {
   .panel {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 20px;
+    border-radius: 26px;
   }
 
   .panel-flush {
@@ -167,21 +190,52 @@ body {
     border: 1px solid var(--line);
   }
 
-  .hairline {
-    border-color: var(--line);
+  /* Arche : la signature boho, pour les couvertures et les portraits */
+  .arch {
+    border-radius: var(--radius-arch);
+    overflow: hidden;
+  }
+
+  .arch-soft {
+    border-radius: 999px 999px 20px 20px;
+    overflow: hidden;
   }
 
   .lift {
     transition:
-      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 0.35s ease,
-      box-shadow 0.35s ease;
+      transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.4s ease,
+      box-shadow 0.4s ease;
   }
 
   .lift:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
     border-color: var(--line-strong);
     box-shadow: var(--shadow-md);
+  }
+
+  /* Filet orne, au lieu d'un trait sec */
+  .ornament {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .ornament::before,
+  .ornament::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(to right, transparent, var(--line), transparent);
+  }
+
+  .ornament-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    transform: rotate(45deg);
+    border: 1px solid var(--line-strong);
   }
 
   /* ------------------------------------------------------------------------
@@ -194,19 +248,19 @@ body {
     gap: 0.5rem;
     border: 1px solid var(--line-strong);
     border-radius: 999px;
-    padding: 0.55rem 1.15rem;
+    padding: 0.58rem 1.25rem;
     font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--text);
     background: transparent;
     cursor: pointer;
     white-space: nowrap;
     transition:
-      background-color 0.25s ease,
-      border-color 0.25s ease,
-      color 0.25s ease,
-      transform 0.25s ease;
+      background-color 0.28s ease,
+      border-color 0.28s ease,
+      color 0.28s ease,
+      transform 0.28s ease;
   }
 
   .btn:hover {
@@ -228,12 +282,11 @@ body {
     background: var(--accent);
     border-color: var(--accent);
     color: var(--accent-ink);
-    font-weight: 600;
   }
 
   .btn-accent:hover {
-    background: var(--color-terracotta-soft);
-    border-color: var(--color-terracotta-soft);
+    background: var(--color-clay-soft);
+    border-color: var(--color-clay-soft);
     color: var(--accent-ink);
   }
 
@@ -249,14 +302,14 @@ body {
   }
 
   .btn-xs {
-    padding: 0.3rem 0.7rem;
+    padding: 0.32rem 0.78rem;
     font-size: 0.6875rem;
   }
 
   .btn-icon {
     padding: 0.45rem;
-    width: 2.1rem;
-    height: 2.1rem;
+    width: 2.15rem;
+    height: 2.15rem;
   }
 
   /* ------------------------------------------------------------------------
@@ -266,15 +319,14 @@ body {
     width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 0.65rem 0.9rem;
-    font-size: 0.875rem;
+    border-radius: 16px;
+    padding: 0.68rem 0.95rem;
+    font-size: 0.9rem;
     color: var(--text);
     outline: none;
     transition:
-      border-color 0.25s ease,
-      box-shadow 0.25s ease,
-      background-color 0.25s ease;
+      border-color 0.28s ease,
+      box-shadow 0.28s ease;
   }
 
   .field:focus {
@@ -288,10 +340,10 @@ body {
 
   .label {
     display: block;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.45rem;
     font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
@@ -303,13 +355,15 @@ body {
     border: 1px solid var(--line);
     border-radius: 999px;
     background: var(--surface-2);
-    padding: 0.28rem 0.75rem;
+    padding: 0.3rem 0.85rem;
     font-size: 0.75rem;
+    font-weight: 500;
     color: var(--text-soft);
+    cursor: pointer;
     transition:
-      border-color 0.25s ease,
-      color 0.25s ease,
-      background-color 0.25s ease;
+      border-color 0.28s ease,
+      color 0.28s ease,
+      background-color 0.28s ease;
   }
 
   .pill-active {
@@ -321,20 +375,20 @@ body {
   .notice {
     border: 1px solid var(--line);
     border-left: 3px solid var(--accent);
-    border-radius: 12px;
+    border-radius: 16px;
     background: var(--surface-2);
-    padding: 0.7rem 0.9rem;
+    padding: 0.72rem 0.95rem;
     font-size: 0.8125rem;
     color: var(--text-soft);
   }
 
   .notice-bad {
-    border-left-color: #c2543f;
+    border-left-color: #b4533f;
   }
 }
 
 /* --------------------------------------------------------------------------
-   Animations : discretes, et desactivees si l'utilisateur le demande
+   Animations : discretes, coupees si l'utilisateur le demande
    -------------------------------------------------------------------------- */
 .reveal {
   opacity: 0;
@@ -342,7 +396,7 @@ body {
 }
 
 .reveal-in {
-  animation: reveal-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: reveal-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes reveal-up {
@@ -353,7 +407,7 @@ body {
 }
 
 .panel-enter {
-  animation: panel-in 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: panel-in 0.44s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes panel-in {
@@ -410,10 +464,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Les tuiles gardent le ton chaud du theme au lieu du gris d'origine */
+.leaflet-tile-pane {
+  filter: sepia(0.22) saturate(0.92);
+}
+
 .leaflet-control-attribution {
-  background: color-mix(in srgb, var(--bg) 82%, transparent) !important;
+  background: color-mix(in srgb, var(--bg) 84%, transparent) !important;
   color: var(--text-muted) !important;
-  border-top-left-radius: 10px;
+  border-top-left-radius: 14px;
   font-size: 10px !important;
   padding: 2px 8px !important;
   backdrop-filter: blur(6px);
@@ -425,7 +484,7 @@ body {
 
 .leaflet-bar {
   border: 1px solid var(--line) !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   overflow: hidden;
   box-shadow: var(--shadow-md) !important;
 }
@@ -434,7 +493,7 @@ body {
   background: var(--surface) !important;
   color: var(--text-soft) !important;
   border-bottom: 1px solid var(--line) !important;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .leaflet-bar a:last-child {
@@ -453,8 +512,8 @@ body {
   box-shadow: var(--shadow-md) !important;
   color: var(--text) !important;
   font-size: 11px !important;
-  font-weight: 500;
-  padding: 3px 11px !important;
+  font-weight: 600;
+  padding: 3px 12px !important;
 }
 
 .leaflet-tooltip::before {
@@ -465,11 +524,11 @@ body {
 .pin {
   display: grid;
   place-items: center;
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pin:hover {
-  transform: translateY(-3px) scale(1.06);
+  transform: translateY(-3px) scale(1.08);
 }
 
 .pin-dot {
@@ -480,20 +539,20 @@ body {
   border: 2px solid var(--bg);
   box-shadow:
     0 0 0 3px var(--halo),
-    0 6px 14px -6px rgba(0, 0, 0, 0.7);
+    0 6px 14px -6px rgba(0, 0, 0, 0.6);
 }
 
 .pin-active .pin-dot {
-  background: var(--color-sand);
+  background: var(--color-ochre);
   box-shadow:
     0 0 0 6px var(--halo),
-    0 8px 18px -6px rgba(0, 0, 0, 0.7);
+    0 8px 18px -6px rgba(0, 0, 0, 0.6);
 }
 
 .pin-wish .pin-dot {
   background: transparent;
   border: 2px solid var(--color-sand);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sand) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sand) 16%, transparent);
 }
 
 .pin-draft .pin-dot {
@@ -502,20 +561,19 @@ body {
   box-shadow: none;
 }
 
-/* Grappes de marqueurs */
 .cluster {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 88%, transparent);
+  background: color-mix(in srgb, var(--accent) 90%, transparent);
   color: var(--accent-ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   border: 2px solid var(--bg);
   box-shadow:
     0 0 0 4px var(--halo),
-    0 10px 22px -10px rgba(0, 0, 0, 0.75);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    0 10px 22px -10px rgba(0, 0, 0, 0.7);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .cluster:hover {
