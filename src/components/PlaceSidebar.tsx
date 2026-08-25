@@ -6,6 +6,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../lib/stats'
 import Lightbox from './Lightbox'
+import PlaceExtras, { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 
 type Props = {
@@ -31,6 +32,14 @@ export default function PlaceSidebar({ place, onClose }: Props) {
     visit_date: place.visit_date ?? '',
     notes: place.notes ?? '',
     category_id: place.category_id ?? '',
+    cost: place.cost === null ? '' : String(place.cost),
+    currency: place.currency ?? 'EUR',
+    price_level: place.price_level,
+    rating: place.rating,
+    review: place.review ?? '',
+    promo_note: place.promo_note ?? '',
+    promo_code: place.promo_code ?? '',
+    promo_until: place.promo_until ?? '',
   })
 
   useEffect(() => {
@@ -48,6 +57,14 @@ export default function PlaceSidebar({ place, onClose }: Props) {
       visit_date: place.visit_date ?? '',
       notes: place.notes ?? '',
       category_id: place.category_id ?? '',
+      cost: place.cost === null ? '' : String(place.cost),
+      currency: place.currency ?? 'EUR',
+      price_level: place.price_level,
+      rating: place.rating,
+      review: place.review ?? '',
+      promo_note: place.promo_note ?? '',
+      promo_code: place.promo_code ?? '',
+      promo_until: place.promo_until ?? '',
     })
 
     fetchPhotos(place.id)
@@ -84,6 +101,14 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         visit_date: form.visit_date || null,
         notes: form.notes.trim() || null,
         category_id: form.category_id || null,
+        cost: form.cost.trim() ? Number(form.cost.replace(',', '.')) : null,
+        currency: form.currency,
+        price_level: form.price_level,
+        rating: form.rating,
+        review: form.review.trim() || null,
+        promo_note: form.promo_note.trim() || null,
+        promo_code: form.promo_code.trim() || null,
+        promo_until: form.promo_until || null,
       })
       setEditing(false)
     } catch (err) {
@@ -267,6 +292,97 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </div>
+            <div>
+              <label className="label">Votre note</label>
+              <Stars value={form.rating} onChange={(rating) => setForm({ ...form, rating })} />
+            </div>
+
+            <div>
+              <label className="label">Avis</label>
+              <textarea
+                className="field min-h-20 resize-y"
+                value={form.review}
+                onChange={(e) => setForm({ ...form, review: e.target.value })}
+                placeholder="Ce qu'on en a pense..."
+              />
+            </div>
+
+            <div>
+              <label className="label">Fourchette de prix</label>
+              <div className="flex gap-2">
+                {PRICE_LEVELS.map((lvl) => (
+                  <button
+                    key={lvl.value}
+                    type="button"
+                    title={lvl.hint}
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        price_level: form.price_level === lvl.value ? null : lvl.value,
+                      })
+                    }
+                    className={`pill flex-1 justify-center ${
+                      form.price_level === lvl.value ? 'pill-active' : ''
+                    }`}
+                  >
+                    {lvl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="label">Depense sur place</label>
+                <input
+                  className="field"
+                  inputMode="decimal"
+                  value={form.cost}
+                  onChange={(e) => setForm({ ...form, cost: e.target.value })}
+                  placeholder="120"
+                />
+              </div>
+              <div>
+                <label className="label">Devise</label>
+                <select
+                  className="field"
+                  value={form.currency}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Bon plan</label>
+              <input
+                className="field"
+                value={form.promo_note}
+                onChange={(e) => setForm({ ...form, promo_note: e.target.value })}
+                placeholder="Deuxieme nuit offerte, menu du midi..."
+              />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input
+                  className="field font-mono"
+                  value={form.promo_code}
+                  onChange={(e) => setForm({ ...form, promo_code: e.target.value })}
+                  placeholder="CODE PROMO"
+                />
+                <input
+                  className="field"
+                  type="date"
+                  value={form.promo_until}
+                  onChange={(e) => setForm({ ...form, promo_until: e.target.value })}
+                  title="Valable jusqu'au"
+                />
+              </div>
+            </div>
+
             <button onClick={() => void saveEdits()} className="btn btn-accent w-full" disabled={busy}>
               {busy ? 'Enregistrement...' : 'Enregistrer les modifications'}
             </button>
@@ -303,6 +419,11 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               ))}
             </select>
           )}
+        </section>
+
+        {/* Budget, avis, bon plan */}
+        <section className={editing ? 'hidden' : ''}>
+          <PlaceExtras place={place} />
         </section>
 
         {/* Notes */}

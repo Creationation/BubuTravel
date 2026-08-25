@@ -7,6 +7,7 @@ import { readPhotoMeta } from '../lib/exif'
 import { reverseGeocode } from '../lib/geocode'
 import { uploadPhoto } from '../lib/api'
 import type { Place, PlaceStatus } from '../lib/types'
+import { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 
 export type Draft = {
@@ -20,6 +21,14 @@ export type Draft = {
   trip_id: string
   category_id: string
   status: PlaceStatus
+  cost: string
+  currency: string
+  price_level: number | null
+  rating: number | null
+  review: string
+  promo_note: string
+  promo_code: string
+  promo_until: string
 }
 
 export const emptyDraft: Draft = {
@@ -33,6 +42,14 @@ export const emptyDraft: Draft = {
   trip_id: '',
   category_id: '',
   status: 'visited',
+  cost: '',
+  currency: 'EUR',
+  price_level: null,
+  rating: null,
+  review: '',
+  promo_note: '',
+  promo_code: '',
+  promo_until: '',
 }
 
 export type GpsInfo = {
@@ -182,6 +199,15 @@ export default function PlaceForm({
         category_id: draft.category_id || null,
         status: draft.status,
         planned_order: null,
+        // Une virgule decimale saisie a la main doit etre acceptee
+        cost: draft.cost.trim() ? Number(draft.cost.replace(',', '.')) : null,
+        currency: draft.currency,
+        price_level: draft.price_level,
+        rating: draft.rating,
+        review: draft.review.trim() || null,
+        promo_note: draft.promo_note.trim() || null,
+        promo_code: draft.promo_code.trim() || null,
+        promo_until: draft.promo_until || null,
       })
 
       if (pending.length > 0 && user) {
@@ -465,6 +491,107 @@ export default function PlaceForm({
             placeholder="Ce qu'on a vu, mange, retenu..."
           />
         </div>
+
+        {/* Budget, avis et bon plan : utile surtout pour un hotel ou un
+            restaurant, replie tant qu'on n'en a pas besoin. */}
+        <details className="rounded-2xl border border-line bg-surface-2 p-4">
+          <summary className="cursor-pointer text-[13px] font-semibold">
+            Budget, avis et bon plan
+          </summary>
+
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="label">Votre note</label>
+              <Stars value={draft.rating} onChange={(rating) => onDraftChange({ ...draft, rating })} />
+            </div>
+
+            <div>
+              <label className="label">Avis</label>
+              <textarea
+                className="field min-h-20 resize-y"
+                value={draft.review}
+                onChange={(e) => onDraftChange({ ...draft, review: e.target.value })}
+                placeholder="Ce qu'on en a pense, ce qu'il faut savoir avant d'y aller..."
+              />
+            </div>
+
+            <div>
+              <label className="label">Fourchette de prix</label>
+              <div className="flex gap-2">
+                {PRICE_LEVELS.map((lvl) => (
+                  <button
+                    key={lvl.value}
+                    type="button"
+                    title={lvl.hint}
+                    onClick={() =>
+                      onDraftChange({
+                        ...draft,
+                        price_level: draft.price_level === lvl.value ? null : lvl.value,
+                      })
+                    }
+                    className={`pill flex-1 justify-center ${
+                      draft.price_level === lvl.value ? 'pill-active' : ''
+                    }`}
+                  >
+                    {lvl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className="label">Depense sur place</label>
+                <input
+                  className="field"
+                  inputMode="decimal"
+                  value={draft.cost}
+                  onChange={(e) => onDraftChange({ ...draft, cost: e.target.value })}
+                  placeholder="120"
+                />
+              </div>
+              <div>
+                <label className="label">Devise</label>
+                <select
+                  className="field"
+                  value={draft.currency}
+                  onChange={(e) => onDraftChange({ ...draft, currency: e.target.value })}
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Bon plan</label>
+              <input
+                className="field"
+                value={draft.promo_note}
+                onChange={(e) => onDraftChange({ ...draft, promo_note: e.target.value })}
+                placeholder="Deuxieme nuit offerte, menu du midi a 15 euros..."
+              />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input
+                  className="field font-mono"
+                  value={draft.promo_code}
+                  onChange={(e) => onDraftChange({ ...draft, promo_code: e.target.value })}
+                  placeholder="CODE PROMO"
+                />
+                <input
+                  className="field"
+                  type="date"
+                  value={draft.promo_until}
+                  onChange={(e) => onDraftChange({ ...draft, promo_until: e.target.value })}
+                  title="Valable jusqu'au"
+                />
+              </div>
+            </div>
+          </div>
+        </details>
 
         {error && <p className="notice notice-bad">{error}</p>}
         {step && <p className="notice">{step}...</p>}

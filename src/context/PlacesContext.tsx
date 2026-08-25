@@ -3,22 +3,35 @@ import type { ReactNode } from 'react'
 import {
   countPhotos,
   createCategory,
+  createEvent,
   createPlace,
   createTrip,
   deleteCategory,
+  deleteEvent,
   deletePlace,
   deleteTrack,
   deleteTrip,
   fetchCategories,
+  fetchEvents,
   fetchPlaces,
   fetchTracks,
   fetchTrips,
   seedCategories,
   updateCategory,
+  updateEvent,
   updatePlace,
   updateTrip,
 } from '../lib/api'
-import type { Category, NewPlace, NewTrip, Place, Track, Trip } from '../lib/types'
+import type {
+  Category,
+  NewEvent,
+  NewPlace,
+  NewTrip,
+  Place,
+  Track,
+  TravelEvent,
+  Trip,
+} from '../lib/types'
 import { buildStats } from '../lib/stats'
 import type { Stats } from '../lib/stats'
 import { useAuth } from './AuthContext'
@@ -34,6 +47,7 @@ type PlacesValue = {
   trips: Trip[]
   tracks: Track[]
   categories: Category[]
+  events: TravelEvent[]
   loading: boolean
   error: string | null
   countries: string[]
@@ -52,6 +66,9 @@ type PlacesValue = {
   removeCategory: (id: string) => Promise<void>
   seedDefaultCategories: () => Promise<void>
   categoryOf: (place: Place) => Category | null
+  addEvent: (input: Omit<NewEvent, 'user_id'>) => Promise<TravelEvent>
+  editEvent: (id: string, patch: Partial<NewEvent>) => Promise<TravelEvent>
+  removeEvent: (id: string) => Promise<void>
   bumpPhotoCount: (delta: number) => void
   reload: () => Promise<void>
 }
@@ -64,6 +81,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
   const [trips, setTrips] = useState<Trip[]>([])
   const [tracks, setTracks] = useState<Track[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [events, setEvents] = useState<TravelEvent[]>([])
   const [photoCount, setPhotoCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +92,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       setTrips([])
       setTracks([])
       setCategories([])
+      setEvents([])
       setPhotoCount(0)
       setLoading(false)
       return
@@ -81,17 +100,19 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [p, t, k, cat, c] = await Promise.all([
+      const [p, t, k, cat, ev, c] = await Promise.all([
         fetchPlaces(user.id),
         fetchTrips(user.id),
         fetchTracks(user.id),
         fetchCategories(user.id),
+        fetchEvents(user.id),
         countPhotos(user.id),
       ])
       setPlaces(p)
       setTrips(t)
       setTracks(k)
       setCategories(cat)
+      setEvents(ev)
       setPhotoCount(c)
     } catch (err) {
       setError(friendlyError(err))
@@ -120,6 +141,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       trips,
       tracks,
       categories,
+      events,
       loading,
       error,
       countries,
@@ -193,6 +215,21 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         )
       },
       categoryOf: (place) => (place.category_id ? (byId.get(place.category_id) ?? null) : null),
+      async addEvent(input) {
+        if (!user) throw new Error('Non connecte')
+        const created = await createEvent({ ...input, user_id: user.id })
+        setEvents((prev) => [...prev, created])
+        return created
+      },
+      async editEvent(id, patch) {
+        const updated = await updateEvent(id, patch)
+        setEvents((prev) => prev.map((e) => (e.id === id ? updated : e)))
+        return updated
+      },
+      async removeEvent(id) {
+        await deleteEvent(id)
+        setEvents((prev) => prev.filter((e) => e.id !== id))
+      },
       bumpPhotoCount: (delta) => setPhotoCount((c) => Math.max(0, c + delta)),
       reload,
     }
@@ -205,7 +242,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         // Le compteur n'est pas critique, on ne casse pas l'ecran pour ca
       }
     }
-  }, [places, trips, tracks, categories, photoCount, loading, error, user, reload])
+  }, [places, trips, tracks, categories, events, photoCount, loading, error, user, reload])
 
   return <PlacesContext.Provider value={value}>{children}</PlacesContext.Provider>
 }

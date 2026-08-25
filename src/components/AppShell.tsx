@@ -8,6 +8,8 @@ const NAV = [
   { to: '/voyages', label: 'Voyages' },
   { to: '/carte', label: 'Carte' },
   { to: '/bucketlist', label: 'Envies' },
+  { to: '/planificateur', label: 'Planifier' },
+  { to: '/evenements', label: 'Evenements' },
   { to: '/galerie', label: 'Galerie' },
 ]
 

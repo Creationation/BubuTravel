@@ -1,7 +1,41 @@
+export type Lang = 'fr' | 'en'
+
 export type Profile = {
   id: string
   display_name: string | null
   avatar_url: string | null
+  /** Langue de l'interface, liee au compte et non a l'appareil. */
+  lang: Lang
+  created_at: string
+}
+
+export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+export type TravelEvent = {
+  id: string
+  user_id: string
+  place_id: string | null
+  trip_id: string | null
+  category_id: string | null
+  title: string
+  description: string | null
+  /** Ce qui aide a reconnaitre l'evenement : concert, marche, festival... */
+  kind: string | null
+  organizer: string | null
+  url: string | null
+  starts_at: string
+  ends_at: string | null
+  all_day: boolean
+  recurrence: Recurrence
+  recurrence_until: string | null
+  price: number | null
+  currency: string
+  is_free: boolean
+  booking_note: string | null
+  /** Renseignes seulement si l'evenement n'est pas sur un lieu du carnet. */
+  venue: string | null
+  lat: number | null
+  lng: number | null
   created_at: string
 }
 
@@ -49,6 +83,17 @@ export type Place = {
   status: PlaceStatus
   /** Rang de l'etape dans un voyage en preparation. */
   planned_order: number | null
+  /** Ce qui a ete depense sur place. Reste prive, jamais partage. */
+  cost: number | null
+  currency: string
+  /** Fourchette de prix, de 1 a 4, facon guides de voyage. */
+  price_level: number | null
+  promo_code: string | null
+  promo_note: string | null
+  promo_until: string | null
+  /** Note personnelle, de 1 a 5. */
+  rating: number | null
+  review: string | null
   created_at: string
 }
 
@@ -87,13 +132,19 @@ export type NewPlace = Omit<Place, 'id' | 'created_at'>
 export type NewTrip = Omit<Trip, 'id' | 'created_at'>
 export type NewTrack = Omit<Track, 'id' | 'created_at'>
 export type NewCategory = Omit<Category, 'id' | 'created_at'>
+export type NewEvent = Omit<TravelEvent, 'id' | 'created_at'>
 
-/** Vues renvoyees par les fonctions de partage, sans user_id ni email. */
-export type SharedPlace = Omit<Place, 'user_id' | 'created_at'>
+/**
+ * Vues renvoyees par les fonctions de partage, sans user_id ni email.
+ * Le montant depense et la devise n'y figurent pas : un visiteur voit la
+ * fourchette et l'avis, jamais ce qui a ete paye.
+ */
+export type SharedPlace = Omit<Place, 'user_id' | 'created_at' | 'cost' | 'currency'>
 export type SharedTrip = Omit<Trip, 'user_id' | 'created_at'>
 export type SharedPhoto = Pick<Photo, 'id' | 'place_id' | 'url' | 'uploaded_at'>
 export type SharedTrack = Omit<Track, 'user_id' | 'created_at'>
 export type SharedCategory = Omit<Category, 'user_id' | 'created_at'>
+export type SharedEvent = Omit<TravelEvent, 'user_id' | 'created_at' | 'booking_note'>
 
 /**
  * Typage minimal pour createClient. Il decrit uniquement ce que l'app utilise,
@@ -121,6 +172,12 @@ export type Database = {
         Row: Track
         Insert: NewTrack
         Update: Partial<NewTrack>
+        Relationships: []
+      }
+      events: {
+        Row: TravelEvent
+        Insert: NewEvent
+        Update: Partial<NewEvent>
         Relationships: []
       }
       categories: {
@@ -152,7 +209,11 @@ export type Database = {
     Functions: {
       shared_profile: {
         Args: { share_token: string }
-        Returns: { display_name: string | null; avatar_url: string | null }[]
+        Returns: { display_name: string | null; avatar_url: string | null; lang: Lang }[]
+      }
+      shared_events: {
+        Args: { share_token: string }
+        Returns: SharedEvent[]
       }
       shared_places: {
         Args: { share_token: string }

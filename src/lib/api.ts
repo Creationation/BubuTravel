@@ -2,7 +2,9 @@ import { AVATARS_BUCKET, PHOTOS_BUCKET, supabase } from './supabase'
 import { compressImage } from './images'
 import type {
   Category,
+  Lang,
   NewCategory,
+  NewEvent,
   NewPlace,
   NewTrack,
   NewTrip,
@@ -14,6 +16,7 @@ import type {
   SharedPlace,
   SharedTrip,
   Track,
+  TravelEvent,
   Trip,
 } from './types'
 
@@ -413,4 +416,47 @@ export async function seedCategories(userId: string): Promise<Category[]> {
   const { data, error } = await supabase.from('categories').insert(rows).select()
   if (error) throw error
   return data ?? []
+}
+
+/* -------------------------------------------------------------------------- */
+/* Evenements                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchEvents(userId: string): Promise<TravelEvent[]> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('user_id', userId)
+    .order('starts_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createEvent(input: NewEvent): Promise<TravelEvent> {
+  const { data, error } = await supabase.from('events').insert(input).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateEvent(id: string, patch: Partial<NewEvent>): Promise<TravelEvent> {
+  const { data, error } = await supabase.from('events').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const { error } = await supabase.from('events').delete().eq('id', id)
+  if (error) throw error
+}
+
+/** Langue de l'interface, enregistree sur le compte. */
+export async function updateLang(userId: string, lang: Lang): Promise<Profile> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ lang })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }

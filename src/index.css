@@ -522,43 +522,68 @@ body::before {
 
 /* Marqueurs maison, aucune image externe */
 .pin {
-  display: grid;
-  place-items: center;
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
 }
 
 .pin:hover {
-  transform: translateY(-3px) scale(1.08);
+  transform: translateY(-2px) scale(1.08);
 }
 
-.pin-dot {
-  width: 15px;
-  height: 15px;
+.pin svg {
+  display: block;
+}
+
+/* Envie : contour seul, sans remplissage */
+.pin-wish svg path {
+  stroke: var(--color-sand);
+  stroke-width: 2.4;
+}
+
+.pin-wish svg circle {
+  fill: var(--color-sand);
+}
+
+.pin-draft svg path {
+  stroke: var(--color-ochre);
+  stroke-width: 2.4;
+}
+
+/*
+ * Halo du lieu selectionne. C'est une couche a part, jamais l'icone du
+ * marqueur : changer l'icone d'un marqueur en grappe le fait disparaitre.
+ */
+.halo {
+  pointer-events: none;
+}
+
+.halo-ring {
+  display: block;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
-  background: var(--accent);
-  border: 2px solid var(--bg);
-  box-shadow:
-    0 0 0 3px var(--halo),
-    0 6px 14px -6px rgba(0, 0, 0, 0.6);
+  background: var(--halo);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: halo-pulse 2.4s ease-in-out infinite;
 }
 
-.pin-active .pin-dot {
-  background: var(--color-ochre);
-  box-shadow:
-    0 0 0 6px var(--halo),
-    0 8px 18px -6px rgba(0, 0, 0, 0.6);
+@keyframes halo-pulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
 }
 
-.pin-wish .pin-dot {
-  background: transparent;
-  border: 2px solid var(--color-sand);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sand) 16%, transparent);
-}
-
-.pin-draft .pin-dot {
-  background: transparent;
-  border: 2px dashed var(--accent);
-  box-shadow: none;
+@media (prefers-reduced-motion: reduce) {
+  .halo-ring {
+    animation: none;
+  }
 }
 
 .cluster {

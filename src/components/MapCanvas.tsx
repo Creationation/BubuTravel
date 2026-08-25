@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapContainer,
   Marker,
@@ -12,7 +12,7 @@ import {
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import type { ReactNode } from 'react'
 import { useTheme } from '../context/ThemeContext'
-import { activeIcon, clusterIcon, draftIcon, placeIcon, wishIcon } from './mapIcon'
+import { clusterIcon, draftIcon, haloIcon, placeIcon, wishIcon } from './mapIcon'
 import type { TrackPoint } from '../lib/types'
 
 type Point = {
@@ -34,13 +34,10 @@ type Props = {
   picking?: boolean
   onMapClick?: (lat: number, lng: number) => void
   focus?: [number, number] | null
-  /** Cadre la vue sur les points au premier rendu utile. */
   autoFit?: boolean
   cluster?: boolean
   minZoom?: number
-  /** Parcours enregistres, traces en continu. */
   tracks?: TrackLine[]
-  /** Parcours en cours d'enregistrement, trace en pointilles. */
   liveTrack?: TrackPoint[] | null
   onTrackSelect?: (id: string) => void
   children?: ReactNode
@@ -49,12 +46,18 @@ type Props = {
 const WORLD_CENTER: [number, number] = [28, 8]
 
 /**
- * Fond de carte CARTO : deux styles cohérents avec les deux themes, libres
- * d'usage et sans cle API, contrairement a Mapbox. La couche est remontee
- * avec une cle qui change avec le theme pour forcer le rechargement des
- * tuiles, sinon Leaflet garde l'ancien jeu en cache.
+ * Fond de carte CARTO : deux styles accordes aux deux themes, libres d'usage
+ * et sans cle API, contrairement a Mapbox.
+ *
+ * Deux precautions de performance, apprises a l'usage :
+ *   - les marqueurs sont memorises et ne dependent PAS de la selection, sinon
+ *     chaque clic changeait l'icone d'un marqueur vivant dans une grappe, ce
+ *     que Leaflet.markercluster ne sait pas faire : le marqueur disparaissait
+ *     et laissait un element orphelin derriere lui, jusqu'a bloquer la carte ;
+ *   - le composant est memo, pour que l'ouverture d'un panneau lateral ne
+ *     redessine pas toute la couche de marqueurs.
  */
-export default function MapCanvas({
+function MapCanvasInner({
   points,
   activeId,
   onSelect,
@@ -76,21 +79,32 @@ export default function MapCanvas({
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 
-  const markers = points.map((p) => (
-    <Marker
-      key={p.id}
-      position={[p.lat, p.lng]}
-      icon={activeId === p.id ? activeIcon : p.wish ? wishIcon : placeIcon}
-      eventHandlers={onSelect ? { click: () => onSelect(p.id) } : undefined}
-    >
-      <Tooltip direction="top" offset={[0, -14]} opacity={1}>
-        <span>
-          {p.name}
-          <span style={{ opacity: 0.6 }}>, {p.country}</span>
-        </span>
-      </Tooltip>
-    </Marker>
-  ))
+  // Le gestionnaire passe par une reference : sa nouvelle identite a chaque
+  // rendu suffirait sinon a faire remonter tous les marqueurs.
+  const selectRef = useRef(onSelect)
+  selectRef.current = onSelect
+
+  const markers = useMemo(
+    () =>
+      points.map((p) => (
+        <Marker
+          key={p.id}
+          position={[p.lat, p.lng]}
+          icon={p.wish ? wishIcon : placeIcon}
+          eventHandlers={{ click: () => selectRef.current?.(p.id) }}
+        >
+          <Tooltip direction="top" opacity={1}>
+            <span>
+              {p.name}
+              <span style={{ opacity: 0.6 }}>, {p.country}</span>
+            </span>
+          </Tooltip>
+        </Marker>
+      )),
+    [points],
+  )
+
+  const activePoint = activeId ? points.find((p) => p.id === activeId) : null
 
   return (
     <MapContainer
@@ -112,6 +126,17 @@ export default function MapCanvas({
       {onMapClick && <ClickCatcher enabled={picking} onClick={onMapClick} />}
       {autoFit && <FitOnce points={points} />}
       <FlyTo target={focus ?? null} />
+
+      {/* Halo du lieu selectionne, pose hors grappe pour ne jamais toucher
+          aux marqueurs eux-memes. */}
+      {activePoint && (
+        <Marker
+          position={[activePoint.lat, activePoint.lng]}
+          icon={haloIcon}
+          interactive={false}
+          zIndexOffset={-500}
+        />
+      )}
 
       {cluster ? (
         <MarkerClusterGroup
@@ -155,6 +180,9 @@ export default function MapCanvas({
   )
 }
 
+const MapCanvas = memo(MapCanvasInner)
+export default MapCanvas
+
 function ClickCatcher({
   enabled,
   onClick,
@@ -193,8 +221,16 @@ function FitOnce({ points }: { points: { lat: number; lng: number }[] }) {
 
 function FlyTo({ target }: { target: [number, number] | null }) {
   const map = useMap()
+  // On compare les coordonnees, pas l'identite du tableau : un simple rendu
+  // relançait sinon l'animation, et la carte paraissait se figer.
+  const key = target ? `${target[0]},${target[1]}` : null
+  const lastRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (target) map.flyTo(target, Math.max(map.getZoom(), 7), { duration: 0.9 })
-  }, [target, map])
+    if (!target || !key || lastRef.current === key) return
+    lastRef.current = key
+    map.flyTo(target, Math.max(map.getZoom(), 7), { duration: 0.9 })
+  }, [key, target, map])
+
   return null
 }

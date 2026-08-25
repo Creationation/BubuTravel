@@ -5,6 +5,9 @@ import type { TrackPoint } from '../lib/types'
 
 const DRAFT_KEY = 'bubutravel:track-draft'
 
+/** Ecriture disque au plus une fois toutes les 15 s, voir plus bas. */
+const PERSIST_EVERY_MS = 15000
+
 type Recording = {
   points: TrackPoint[]
   startedAt: string
@@ -39,20 +42,25 @@ function loadDraft(): Recording | null {
 
 /**
  * Enregistrement d'un parcours par watchPosition. La trace en cours est
- * ecrite dans localStorage a chaque point : un rechargement de page, ou un
- * telephone qui met l'onglet en veille, ne doit pas effacer une randonnee.
- * Le suivi reprend tout seul au retour sur la page.
+ * conservee dans localStorage : un rechargement de page, ou un telephone qui
+ * met l'onglet en veille, ne doit pas effacer une randonnee.
  */
 export function TrackerProvider({ children }: { children: ReactNode }) {
   const [recording, setRecording] = useState<Recording | null>(loadDraft)
   const [error, setError] = useState<string | null>(null)
   const watchRef = useRef<number | null>(null)
+  const lastPersistRef = useRef(0)
+  const recordingRef = useRef(recording)
 
-  // Persistance de la trace en cours
-  useEffect(() => {
-    if (recording) localStorage.setItem(DRAFT_KEY, JSON.stringify(recording))
-    else localStorage.removeItem(DRAFT_KEY)
-  }, [recording])
+  recordingRef.current = recording
+
+  /**
+   * Le suivi ne depend que d'un booleen, jamais de l'objet complet. Sinon
+   * chaque point recu changeait l'etat, relançait l'effet, coupait le suivi
+   * puis en ouvrait un autre : le GPS ne se stabilisait jamais et les
+   * abonnements s'empilaient jusqu'a bloquer l'app sur une longue sortie.
+   */
+  const active = recording !== null && !recording.paused
 
   const stopWatch = useCallback(() => {
     if (watchRef.current !== null) {
@@ -61,15 +69,32 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Le suivi tourne tant qu'un enregistrement est actif et non suspendu
+  /**
+   * Ecriture disque limitee. Ecrire la trace entiere a chaque point coute de
+   * plus en plus cher a mesure qu'elle grandit : au bout d'une heure de
+   * marche, chaque point recopiait des milliers d'entrees, ce qui figeait
+   * l'interface. On ecrit au plus toutes les 15 s, et systematiquement aux
+   * moments qui comptent (pause, arret, fermeture de l'onglet).
+   */
+  const persist = useCallback((value: Recording | null, force = false) => {
+    const now = Date.now()
+    if (!force && now - lastPersistRef.current < PERSIST_EVERY_MS) return
+    lastPersistRef.current = now
+    try {
+      if (value) localStorage.setItem(DRAFT_KEY, JSON.stringify(value))
+      else localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // Quota plein : l'enregistrement continue, seule la reprise est perdue
+    }
+  }, [])
+
   useEffect(() => {
-    if (!recording || recording.paused) {
+    if (!active) {
       stopWatch()
       return
     }
-    if (watchRef.current !== null) return
     if (!('geolocation' in navigator)) {
-      setError("Ce navigateur ne sait pas suivre la position.")
+      setError('Ce navigateur ne sait pas suivre la position.')
       return
     }
 
@@ -84,7 +109,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
             accuracy: pos.coords.accuracy,
             t: pos.timestamp,
           })
-          return added ? { ...prev, points } : prev
+          if (!added) return prev
+          const next = { ...prev, points }
+          persist(next)
+          return next
         })
       },
       (err) => setError(messageFor(err)),
@@ -92,7 +120,20 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     )
 
     return stopWatch
-  }, [recording, stopWatch])
+  }, [active, stopWatch, persist])
+
+  // Une fermeture d'onglet ne doit pas perdre les derniers points
+  useEffect(() => {
+    function flush() {
+      persist(recordingRef.current, true)
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', flush)
+    }
+  }, [persist])
 
   useEffect(() => stopWatch, [stopWatch])
 
@@ -103,10 +144,17 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       error,
       start() {
         setError(null)
-        setRecording({ points: [], startedAt: new Date().toISOString(), paused: false })
+        const next = { points: [], startedAt: new Date().toISOString(), paused: false }
+        setRecording(next)
+        persist(next, true)
       },
       pause() {
-        setRecording((prev) => (prev ? { ...prev, paused: true } : prev))
+        setRecording((prev) => {
+          if (!prev) return prev
+          const next = { ...prev, paused: true }
+          persist(next, true)
+          return next
+        })
       },
       resume() {
         setRecording((prev) => (prev ? { ...prev, paused: false } : prev))
@@ -114,22 +162,25 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       discard() {
         stopWatch()
         setRecording(null)
+        persist(null, true)
         setError(null)
       },
       finish() {
-        if (!recording) return null
+        const current = recordingRef.current
+        if (!current) return null
         stopWatch()
         const result = {
-          points: recording.points,
-          startedAt: recording.startedAt,
+          points: current.points,
+          startedAt: current.startedAt,
           endedAt: new Date().toISOString(),
-          distanceKm: trackDistanceKm(recording.points),
+          distanceKm: trackDistanceKm(current.points),
         }
         setRecording(null)
+        persist(null, true)
         return result
       },
     }),
-    [recording, error, stopWatch],
+    [recording, error, stopWatch, persist],
   )
 
   return <TrackerContext.Provider value={value}>{children}</TrackerContext.Provider>

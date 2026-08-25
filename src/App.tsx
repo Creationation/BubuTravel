@@ -11,6 +11,8 @@ import TripsPage from './pages/TripsPage'
 import TripView from './pages/TripView'
 import GalleryPage from './pages/GalleryPage'
 import BucketlistPage from './pages/BucketlistPage'
+import EventsPage from './pages/EventsPage'
+import PlannerPage from './pages/PlannerPage'
 import ProfilePage from './pages/ProfilePage'
 import SharePage from './pages/SharePage'
 import PasswordPage from './pages/PasswordPage'
@@ -85,6 +87,22 @@ export default function App() {
               element={
                 <Protected>
                   <BucketlistPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/planificateur"
+              element={
+                <Protected>
+                  <PlannerPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/evenements"
+              element={
+                <Protected>
+                  <EventsPage />
                 </Protected>
               }
             />
