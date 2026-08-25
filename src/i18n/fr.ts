@@ -133,6 +133,8 @@ export const fr = {
   'map.filters': 'Filtres',
   'map.clearFilters': 'Tout effacer',
   'map.status': 'Statut',
+  'map.overlap': 'Plusieurs lieux ici',
+  'map.whichPlace': 'Lequel voulez-vous ouvrir ?',
   'map.legendVisited': 'Visite',
   'map.legendWish': 'A visiter',
   'map.visited': 'Visites',

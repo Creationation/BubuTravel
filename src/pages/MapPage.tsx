@@ -13,6 +13,7 @@ import type { Draft, GpsInfo } from '../components/PlaceForm'
 import TrackRecorder from '../components/TrackRecorder'
 import TrackSidebar from '../components/TrackSidebar'
 import MapLegend from '../components/MapLegend'
+import PlaceChooser from '../components/PlaceChooser'
 import MapFilters, { applyFilter, emptyFilter } from '../components/MapFilters'
 import type { MapFilter } from '../components/MapFilters'
 import { useT } from '../i18n/I18nContext'
@@ -36,6 +37,8 @@ export default function MapPage() {
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [filter, setFilter] = useState<MapFilter>(emptyFilter)
+  /** Lieux superposes sous le dernier clic, a departager. */
+  const [choices, setChoices] = useState<string[] | null>(null)
   const t = useT()
 
   const selected = useMemo(
@@ -229,6 +232,7 @@ export default function MapPage() {
                 const place = places.find((p) => p.id === id)
                 if (place) selectPlace(place)
               }}
+              onAmbiguous={setChoices}
               draft={
                 panel.kind === 'new' && draft.lat !== null && draft.lng !== null
                   ? { lat: draft.lat, lng: draft.lng }
@@ -277,6 +281,19 @@ export default function MapPage() {
 
           {panel.kind === 'track' && selectedTrack && (
             <TrackSidebar key={selectedTrack.id} track={selectedTrack} onClose={closePanel} />
+          )}
+
+          {choices && (
+            <PlaceChooser
+              places={choices
+                .map((id) => places.find((p) => p.id === id))
+                .filter((p): p is NonNullable<typeof p> => Boolean(p))}
+              onPick={(place) => {
+                setChoices(null)
+                selectPlace(place)
+              }}
+              onClose={() => setChoices(null)}
+            />
           )}
 
           {panel.kind === 'new' && (

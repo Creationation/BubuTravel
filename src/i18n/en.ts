@@ -130,6 +130,8 @@ export const en: Dict = {
   'map.filters': 'Filters',
   'map.clearFilters': 'Clear all',
   'map.status': 'Status',
+  'map.overlap': 'Several places here',
+  'map.whichPlace': 'Which one do you want to open?',
   'map.legendVisited': 'Visited',
   'map.legendWish': 'To visit',
   'map.visited': 'Visited',

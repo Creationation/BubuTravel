@@ -11,6 +11,7 @@ import Reveal from '../components/Reveal'
 import TripForm from '../components/TripForm'
 import TripPlanner from '../components/TripPlanner'
 import Lightbox from '../components/Lightbox'
+import PlaceChooser from '../components/PlaceChooser'
 import { useI18n } from '../i18n/I18nContext'
 
 export default function TripView() {
@@ -23,6 +24,8 @@ export default function TripView() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [photos, setPhotos] = useState<Record<string, string[]>>({})
   const [zoom, setZoom] = useState<{ urls: string[]; index: number } | null>(null)
+  // Deux etapes voisines se superposent vite sur une carte de cette taille
+  const [choices, setChoices] = useState<string[] | null>(null)
 
   const trip = trips.find((t) => t.id === id)
   const steps = useMemo(
@@ -149,9 +152,23 @@ export default function TripView() {
                 tracks={tripTracks.map((t) => ({ id: t.id, name: t.name, points: t.points }))}
                 cluster={false}
                 onSelect={(placeId) => navigate(`/carte?lieu=${placeId}`)}
+                onAmbiguous={setChoices}
               />
             </div>
           </Reveal>
+        )}
+
+        {choices && (
+          <PlaceChooser
+            places={choices
+              .map((placeId) => steps.find((p) => p.id === placeId))
+              .filter((p): p is NonNullable<typeof p> => Boolean(p))}
+            onPick={(place) => {
+              setChoices(null)
+              navigate(`/carte?lieu=${place.id}`)
+            }}
+            onClose={() => setChoices(null)}
+          />
         )}
 
         {/* Parcours enregistres */}

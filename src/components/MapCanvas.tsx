@@ -10,6 +10,7 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
+import type L from 'leaflet'
 import type { ReactNode } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { clusterIcon, draftIcon, haloIcon, placeIcon, wishIcon } from './mapIcon'
@@ -30,6 +31,11 @@ type Props = {
   points: Point[]
   activeId?: string | null
   onSelect?: (id: string) => void
+  /**
+   * Appele quand plusieurs lieux se superposent sous le clic. Sans ca, la
+   * zone cliquable elargie ferait ouvrir le voisin plutot que celui vise.
+   */
+  onAmbiguous?: (ids: string[]) => void
   draft?: { lat: number; lng: number } | null
   picking?: boolean
   onMapClick?: (lat: number, lng: number) => void
@@ -44,6 +50,21 @@ type Props = {
 }
 
 const WORLD_CENTER: [number, number] = [28, 8]
+
+/**
+ * Deux marqueurs plus proches que ce rayon a l'ecran sont indissociables au
+ * clic. La valeur suit la moitie de la zone cliquable : au-dela, les cibles
+ * ne se recouvrent plus.
+ */
+const AMBIGUOUS_RADIUS_PX = 20
+
+/**
+ * En dessous de cette distance reelle, zoomer ne separera jamais vraiment
+ * les marqueurs : meme au zoom maximum ils resteront colles. C'est la, et la
+ * seulement, qu'il faut demander lequel ouvrir. Au-dessus, on zoome, parce
+ * que c'est ce qu'attend quiconque clique sur une grappe.
+ */
+const TIGHT_CLUSTER_METRES = 60
 
 /**
  * Fond de carte CARTO : deux styles accordes aux deux themes, libres d'usage
@@ -61,6 +82,7 @@ function MapCanvasInner({
   points,
   activeId,
   onSelect,
+  onAmbiguous,
   draft,
   picking = false,
   onMapClick,
@@ -79,10 +101,95 @@ function MapCanvasInner({
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 
-  // Le gestionnaire passe par une reference : sa nouvelle identite a chaque
-  // rendu suffirait sinon a faire remonter tous les marqueurs.
+  // Les gestionnaires passent par des references : leur nouvelle identite a
+  // chaque rendu suffirait sinon a faire remonter tous les marqueurs.
   const selectRef = useRef(onSelect)
   selectRef.current = onSelect
+  const ambiguousRef = useRef(onAmbiguous)
+  ambiguousRef.current = onAmbiguous
+  const pointsRef = useRef(points)
+  pointsRef.current = points
+  const mapRef = useRef<L.Map | null>(null)
+
+  /** Retrouve les lieux correspondant a une liste de marqueurs Leaflet. */
+  function idsAt(latlngs: { lat: number; lng: number }[]): string[] {
+    const ids: string[] = []
+    for (const ll of latlngs) {
+      const match = pointsRef.current.find(
+        (p) => Math.abs(p.lat - ll.lat) < 1e-7 && Math.abs(p.lng - ll.lng) < 1e-7,
+      )
+      if (match && !ids.includes(match.id)) ids.push(match.id)
+    }
+    return ids
+  }
+
+  /**
+   * Clic sur une grappe. Tant que zoomer separe encore les marqueurs, on
+   * zoome, c'est ce qu'attend l'utilisateur. Mais quand la grappe est deja
+   * resserree, zoomer n'apporte plus rien : on demande alors lequel ouvrir,
+   * plutot que d'en desigher un au hasard ou d'eparpiller les marqueurs.
+   */
+  function handleClusterClick(event: {
+    layer: {
+      getBounds: () => L.LatLngBounds
+      getAllChildMarkers: () => { getLatLng: () => L.LatLng }[]
+    }
+  }) {
+    const map = mapRef.current
+    if (!map) return
+
+    const cluster = event.layer
+    const bounds = cluster.getBounds()
+    // Diagonale reelle de la grappe, en metres : independante du zoom courant
+    const spreadMetres = bounds.getNorthWest().distanceTo(bounds.getSouthEast())
+
+    const tight = spreadMetres <= TIGHT_CLUSTER_METRES || map.getZoom() >= map.getMaxZoom()
+    if (tight && ambiguousRef.current) {
+      const ids = idsAt(cluster.getAllChildMarkers().map((m) => m.getLatLng()))
+      if (ids.length > 1) {
+        ambiguousRef.current(ids)
+        return
+      }
+      if (ids.length === 1) {
+        selectRef.current?.(ids[0])
+        return
+      }
+    }
+    map.fitBounds(bounds, { padding: [60, 60] })
+  }
+
+  /**
+   * Un clic sur un marqueur ne designe pas forcement un seul lieu : deux
+   * adresses voisines, ou deux enregistrements au meme endroit, se
+   * chevauchent a l'ecran. On regarde donc qui d'autre se trouve sous la
+   * meme zone, en pixels et non en metres, puisque c'est bien la distance a
+   * l'ecran qui rend le clic ambigu.
+   */
+  function handleMarkerClick(id: string) {
+    const map = mapRef.current
+    const all = pointsRef.current
+    if (!map) {
+      selectRef.current?.(id)
+      return
+    }
+
+    const target = all.find((p) => p.id === id)
+    if (!target) return
+
+    const anchor = map.latLngToContainerPoint([target.lat, target.lng])
+    const near = all.filter((p) => {
+      const pt = map.latLngToContainerPoint([p.lat, p.lng])
+      return anchor.distanceTo(pt) <= AMBIGUOUS_RADIUS_PX
+    })
+
+    if (near.length > 1 && ambiguousRef.current) {
+      // Le lieu vise en premier, les voisins ensuite
+      const ids = [id, ...near.filter((p) => p.id !== id).map((p) => p.id)]
+      ambiguousRef.current(ids)
+      return
+    }
+    selectRef.current?.(id)
+  }
 
   const markers = useMemo(
     () =>
@@ -91,7 +198,7 @@ function MapCanvasInner({
           key={p.id}
           position={[p.lat, p.lng]}
           icon={p.wish ? wishIcon : placeIcon}
-          eventHandlers={{ click: () => selectRef.current?.(p.id) }}
+          eventHandlers={{ click: () => handleMarkerClick(p.id) }}
         >
           <Tooltip direction="top" opacity={1}>
             <span>
@@ -123,6 +230,8 @@ function MapCanvasInner({
 
       <ZoomControl position="bottomright" />
 
+      <MapHandle onReady={(map) => (mapRef.current = map)} />
+
       {onMapClick && <ClickCatcher enabled={picking} onClick={onMapClick} />}
       {autoFit && <FitOnce points={points} />}
       <FlyTo target={focus ?? null} />
@@ -143,7 +252,14 @@ function MapCanvasInner({
           chunkedLoading
           maxClusterRadius={48}
           showCoverageOnHover={false}
-          spiderfyDistanceMultiplier={1.6}
+          // On gere nous-memes le clic : eparpiller les marqueurs ou zoomer
+          // indefiniment ne repond pas a la question « lequel ? »
+          zoomToBoundsOnClick={false}
+          spiderfyOnMaxZoom={false}
+          // La bibliotheque prefixe elle-meme l'evenement : onClick devient
+          // clusterclick. Nommer la prop onClusterClick donnerait
+          // clusterclusterclick, qui n'existe pas et ne se declenche jamais.
+          onClick={handleClusterClick}
           iconCreateFunction={(c: { getChildCount: () => number }) => clusterIcon(c.getChildCount())}
         >
           {markers}
@@ -182,6 +298,20 @@ function MapCanvasInner({
 
 const MapCanvas = memo(MapCanvasInner)
 export default MapCanvas
+
+/** Expose l'instance Leaflet au composant parent. */
+function MapHandle({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    onReady(map)
+    // Poignee de mise au point, uniquement en developpement : elle permet de
+    // piloter la carte depuis la console pour reproduire un cas precis.
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __bubuMap?: L.Map }).__bubuMap = map
+    }
+  }, [map, onReady])
+  return null
+}
 
 function ClickCatcher({
   enabled,
