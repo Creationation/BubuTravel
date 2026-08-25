@@ -42,15 +42,26 @@ export function pinSvg(fill: string, hollow = false, dashed = false, size = 1): 
   </svg>`
 }
 
+/**
+ * Le dessin reste petit, la zone cliquable ne l'est pas.
+ *
+ * Une punaise de 22 par 30 est agreable a l'oeil mais penible a viser, au
+ * doigt comme a la souris. L'icone occupe donc 40 par 44, dont la marge est
+ * transparente : la cible respecte le seuil confortable, sans alourdir la
+ * carte.
+ */
+const HIT_W = 40
+const HIT_H = 44
+
 function pin(html: string, extra = ''): L.DivIcon {
   return L.divIcon({
-    html,
+    html: `<span class="pin-hit">${html}</span>`,
     className: `pin ${extra}`,
-    iconSize: [22, 30],
-    // La pointe de l'aiguille, pas le centre de l'icone
-    iconAnchor: [11, 29],
-    popupAnchor: [0, -26],
-    tooltipAnchor: [0, -26],
+    iconSize: [HIT_W, HIT_H],
+    // La pointe de l'aiguille tombe sur la coordonnee, pas le centre du cadre
+    iconAnchor: [HIT_W / 2, HIT_H - 7],
+    popupAnchor: [0, -HIT_H + 12],
+    tooltipAnchor: [0, -HIT_H + 12],
   })
 }
 

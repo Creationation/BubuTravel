@@ -102,7 +102,13 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [p, t, k, cat, ev, c] = await Promise.all([
+      /*
+       * allSettled et non all : avec all, une seule source en echec, par
+       * exemple une table pas encore migree, vidait TOUT le carnet. Les
+       * lieux deja charges n'ont aucune raison de disparaitre parce que la
+       * table des evenements manque.
+       */
+      const [rPlaces, rTrips, rTracks, rCats, rEvents, rCount] = await Promise.allSettled([
         fetchPlaces(user.id),
         fetchTrips(user.id),
         fetchTracks(user.id),
@@ -110,12 +116,25 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         fetchEvents(user.id),
         countPhotos(user.id),
       ])
-      setPlaces(p)
-      setTrips(t)
-      setTracks(k)
-      setCategories(cat)
-      setEvents(ev)
-      setPhotoCount(c)
+
+      if (rPlaces.status === 'fulfilled') setPlaces(rPlaces.value)
+      if (rTrips.status === 'fulfilled') setTrips(rTrips.value)
+      if (rTracks.status === 'fulfilled') setTracks(rTracks.value)
+      if (rCats.status === 'fulfilled') setCategories(rCats.value)
+      if (rEvents.status === 'fulfilled') setEvents(rEvents.value)
+      if (rCount.status === 'fulfilled') setPhotoCount(rCount.value)
+
+      // Une migration manquante se signale une fois, sans masquer le reste
+      const failure = [rPlaces, rTrips, rTracks, rCats, rEvents, rCount].find(
+        (r) => r.status === 'rejected',
+      )
+      if (failure && failure.status === 'rejected') {
+        setError(
+          isMissingTable(failure.reason)
+            ? t('error.missingTable')
+            : errorMessage(failure.reason),
+        )
+      }
     } catch (err) {
       setError(isMissingTable(err) ? t('error.missingTable') : errorMessage(err))
     } finally {

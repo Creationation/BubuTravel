@@ -31,23 +31,23 @@ export default function AppShell({
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-[900] border-b border-line bg-bg/85 backdrop-blur-xl">
         <div
-          className={`mx-auto flex h-16 items-center gap-6 px-5 sm:px-8 ${
+          className={`mx-auto flex h-16 items-center gap-4 px-5 sm:px-8 ${
             wide ? 'max-w-none' : 'max-w-6xl'
           }`}
         >
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to="/" className="flex shrink-0 items-center gap-2.5">
             <span className="h-2 w-2 rounded-full bg-accent" />
             <span className="display-sm text-xl">{t('app.name')}</span>
           </Link>
 
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav className="nav-scroll hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:flex">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
+                  `shrink-0 rounded-full px-3 py-1.5 text-[13px] transition-colors ${
                     isActive
                       ? 'bg-surface-2 text-text'
                       : 'text-text-muted hover:bg-surface-2 hover:text-text'
@@ -59,7 +59,7 @@ export default function AppShell({
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <ThemeToggle />
             <Link
               to="/profil"
@@ -75,7 +75,7 @@ export default function AppShell({
         </div>
 
         {/* Navigation repliee sur petit ecran */}
-        <nav className="flex gap-1 overflow-x-auto border-t border-line px-4 py-2 sm:hidden">
+        <nav className="nav-scroll flex gap-1 overflow-x-auto border-t border-line px-4 py-2 sm:hidden">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
