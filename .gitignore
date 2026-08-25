@@ -27,3 +27,14 @@ dist-ssr
 .env
 .env.local
 .db-password.txt
+
+# Android / Capacitor
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/release/
+android/capacitor-cordova-android-plugins/build/
+*.jks
+*.keystore
+keystore.properties
