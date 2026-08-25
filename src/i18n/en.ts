@@ -130,6 +130,8 @@ export const en: Dict = {
   'map.filters': 'Filters',
   'map.clearFilters': 'Clear all',
   'map.status': 'Status',
+  'map.legendVisited': 'Visited',
+  'map.legendWish': 'To visit',
   'map.visited': 'Visited',
   'map.toVisit': 'To visit',
   'map.allCountries': 'All countries',
@@ -266,7 +268,7 @@ export const en: Dict = {
   'wish.title': 'The wishlist',
   'wish.count': '{count} wish(es)',
   'wish.intro':
-    'The places you want to see, not visited yet. They show on the map as hollow markers, and move into the journal the day you go.',
+    'The places you want to see, not visited yet. They show on the map as olive markers, and move into the journal, in terracotta, the day you go.',
   'wish.emptyTitle': 'Nothing on the list',
   'wish.emptyBody':
     'Open the map, search a place, and choose "To visit" instead of "Visited" in the form.',

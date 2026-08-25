@@ -535,20 +535,11 @@ body::before {
   display: block;
 }
 
-/* Envie : contour seul, sans remplissage */
-.pin-wish svg path {
-  stroke: var(--color-sand);
-  stroke-width: 2.4;
-}
-
-.pin-wish svg circle {
-  fill: var(--color-sand);
-}
-
-.pin-draft svg path {
-  stroke: var(--color-ochre);
-  stroke-width: 2.4;
-}
+/*
+ * Les couleurs sont portees par le SVG lui-meme, pas par le CSS : une regle
+ * de contour ici ecrasait le remplissage et rendait les deux etats
+ * indistinguables.
+ */
 
 /*
  * Halo du lieu selectionne. C'est une couche a part, jamais l'icone du

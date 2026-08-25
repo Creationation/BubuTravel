@@ -133,6 +133,8 @@ export const fr = {
   'map.filters': 'Filtres',
   'map.clearFilters': 'Tout effacer',
   'map.status': 'Statut',
+  'map.legendVisited': 'Visite',
+  'map.legendWish': 'A visiter',
   'map.visited': 'Visites',
   'map.toVisit': 'A visiter',
   'map.allCountries': 'Tous les pays',
@@ -277,7 +279,7 @@ export const fr = {
   'wish.title': 'Les envies',
   'wish.count': '{count} envie(s)',
   'wish.intro':
-    'Les endroits que vous voulez voir, pas encore visites. Ils apparaissent sur la carte en marqueur creux, et basculent dans le carnet le jour ou vous y allez.',
+    'Les endroits que vous voulez voir, pas encore visites. Ils apparaissent sur la carte en marqueur olive, et basculent dans le carnet, en terracotta, le jour ou vous y allez.',
   'wish.emptyTitle': 'Rien sur la liste',
   'wish.emptyBody':
     "Ouvrez la carte, cherchez un endroit, et choisissez « A visiter » au lieu de « Visite » dans le formulaire.",

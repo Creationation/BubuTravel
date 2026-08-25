@@ -11,14 +11,25 @@ import L from 'leaflet'
  * disparaitre, Leaflet.markercluster ne retrouvant plus son element. L'etat
  * selectionne est donc rendu par une couche separee, en dehors des grappes.
  */
-function pinSvg(fill: string, dashed = false): string {
+/**
+ * Deux etats, deux lectures.
+ *
+ * Le lieu visite est terracotta a coeur plein, l'envie est olive a coeur
+ * creux : la couleur distingue au premier coup d'oeil, et la forme du coeur
+ * prend le relais pour qui ne separe pas bien le rouge du vert.
+ */
+function pinSvg(fill: string, hollow = false, dashed = false): string {
+  const heart = hollow
+    ? `<circle cx="13" cy="12.4" r="3.9" fill="none" stroke="var(--bg)" stroke-width="2.4" />`
+    : `<circle cx="13" cy="12.4" r="4.1" fill="var(--bg)" />`
+
   return `<svg viewBox="0 0 26 34" width="26" height="34" xmlns="http://www.w3.org/2000/svg">
     <path d="M13 1.6c-6.1 0-11 4.9-11 11 0 8 9.4 18.8 9.8 19.2a1.6 1.6 0 0 0 2.4 0c.4-.4 9.8-11.2 9.8-19.2 0-6.1-4.9-11-11-11z"
       fill="${fill}"
       stroke="var(--bg)"
       stroke-width="2"
       ${dashed ? 'stroke-dasharray="3 3"' : ''} />
-    <circle cx="13" cy="12.4" r="4.1" fill="var(--bg)" />
+    ${heart}
   </svg>`
 }
 
@@ -34,9 +45,12 @@ function pin(html: string, extra = ''): L.DivIcon {
   })
 }
 
-export const placeIcon = pin(pinSvg('var(--accent)'))
-export const wishIcon = pin(pinSvg('transparent', true), 'pin-wish')
-export const draftIcon = pin(pinSvg('var(--color-ochre)', true), 'pin-draft')
+/** Lieu deja visite : terracotta plein. */
+export const placeIcon = pin(pinSvg('var(--color-clay)'))
+/** Envie a visiter : olive, coeur creux. */
+export const wishIcon = pin(pinSvg('var(--color-olive)', true), 'pin-wish')
+/** Marqueur provisoire, le temps de valider le formulaire. */
+export const draftIcon = pin(pinSvg('var(--color-ochre)', false, true), 'pin-draft')
 
 /** Halo pose sous le marqueur selectionne, hors grappe. */
 export const haloIcon = L.divIcon({

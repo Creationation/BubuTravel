@@ -12,6 +12,7 @@ import PlaceForm, { emptyDraft } from '../components/PlaceForm'
 import type { Draft, GpsInfo } from '../components/PlaceForm'
 import TrackRecorder from '../components/TrackRecorder'
 import TrackSidebar from '../components/TrackSidebar'
+import MapLegend from '../components/MapLegend'
 import MapFilters, { applyFilter, emptyFilter } from '../components/MapFilters'
 import type { MapFilter } from '../components/MapFilters'
 import { useT } from '../i18n/I18nContext'
@@ -237,6 +238,11 @@ export default function MapPage() {
               onMapClick={picking ? onMapClick : undefined}
               focus={focus}
             />
+
+            {/* Legende : la couleur des marqueurs porte une information */}
+            <div className="absolute right-4 top-4 z-[1000]">
+              <MapLegend />
+            </div>
 
             {/* Enregistreur de parcours, toujours accessible */}
             <div className="absolute bottom-6 left-5 z-[1000]">
