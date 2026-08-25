@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { useAuth } from '../context/AuthContext'
 import { fetchAllPhotos, signPhotoUrls } from '../lib/api'
-import { formatDate, formatRange, totalDistanceKm } from '../lib/stats'
+import { formatDate, formatRange, plural, totalDistanceKm } from '../lib/stats'
 import { formatDuration } from '../lib/geolocation'
 import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
@@ -121,7 +121,7 @@ export default function TripView() {
             </div>
             {trip.notes && <p className="lede mt-5 max-w-2xl">{trip.notes}</p>}
             <p className="mt-5 text-[13px] text-text-muted">
-              {steps.length} etape{steps.length > 1 ? 's' : ''}
+              {plural(steps.length, 'etape')}
               {countries.length > 0 && ` · ${countries.join(', ')}`}
               {km > 0 && ` · ${km} km a vol d'oiseau`}
             </p>

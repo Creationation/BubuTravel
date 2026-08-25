@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
-import { formatDate, totalDistanceKm } from '../lib/stats'
+import { formatDate, plural, totalDistanceKm } from '../lib/stats'
 import type { ChecklistItem, Place, Trip } from '../lib/types'
 
 /**
@@ -87,9 +87,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="eyebrow">Itineraire</p>
-            <h2 className="display-sm mt-2 text-3xl">
-              {steps.length} etape{steps.length > 1 ? 's' : ''}
-            </h2>
+            <h2 className="display-sm mt-2 text-3xl">{plural(steps.length, 'etape')}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/carte?envie=1" className="btn btn-xs">

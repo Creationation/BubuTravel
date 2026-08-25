@@ -13,6 +13,8 @@ import GalleryPage from './pages/GalleryPage'
 import BucketlistPage from './pages/BucketlistPage'
 import ProfilePage from './pages/ProfilePage'
 import SharePage from './pages/SharePage'
+import PasswordPage from './pages/PasswordPage'
+import UpdatePrompt from './components/UpdatePrompt'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -36,12 +38,15 @@ function Splash() {
 export default function App() {
   return (
     <ThemeProvider>
+      <UpdatePrompt />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             {/* Page publique, sans compte ni session */}
             <Route path="/p/:token" element={<SharePage />} />
+            {/* Arrivee du lien de reinitialisation, hors zone protegee */}
+            <Route path="/motdepasse" element={<PasswordPage />} />
 
             <Route
               path="/"

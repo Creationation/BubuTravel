@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import ThemeToggle from '../components/ThemeToggle'
 import { errorMessage } from '../lib/errors'
 
-type Mode = 'signin' | 'signup'
+type Mode = 'signin' | 'signup' | 'reset'
 
 export default function Login() {
-  const { session, signIn, signUp } = useAuth()
+  const { session, signIn, signUp, sendReset } = useAuth()
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,7 +24,13 @@ export default function Login() {
     setInfo(null)
     setBusy(true)
     try {
-      if (mode === 'signin') {
+      if (mode === 'reset') {
+        await sendReset(email)
+        setInfo(
+          "Si un compte existe avec cet email, un lien de reinitialisation vient de partir. Pensez aux indesirables.",
+        )
+        setMode('signin')
+      } else if (mode === 'signin') {
         await signIn(email, password)
       } else {
         const { needsConfirm } = await signUp(email, password, displayName.trim())
@@ -56,22 +62,28 @@ export default function Login() {
         </div>
 
         <div className="panel p-7">
-          <div className="mb-6 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setMode('signin')}
-              className={`pill flex-1 justify-center ${mode === 'signin' ? 'pill-active' : ''}`}
-            >
-              Connexion
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('signup')}
-              className={`pill flex-1 justify-center ${mode === 'signup' ? 'pill-active' : ''}`}
-            >
-              Creer un compte
-            </button>
-          </div>
+          {mode === 'reset' ? (
+            <p className="mb-6 text-[13px] leading-relaxed text-text-soft">
+              Entrez votre email, un lien de reinitialisation vous sera envoye.
+            </p>
+          ) : (
+            <div className="mb-6 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className={`pill flex-1 justify-center ${mode === 'signin' ? 'pill-active' : ''}`}
+              >
+                Connexion
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('signup')}
+                className={`pill flex-1 justify-center ${mode === 'signup' ? 'pill-active' : ''}`}
+              >
+                Creer un compte
+              </button>
+            </div>
+          )}
 
           <form onSubmit={onSubmit} className="space-y-4">
             {mode === 'signup' && (
@@ -100,24 +112,44 @@ export default function Login() {
               />
             </div>
 
-            <div>
-              <label className="label">Mot de passe</label>
-              <input
-                className="field"
-                type="password"
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                required
-              />
-            </div>
+            {mode !== 'reset' && (
+              <div>
+                <label className="label">Mot de passe</label>
+                <input
+                  className="field"
+                  type="password"
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+            )}
 
             {error && <p className="notice notice-bad">{error}</p>}
             {info && <p className="notice">{info}</p>}
 
             <button type="submit" className="btn btn-accent w-full py-3" disabled={busy}>
-              {busy ? 'Un instant...' : mode === 'signin' ? 'Se connecter' : 'Creer le compte'}
+              {busy
+                ? 'Un instant...'
+                : mode === 'signin'
+                  ? 'Se connecter'
+                  : mode === 'signup'
+                    ? 'Creer le compte'
+                    : 'Envoyer le lien'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setError(null)
+                setInfo(null)
+                setMode(mode === 'reset' ? 'signin' : 'reset')
+              }}
+              className="block w-full text-center text-[12px] text-text-muted underline-offset-4 hover:text-text hover:underline"
+            >
+              {mode === 'reset' ? 'Revenir a la connexion' : 'Mot de passe oublie ?'}
             </button>
           </form>
         </div>
@@ -136,5 +168,7 @@ function messageFor(err: unknown): string {
   if (raw.includes('Email not confirmed')) return 'Compte pas encore confirme, verifiez vos emails.'
   if (raw.includes('User already registered')) return 'Un compte existe deja avec cet email.'
   if (raw.includes('Password should be')) return 'Mot de passe trop court, 6 caracteres minimum.'
+  if (raw.includes('rate limit') || raw.includes('Too many'))
+    return 'Trop de tentatives, patientez quelques minutes.'
   return raw
 }

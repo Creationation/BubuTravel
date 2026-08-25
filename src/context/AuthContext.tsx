@@ -13,6 +13,10 @@ type AuthValue = {
   signUp: (email: string, password: string, displayName: string) => Promise<{ needsConfirm: boolean }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  /** Envoie le lien de reinitialisation par email. */
+  sendReset: (email: string) => Promise<void>
+  /** Change le mot de passe de la session en cours. */
+  changePassword: (password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
@@ -121,6 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await supabase.auth.signOut()
+      },
+      async sendReset(email) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          // Le lien ramene sur cette page, ou la session de recuperation
+          // permet de choisir un nouveau mot de passe.
+          redirectTo: `${window.location.origin}/motdepasse`,
+        })
+        if (error) throw error
+      },
+      async changePassword(password) {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
       },
       async refreshProfile() {
         if (user) await loadProfile(user)

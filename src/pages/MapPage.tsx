@@ -12,6 +12,8 @@ import PlaceForm, { emptyDraft } from '../components/PlaceForm'
 import type { Draft, GpsInfo } from '../components/PlaceForm'
 import TrackRecorder from '../components/TrackRecorder'
 import TrackSidebar from '../components/TrackSidebar'
+import MapFilters, { applyFilter, emptyFilter } from '../components/MapFilters'
+import type { MapFilter } from '../components/MapFilters'
 import { errorMessage } from '../lib/errors'
 
 type Panel =
@@ -21,7 +23,7 @@ type Panel =
   | { kind: 'track'; id: string }
 
 export default function MapPage() {
-  const { places, visited, wishlist, tracks, loading, pushTrack } = usePlaces()
+  const { places, tracks, loading, pushTrack } = usePlaces()
   const { recording } = useTracker()
   const [params, setParams] = useSearchParams()
   const [panel, setPanel] = useState<Panel>({ kind: 'none' })
@@ -31,6 +33,7 @@ export default function MapPage() {
   const [focus, setFocus] = useState<[number, number] | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<MapFilter>(emptyFilter)
 
   const selected = useMemo(
     () => (panel.kind === 'place' ? (places.find((p) => p.id === panel.id) ?? null) : null),
@@ -146,9 +149,11 @@ export default function MapPage() {
     setFocus([place.lat, place.lng])
   }
 
+  const filtered = useMemo(() => applyFilter(places, filter), [places, filter])
+
   const points = useMemo(
     () =>
-      places.map((p) => ({
+      filtered.map((p) => ({
         id: p.id,
         lat: p.lat,
         lng: p.lng,
@@ -156,7 +161,7 @@ export default function MapPage() {
         country: p.country,
         wish: p.status === 'wishlist',
       })),
-    [places],
+    [filtered],
   )
   const trackLines = useMemo(
     () => tracks.map((t) => ({ id: t.id, name: t.name, points: t.points })),
@@ -166,16 +171,19 @@ export default function MapPage() {
   return (
     <AppShell wide>
       <div className="flex h-[calc(100vh-4rem)] flex-col">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3 sm:px-8">
-          <div>
-            <p className="eyebrow">Carte</p>
-            <p className="mt-1 text-[13px] text-text-soft">
-              {loading
-                ? 'Chargement du carnet...'
-                : `${visited.length} lieu${visited.length > 1 ? 'x' : ''}${
-                    wishlist.length > 0 ? `, ${wishlist.length} a visiter` : ''
-                  }${tracks.length > 0 ? `, ${tracks.length} parcours` : ''}`}
-            </p>
+        <div className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3 sm:px-8">
+          <div className="min-w-0">
+            <p className="eyebrow mb-1.5">Carte</p>
+            {loading ? (
+              <p className="text-[13px] text-text-soft">Chargement du carnet...</p>
+            ) : (
+              <MapFilters
+                value={filter}
+                onChange={setFilter}
+                shown={filtered.length}
+                total={places.length}
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void scanHere()} className="btn" disabled={scanning}>

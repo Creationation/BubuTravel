@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePlaces } from '../context/PlacesContext'
+import CoverPicker from './CoverPicker'
 import type { Trip, TripStatus } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 
@@ -105,16 +106,13 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
 
       <div>
         <label className="label">Photo de couverture</label>
+        <CoverPicker value={cover} onChange={setCover} />
         <input
-          className="field"
+          className="field mt-2"
           value={cover}
           onChange={(e) => setCover(e.target.value)}
-          placeholder="Collez ici l'adresse d'une photo"
+          placeholder="Ou collez l'adresse d'une image"
         />
-        <p className="mt-1.5 text-[11px] text-text-muted">
-          Une photo deja envoyee dans un lieu fait une bonne couverture : ouvrez-la en grand,
-          clic droit, copier l'adresse de l'image.
-        </p>
       </div>
 
       <div>

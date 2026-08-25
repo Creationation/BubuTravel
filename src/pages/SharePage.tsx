@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { fetchSharedData, signPhotoUrls } from '../lib/api'
 import type { SharedData } from '../lib/api'
-import { buildStats, formatDate, formatKm, formatRange, groupByYear } from '../lib/stats'
+import { buildStats, formatDate, formatKm, formatRange, groupByYear, plural } from '../lib/stats'
 import MapCanvas from '../components/MapCanvas'
 import Reveal from '../components/Reveal'
+import TripCover from '../components/TripCover'
 import Lightbox from '../components/Lightbox'
 import ThemeToggle from '../components/ThemeToggle'
 import { Avatar } from '../components/AppShell'
@@ -97,10 +98,11 @@ export default function SharePage() {
               <p className="eyebrow mb-0">Le carnet de {name}</p>
             </div>
             <h1 className="display mt-6 text-[clamp(2.4rem,7vw,4.6rem)]">
-              {stats.countries} pays, {stats.places} lieux
+              {plural(stats.countries, 'pays', 'pays')}, {plural(stats.places, 'lieu', 'lieux')}
             </h1>
             <p className="lede mt-5 max-w-xl">
-              {formatKm(stats.km)} kilometres a vol d'oiseau, {stats.photos} photos
+              {formatKm(stats.km)} {stats.km > 1 ? 'kilometres' : 'kilometre'} a vol d'oiseau,{' '}
+              {plural(stats.photos, 'photo')}
               {stats.firstYear ? `, depuis ${stats.firstYear}` : ''}.
             </p>
           </Reveal>
@@ -132,14 +134,7 @@ export default function SharePage() {
                 <Reveal key={trip.id} delay={i * 60}>
                   <div className="panel overflow-hidden">
                     <div className="arch aspect-[16/11] bg-surface-2">
-                      {trip.cover_url && (
-                        <img
-                          src={trip.cover_url}
-                          alt=""
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      )}
+                      <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
                     </div>
                     <div className="p-5">
                       <h3 className="display-sm text-xl">{trip.title}</h3>

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
-import { formatRange } from '../lib/stats'
+import { formatRange, plural } from '../lib/stats'
 import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
+import TripCover from '../components/TripCover'
 import TripForm from '../components/TripForm'
 
 export default function TripsPage() {
@@ -60,18 +61,7 @@ export default function TripsPage() {
                 <Reveal key={trip.id} delay={i * 60}>
                   <Link to={`/voyages/${trip.id}`} className="panel lift block overflow-hidden">
                     <div className="arch aspect-[16/11] bg-surface-2">
-                      {trip.cover_url ? (
-                        <img
-                          src={trip.cover_url}
-                          alt=""
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <span className="eyebrow">Sans couverture</span>
-                        </div>
-                      )}
+                      <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
                     </div>
                     <div className="p-5">
                       <h2 className="display-sm text-xl">{trip.title}</h2>
@@ -84,7 +74,7 @@ export default function TripsPage() {
                         {formatRange(trip.start_date, trip.end_date)}
                       </p>
                       <p className="mt-3 text-[13px] text-text-soft">
-                        {count} lieu{count > 1 ? 'x' : ''}
+                        {plural(count, 'lieu', 'lieux')}
                         {countries.size > 0 && ` · ${[...countries].join(', ')}`}
                       </p>
                     </div>

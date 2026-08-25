@@ -5,6 +5,7 @@ import { fetchAllPhotos, signPhotoUrls } from '../lib/api'
 import type { Photo } from '../lib/types'
 import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
+import { plural } from '../lib/stats'
 import Lightbox from '../components/Lightbox'
 import { errorMessage } from '../lib/errors'
 
@@ -59,7 +60,7 @@ export default function GalleryPage() {
           <Reveal>
             <p className="eyebrow">Galerie</p>
             <h1 className="display mt-4 text-[clamp(2.2rem,6vw,4rem)]">
-              {photos.length} photo{photos.length > 1 ? 's' : ''}
+              {plural(photos.length, 'photo')}
             </h1>
             <p className="lede mt-5 max-w-xl">
               Toutes les photos du carnet, du plus recent au plus ancien. Filtrez par pays ou par

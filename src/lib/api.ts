@@ -1,4 +1,5 @@
 import { AVATARS_BUCKET, PHOTOS_BUCKET, supabase } from './supabase'
+import { compressImage } from './images'
 import type {
   Category,
   NewCategory,
@@ -161,7 +162,10 @@ function extensionOf(file: File): string {
   return file.type.split('/')[1] ?? 'jpg'
 }
 
-export async function uploadPhoto(userId: string, placeId: string, file: File): Promise<Photo> {
+export async function uploadPhoto(userId: string, placeId: string, input: File): Promise<Photo> {
+  // Compression avant envoi : une photo de telephone brute sature vite le
+  // stockage et rend l'ajout interminable en reseau mobile.
+  const { file } = await compressImage(input)
   const path = `${userId}/${placeId}/${crypto.randomUUID()}.${extensionOf(file)}`
   const { error: uploadError } = await supabase.storage
     .from(PHOTOS_BUCKET)
@@ -192,7 +196,8 @@ export async function deletePhoto(photo: Photo): Promise<void> {
 /* Profil                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export async function uploadAvatar(userId: string, file: File): Promise<Profile> {
+export async function uploadAvatar(userId: string, input: File): Promise<Profile> {
+  const { file } = await compressImage(input)
   const path = `${userId}/avatar.${extensionOf(file)}`
   const { error: uploadError } = await supabase.storage
     .from(AVATARS_BUCKET)

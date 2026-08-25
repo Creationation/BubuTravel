@@ -7,6 +7,7 @@ import { formatDate, formatKm, formatRange, groupByYear, plural } from '../lib/s
 import type { Place } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
+import TripCover from '../components/TripCover'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
@@ -141,18 +142,7 @@ export default function Dashboard() {
                       className="panel lift block overflow-hidden"
                     >
                       <div className="arch aspect-[16/11] bg-surface-2">
-                        {trip.cover_url ? (
-                          <img
-                            src={trip.cover_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-text-muted">
-                            <span className="eyebrow">Sans couverture</span>
-                          </div>
-                        )}
+                        <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
                       </div>
                       <div className="p-5">
                         <h3 className="display-sm text-xl">{trip.title}</h3>

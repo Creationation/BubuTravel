@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
-import { formatDate } from '../lib/stats'
+import { formatDate, plural } from '../lib/stats'
 import type { Place } from '../lib/types'
 import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
@@ -56,7 +56,7 @@ export default function BucketlistPage() {
             <p className="eyebrow">Bucketlist</p>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
               <h1 className="display text-[clamp(2.2rem,6vw,4rem)]">
-                {wishlist.length > 0 ? `${wishlist.length} envie${wishlist.length > 1 ? 's' : ''}` : 'Les envies'}
+                {wishlist.length > 0 ? plural(wishlist.length, 'envie') : 'Les envies'}
               </h1>
               <Link to="/carte?envie=1" className="btn btn-accent">
                 Ajouter une envie

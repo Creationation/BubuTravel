@@ -6,11 +6,12 @@ import type { PublicShare } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import CategoryManager from '../components/CategoryManager'
+import DataTools from '../components/DataTools'
 import { useTheme } from '../context/ThemeContext'
 import { errorMessage } from '../lib/errors'
 
 export default function ProfilePage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, changePassword } = useAuth()
   const { stats } = usePlaces()
   const { theme, setTheme } = useTheme()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -19,6 +20,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [password, setPassword] = useState('')
+  const [passwordDone, setPasswordDone] = useState(false)
   const [share, setShare] = useState<PublicShare | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -60,6 +63,25 @@ export default function ProfilePage() {
     try {
       await uploadAvatar(user.id, file)
       await refreshProfile()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function savePassword() {
+    if (password.length < 6) {
+      setError('Mot de passe trop court, 6 caracteres minimum.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await changePassword(password)
+      setPassword('')
+      setPasswordDone(true)
+      setTimeout(() => setPasswordDone(false), 2500)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -166,6 +188,34 @@ export default function ProfilePage() {
           </section>
         </Reveal>
 
+        {/* Securite */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">Mot de passe</h2>
+            <p className="lede mt-2 text-[14px]">
+              Changez-le quand vous voulez, sans passer par un email.
+            </p>
+            <div className="mt-5 flex max-w-md flex-wrap gap-2">
+              <input
+                className="field min-w-48 flex-1"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Nouveau mot de passe"
+                minLength={6}
+              />
+              <button
+                onClick={() => void savePassword()}
+                className="btn"
+                disabled={busy || password.length < 6}
+              >
+                {passwordDone ? 'Change' : 'Changer'}
+              </button>
+            </div>
+          </section>
+        </Reveal>
+
         {/* Categories */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
@@ -236,6 +286,19 @@ export default function ProfilePage() {
                 {shareBusy ? 'Un instant...' : 'Activer le partage'}
               </button>
             )}
+          </section>
+        </Reveal>
+
+        {/* Sauvegarde */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">Sauvegarde et export</h2>
+            <p className="lede mt-2 text-[14px]">
+              Vos donnees vous appartiennent : emportez-les quand vous voulez.
+            </p>
+            <div className="mt-6">
+              <DataTools />
+            </div>
           </section>
         </Reveal>
 
