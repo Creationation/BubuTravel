@@ -1,17 +1,19 @@
 import type { Place } from '../lib/types'
+import { useI18n } from '../i18n/I18nContext'
+import type { Key } from '../i18n/fr'
 
-export const PRICE_LEVELS = [
-  { value: 1, label: '€', hint: 'Petit budget' },
-  { value: 2, label: '€€', hint: 'Raisonnable' },
-  { value: 3, label: '€€€', hint: 'Cher' },
-  { value: 4, label: '€€€€', hint: 'Tres cher' },
-] as const
+export const PRICE_LEVELS: { value: number; label: string; hint: Key }[] = [
+  { value: 1, label: '€', hint: 'price.1' },
+  { value: 2, label: '€€', hint: 'price.2' },
+  { value: 3, label: '€€€', hint: 'price.3' },
+  { value: 4, label: '€€€€', hint: 'price.4' },
+]
 
 export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'THB', 'MAD', 'CAD'] as const
 
-export function formatMoney(amount: number, currency: string): string {
+export function formatMoney(amount: number, currency: string, locale = 'fr-FR'): string {
   try {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
@@ -42,11 +44,15 @@ export function Stars({
   onChange?: (next: number | null) => void
   size?: number
 }) {
+  const { t } = useI18n()
   const readOnly = !onChange
 
   return (
-    <span className="inline-flex items-center gap-0.5" role={readOnly ? 'img' : undefined}
-      aria-label={readOnly ? `Note ${value ?? 0} sur 5` : undefined}>
+    <span
+      className="inline-flex items-center gap-0.5"
+      role={readOnly ? 'img' : undefined}
+      aria-label={readOnly ? t('rating.of', { value: value ?? 0 }) : undefined}
+    >
       {[1, 2, 3, 4, 5].map((star) => {
         const filled = (value ?? 0) >= star
         const content = (
@@ -69,7 +75,7 @@ export function Stars({
             // posee par erreur ne pourrait plus jamais etre enlevee.
             onClick={() => onChange(value === star ? null : star)}
             className="transition-transform hover:scale-110"
-            aria-label={`Noter ${star} sur 5`}
+            aria-label={t('rating.set', { value: star })}
           >
             {content}
           </button>
@@ -81,6 +87,7 @@ export function Stars({
 
 /** Resume compact affiche sous le titre d'un lieu. */
 export default function PlaceExtras({ place }: { place: Place }) {
+  const { t, locale } = useI18n()
   const level = PRICE_LEVELS.find((p) => p.value === place.price_level)
   const hasPromo = Boolean(place.promo_code || place.promo_note)
   const nothing = !place.rating && !level && place.cost === null && !hasPromo && !place.review
@@ -93,12 +100,12 @@ export default function PlaceExtras({ place }: { place: Place }) {
         <div className="flex flex-wrap items-center gap-3">
           {place.rating !== null && <Stars value={place.rating} />}
           {level && (
-            <span className="pill" title={level.hint}>
+            <span className="pill" title={t(level.hint)}>
               {level.label}
             </span>
           )}
           {place.cost !== null && (
-            <span className="pill">{formatMoney(place.cost, place.currency)}</span>
+            <span className="pill">{formatMoney(place.cost, place.currency, locale)}</span>
           )}
         </div>
       )}
@@ -116,7 +123,7 @@ export default function PlaceExtras({ place }: { place: Place }) {
           }`}
         >
           <p className="eyebrow mb-1.5">
-            {promoActive(place) ? 'Bon plan' : 'Bon plan expire'}
+            {promoActive(place) ? t('extras.deal') : t('extras.dealExpired')}
           </p>
           {place.promo_note && <p className="text-[13px] text-text-soft">{place.promo_note}</p>}
           {place.promo_code && (
@@ -126,8 +133,9 @@ export default function PlaceExtras({ place }: { place: Place }) {
           )}
           {place.promo_until && (
             <p className="mt-1.5 text-[11px] text-text-muted">
-              Valable jusqu'au{' '}
-              {new Date(`${place.promo_until}T00:00:00`).toLocaleDateString('fr-FR')}
+              {t('extras.validUntil', {
+                date: new Date(`${place.promo_until}T00:00:00`).toLocaleDateString(locale),
+              })}
             </p>
           )}
         </div>

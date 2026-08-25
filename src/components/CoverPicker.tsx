@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { fetchAllPhotos, signPhotoUrls } from '../lib/api'
 import { errorMessage } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 type Props = {
   value: string
@@ -13,6 +14,7 @@ type Props = {
  * chemin de stockage et non l'URL signee, qui expirerait en une heure.
  */
 export default function CoverPicker({ value, onChange }: Props) {
+  const t = useT()
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [paths, setPaths] = useState<string[]>([])
@@ -43,12 +45,10 @@ export default function CoverPicker({ value, onChange }: Props) {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setOpen((v) => !v)} className="btn btn-xs">
-          {open ? 'Fermer' : 'Choisir parmi mes photos'}
+          {open ? t('common.close') : t('trips.coverPick')}
         </button>
         {value && (
-          <button type="button" onClick={() => onChange('')} className="btn btn-xs btn-quiet">
-            Retirer la couverture
-          </button>
+          <button type="button" onClick={() => onChange('')} className="btn btn-xs btn-quiet">{t('trips.coverRemove')}</button>
         )}
       </div>
 
@@ -56,11 +56,9 @@ export default function CoverPicker({ value, onChange }: Props) {
         <div className="mt-3">
           {error && <p className="notice notice-bad">{error}</p>}
           {loading ? (
-            <p className="text-[13px] text-text-muted">Chargement des photos...</p>
+            <p className="text-[13px] text-text-muted">{t('cover.loadingPhotos')}</p>
           ) : paths.length === 0 ? (
-            <p className="text-[13px] text-text-muted">
-              Aucune photo dans le carnet pour l'instant.
-            </p>
+            <p className="text-[13px] text-text-muted">{t('cover.noPhotos')}</p>
           ) : (
             <div className="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
               {paths.map((path) => (

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PlacesProvider } from './context/PlacesContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { I18nProvider } from './i18n/I18nContext'
 import { TrackerProvider } from './context/TrackerContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -17,6 +18,7 @@ import ProfilePage from './pages/ProfilePage'
 import SharePage from './pages/SharePage'
 import PasswordPage from './pages/PasswordPage'
 import UpdatePrompt from './components/UpdatePrompt'
+import { useT } from './i18n/I18nContext'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -30,9 +32,10 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 function Splash() {
+  const t = useT()
   return (
     <div className="flex h-full items-center justify-center">
-      <p className="text-[13px] text-text-muted">Chargement...</p>
+      <p className="text-[13px] text-text-muted">{t('common.loading')}</p>
     </div>
   )
 }
@@ -40,10 +43,13 @@ function Splash() {
 export default function App() {
   return (
     <ThemeProvider>
-      <UpdatePrompt />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          {/* Sous AuthProvider : la langue est lue dans le profil du compte */}
+          <I18nProvider>
+            {/* L'invite de mise a jour traduit, elle doit vivre sous I18nProvider */}
+            <UpdatePrompt />
+            <Routes>
             <Route path="/login" element={<Login />} />
             {/* Page publique, sans compte ni session */}
             <Route path="/p/:token" element={<SharePage />} />
@@ -123,7 +129,8 @@ export default function App() {
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            </Routes>
+          </I18nProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

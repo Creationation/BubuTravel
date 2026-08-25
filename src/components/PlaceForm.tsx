@@ -9,6 +9,7 @@ import { uploadPhoto } from '../lib/api'
 import type { Place, PlaceStatus } from '../lib/types'
 import { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 export type Draft = {
   name: string
@@ -80,6 +81,7 @@ export default function PlaceForm({
   gps = null,
 }: Props) {
   const { add, trips, categories, addCategory, bumpPhotoCount } = usePlaces()
+  const t = useT()
   const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<GeoResult[]>([])
@@ -150,11 +152,11 @@ export default function PlaceForm({
 
     if (meta.takenAt && !draft.visit_date) {
       next = { ...next, visit_date: meta.takenAt }
-      bits.push('date de prise de vue')
+      bits.push(t('place.exifDate'))
     }
     if (meta.lat !== null && meta.lng !== null && draft.lat === null) {
       next = { ...next, lat: meta.lat, lng: meta.lng }
-      bits.push('position GPS')
+      bits.push(t('place.exifGps'))
       const found = await reverseGeocode(meta.lat, meta.lng)
       if (found) {
         next = {
@@ -163,7 +165,7 @@ export default function PlaceForm({
           country: next.country || found.country,
           city: next.city || found.city,
         }
-        bits.push('nom et pays')
+        bits.push(t('place.exifName'))
       }
     }
 
@@ -171,7 +173,7 @@ export default function PlaceForm({
     setExifNote(
       bits.length > 0
         ? `Rempli depuis la photo : ${bits.join(', ')}.`
-        : "La photo ne contient ni date ni position exploitables, a saisir a la main.",
+        : t('place.exifNothing'),
     )
   }
 
@@ -180,13 +182,13 @@ export default function PlaceForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!hasCoords) {
-      setError("Choisissez un point : recherche d'adresse ou clic sur la carte.")
+      setError(t('place.needPoint'))
       return
     }
     setBusy(true)
     setError(null)
     try {
-      setStep('Enregistrement du lieu')
+      setStep(t('place.savingPlace'))
       const created = await add({
         name: draft.name.trim(),
         country: draft.country.trim(),
@@ -231,13 +233,13 @@ export default function PlaceForm({
       <header className="flex items-center justify-between border-b border-line px-6 pb-5 pt-6">
         <div>
           <p className="eyebrow">
-            {gps ? 'Releve sur place' : draft.status === 'wishlist' ? 'Bucketlist' : 'Nouvelle etape'}
+            {gps ? t('place.onSite') : draft.status === 'wishlist' ? t('wish.eyebrow') : t('place.newStep')}
           </p>
           <h2 className="display-sm mt-2 text-3xl">
-            {gps ? 'Je suis ici' : draft.status === 'wishlist' ? 'Ajouter une envie' : 'Ajouter un lieu'}
+            {gps ? t('map.here') : draft.status === 'wishlist' ? t('map.addWish') : t('journal.addPlace')}
           </h2>
         </div>
-        <button onClick={onCancel} className="btn btn-icon btn-quiet" aria-label="Fermer">
+        <button onClick={onCancel} className="btn btn-icon btn-quiet" aria-label={t('common.close')}>
           ✕
         </button>
       </header>
@@ -249,31 +251,25 @@ export default function PlaceForm({
             type="button"
             onClick={() => onDraftChange({ ...draft, status: 'visited' })}
             className={`pill justify-center ${draft.status === 'visited' ? 'pill-active' : ''}`}
-          >
-            Deja visite
-          </button>
+          >{t('place.alreadyVisited')}</button>
           <button
             type="button"
             onClick={() => onDraftChange({ ...draft, status: 'wishlist' })}
             className={`pill justify-center ${draft.status === 'wishlist' ? 'pill-active' : ''}`}
-          >
-            A visiter
-          </button>
+          >{t('map.toVisit')}</button>
         </div>
 
         {/* Verification de l'adresse : le GPS se trompe souvent en ville */}
         {gps && !gpsConfirmed && (
           <div className="rounded-xl border border-line bg-surface-2 p-4">
-            <p className="label mb-1">Est-ce la bonne adresse ?</p>
+            <p className="label mb-1">{t('place.rightAddress')}</p>
             <p className="text-[13px] leading-relaxed text-text-soft">{gps.label}</p>
             <p className="mt-2 text-[11px] text-text-muted">
               Position relevee a environ {Math.round(gps.accuracy)} m pres. En ville, entre deux
               batiments, le releve peut tomber a cote.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className="btn btn-accent btn-xs" onClick={() => setGpsConfirmed(true)}>
-                Oui, c'est ici
-              </button>
+              <button type="button" className="btn btn-accent btn-xs" onClick={() => setGpsConfirmed(true)}>{t('place.yesHere')}</button>
               <button
                 type="button"
                 className="btn btn-xs"
@@ -281,9 +277,7 @@ export default function PlaceForm({
                   setGpsConfirmed(true)
                   searchRef.current?.focus()
                 }}
-              >
-                Chercher l'adresse
-              </button>
+              >{t('place.searchAddress')}</button>
               <button
                 type="button"
                 className="btn btn-xs"
@@ -291,26 +285,22 @@ export default function PlaceForm({
                   setGpsConfirmed(true)
                   if (!picking) onTogglePicking()
                 }}
-              >
-                Placer a la main
-              </button>
+              >{t('place.placeByHand')}</button>
             </div>
           </div>
         )}
 
         {/* Photos d'abord : elles remplissent le reste toutes seules */}
         <div>
-          <p className="label">Photos</p>
+          <p className="label">{t('common.photos')}</p>
           <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-line px-4 py-4 text-[13px] text-text-muted transition-colors hover:border-line-strong hover:text-text-soft">
             <span>
               {pending.length > 0
                 ? `${pending.length} photo${pending.length > 1 ? 's' : ''} prete${pending.length > 1 ? 's' : ''}`
-                : 'Choisir des photos'}
-              <span className="mt-0.5 block text-[11px] text-text-muted/70">
-                Date et position lues automatiquement
-              </span>
+                : t('place.pickPhotos')}
+              <span className="mt-0.5 block text-[11px] text-text-muted/70">{t('place.autoRead')}</span>
             </span>
-            <span className="btn btn-xs">Parcourir</span>
+            <span className="btn btn-xs">{t('place.browse')}</span>
             <input
               type="file"
               accept="image/*"
@@ -328,7 +318,7 @@ export default function PlaceForm({
 
         {/* Recherche d'adresse */}
         <div className="relative">
-          <label className="label">Rechercher une adresse</label>
+          <label className="label">{t('place.searchAddressLabel')}</label>
           <input
             ref={searchRef}
             className="field"
@@ -340,7 +330,7 @@ export default function PlaceForm({
             placeholder="Vienne, Autriche"
             autoComplete="off"
           />
-          {searching && <p className="mt-1.5 text-[11px] text-text-muted">Recherche...</p>}
+          {searching && <p className="mt-1.5 text-[11px] text-text-muted">{t('place.searching')}</p>}
           {results.length > 0 && (
             <ul className="panel absolute z-30 mt-1.5 max-h-56 w-full overflow-y-auto p-1.5 shadow-xl">
               {results.map((r) => (
@@ -362,9 +352,9 @@ export default function PlaceForm({
         <div className="rounded-xl border border-line bg-surface-2 px-4 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="label mb-1">Position</p>
+              <p className="label mb-1">{t('place.position')}</p>
               <p className="font-mono text-[12px] text-text-soft">
-                {hasCoords ? `${draft.lat!.toFixed(5)}, ${draft.lng!.toFixed(5)}` : 'non definie'}
+                {hasCoords ? `${draft.lat!.toFixed(5)}, ${draft.lng!.toFixed(5)}` : t('place.noPosition')}
               </p>
             </div>
             <button
@@ -372,13 +362,13 @@ export default function PlaceForm({
               onClick={onTogglePicking}
               className={`btn btn-xs ${picking ? 'btn-accent' : ''}`}
             >
-              {picking ? 'Cliquez sur la carte' : 'Placer sur la carte'}
+              {picking ? t('place.clickMap') : t('place.placeOnMap')}
             </button>
           </div>
         </div>
 
         <div>
-          <label className="label">Nom du lieu</label>
+          <label className="label">{t('place.nameLabel')}</label>
           <input
             className="field"
             value={draft.name}
@@ -390,7 +380,7 @@ export default function PlaceForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="label">Pays</label>
+            <label className="label">{t('common.country')}</label>
             <input
               className="field"
               value={draft.country}
@@ -400,7 +390,7 @@ export default function PlaceForm({
             />
           </div>
           <div>
-            <label className="label">Ville</label>
+            <label className="label">{t('common.city')}</label>
             <input
               className="field"
               value={draft.city}
@@ -413,7 +403,7 @@ export default function PlaceForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">
-              {draft.status === 'wishlist' ? 'Date visee' : 'Date de visite'}
+              {draft.status === 'wishlist' ? t('place.targetDate') : t('place.visitDate')}
             </label>
             <input
               className="field"
@@ -423,17 +413,17 @@ export default function PlaceForm({
             />
           </div>
           <div>
-            <label className="label">Voyage</label>
+            <label className="label">{t('common.trip')}</label>
             <select
               className="field"
               value={draft.trip_id}
               onChange={(e) => onDraftChange({ ...draft, trip_id: e.target.value })}
             >
-              <option value="">Lieu isole</option>
-              {trips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                  {t.status === 'planning' ? ' (a preparer)' : ''}
+              <option value="">{t('place.standalone')}</option>
+              {trips.map((trip) => (
+                <option key={trip.id} value={trip.id}>
+                  {trip.title}
+                  {trip.status === 'planning' ? t('place.toPrepare') : ''}
                 </option>
               ))}
             </select>
@@ -441,14 +431,14 @@ export default function PlaceForm({
         </div>
 
         <div>
-          <label className="label">Categorie</label>
+          <label className="label">{t('common.category')}</label>
           {categories.length > 0 && (
             <select
               className="field"
               value={draft.category_id}
               onChange={(e) => onDraftChange({ ...draft, category_id: e.target.value })}
             >
-              <option value="">Sans categorie</option>
+              <option value="">{t('place.noCategory')}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -461,7 +451,7 @@ export default function PlaceForm({
               className="field"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="Creer une categorie"
+              placeholder={t('place.createCategory')}
             />
             <button
               type="button"
@@ -476,53 +466,49 @@ export default function PlaceForm({
                   })
                   .catch((err) => setError(errorMessage(err)))
               }}
-            >
-              Creer
-            </button>
+            >{t('common.create')}</button>
           </div>
         </div>
 
         <div>
-          <label className="label">Notes</label>
+          <label className="label">{t('common.notes')}</label>
           <textarea
             className="field min-h-24 resize-y"
             value={draft.notes}
             onChange={(e) => onDraftChange({ ...draft, notes: e.target.value })}
-            placeholder="Ce qu'on a vu, mange, retenu..."
+            placeholder={t('place.notesPlaceholder')}
           />
         </div>
 
         {/* Budget, avis et bon plan : utile surtout pour un hotel ou un
             restaurant, replie tant qu'on n'en a pas besoin. */}
         <details className="rounded-2xl border border-line bg-surface-2 p-4">
-          <summary className="cursor-pointer text-[13px] font-semibold">
-            Budget, avis et bon plan
-          </summary>
+          <summary className="cursor-pointer text-[13px] font-semibold">{t('extras.section')}</summary>
 
           <div className="mt-4 space-y-4">
             <div>
-              <label className="label">Votre note</label>
+              <label className="label">{t('extras.yourRating')}</label>
               <Stars value={draft.rating} onChange={(rating) => onDraftChange({ ...draft, rating })} />
             </div>
 
             <div>
-              <label className="label">Avis</label>
+              <label className="label">{t('extras.review')}</label>
               <textarea
                 className="field min-h-20 resize-y"
                 value={draft.review}
                 onChange={(e) => onDraftChange({ ...draft, review: e.target.value })}
-                placeholder="Ce qu'on en a pense, ce qu'il faut savoir avant d'y aller..."
+                placeholder={t('extras.reviewPlaceholder')}
               />
             </div>
 
             <div>
-              <label className="label">Fourchette de prix</label>
+              <label className="label">{t('extras.priceRange')}</label>
               <div className="flex gap-2">
                 {PRICE_LEVELS.map((lvl) => (
                   <button
                     key={lvl.value}
                     type="button"
-                    title={lvl.hint}
+                    title={t(lvl.hint)}
                     onClick={() =>
                       onDraftChange({
                         ...draft,
@@ -541,7 +527,7 @@ export default function PlaceForm({
 
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
-                <label className="label">Depense sur place</label>
+                <label className="label">{t('extras.spent')}</label>
                 <input
                   className="field"
                   inputMode="decimal"
@@ -551,7 +537,7 @@ export default function PlaceForm({
                 />
               </div>
               <div>
-                <label className="label">Devise</label>
+                <label className="label">{t('common.currency')}</label>
                 <select
                   className="field"
                   value={draft.currency}
@@ -567,19 +553,19 @@ export default function PlaceForm({
             </div>
 
             <div>
-              <label className="label">Bon plan</label>
+              <label className="label">{t('extras.deal')}</label>
               <input
                 className="field"
                 value={draft.promo_note}
                 onChange={(e) => onDraftChange({ ...draft, promo_note: e.target.value })}
-                placeholder="Deuxieme nuit offerte, menu du midi a 15 euros..."
+                placeholder={t('extras.dealPlaceholder')}
               />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input
                   className="field font-mono"
                   value={draft.promo_code}
                   onChange={(e) => onDraftChange({ ...draft, promo_code: e.target.value })}
-                  placeholder="CODE PROMO"
+                  placeholder={t('extras.promoCode')}
                 />
                 <input
                   className="field"
@@ -598,11 +584,9 @@ export default function PlaceForm({
 
         <div className="flex gap-2 pb-4">
           <button type="submit" className="btn btn-accent flex-1" disabled={busy || !hasCoords}>
-            {busy ? 'Enregistrement...' : 'Enregistrer'}
+            {busy ? t('common.saving') : t('common.save')}
           </button>
-          <button type="button" onClick={onCancel} className="btn btn-quiet">
-            Annuler
-          </button>
+          <button type="button" onClick={onCancel} className="btn btn-quiet">{t('common.cancel')}</button>
         </div>
       </form>
     </aside>

@@ -4,6 +4,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
 import { formatDate, plural, totalDistanceKm } from '../lib/stats'
 import type { ChecklistItem, Place, Trip } from '../lib/types'
+import { useT } from '../i18n/I18nContext'
 
 /**
  * Preparation d'un voyage : etapes ordonnees a la main, dates visees et
@@ -11,6 +12,7 @@ import type { ChecklistItem, Place, Trip } from '../lib/types'
  * la bucketlist, qui basculeront dans le carnet une fois le voyage fait.
  */
 export default function TripPlanner({ trip }: { trip: Trip }) {
+  const t = useT()
   const { places, edit, editTrip, categoryOf } = usePlaces()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,13 +88,11 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
       <section>
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">Itineraire</p>
-            <h2 className="display-sm mt-2 text-3xl">{plural(steps.length, 'etape')}</h2>
+            <p className="eyebrow">{t('planner.itinerary')}</p>
+            <h2 className="display-sm mt-2 text-3xl">{plural(steps.length, t('unit.step'))}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to="/carte?envie=1" className="btn btn-xs">
-              Ajouter une etape
-            </Link>
+            <Link to="/carte?envie=1" className="btn btn-xs">{t('planner.addStep')}</Link>
             <button
               onClick={() => {
                 if (!confirmDone) {
@@ -104,7 +104,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
               className={`btn btn-xs ${confirmDone ? 'btn-accent' : ''}`}
               disabled={busy}
             >
-              {confirmDone ? 'Confirmer : le voyage a eu lieu' : 'Marquer le voyage comme fait'}
+              {confirmDone ? t('planner.markDoneConfirm') : t('planner.markDone')}
             </button>
           </div>
         </div>
@@ -117,13 +117,8 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
 
         {steps.length === 0 ? (
           <div className="panel px-8 py-12 text-center">
-            <p className="lede">
-              Aucune etape. Ajoutez des envies depuis la carte, puis rattachez-les a ce voyage
-              dans leur panneau.
-            </p>
-            <Link to="/carte?envie=1" className="btn mt-6">
-              Ajouter une envie
-            </Link>
+            <p className="lede">{t('planner.noStepsYet')}</p>
+            <Link to="/carte?envie=1" className="btn mt-6">{t('map.addWish')}</Link>
           </div>
         ) : (
           <ol className="space-y-px overflow-hidden rounded-2xl border border-line bg-line">
@@ -148,9 +143,9 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
       <section>
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
-            <p className="eyebrow">Pense-bete</p>
+            <p className="eyebrow">{t('planner.checklist')}</p>
             <h2 className="display-sm mt-2 text-2xl">
-              {checklist.length > 0 ? `${doneCount} sur ${checklist.length}` : 'A ne pas oublier'}
+              {checklist.length > 0 ? `${doneCount} sur ${checklist.length}` : t('planner.checklistEmpty')}
             </h2>
           </div>
         </div>
@@ -170,7 +165,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
                   setNewItem('')
                 }
               }}
-              placeholder="Passeport, reserver le train, adaptateur..."
+              placeholder={t('planner.checklistPlaceholder')}
             />
             <button
               className="btn"
@@ -182,9 +177,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
                 ])
                 setNewItem('')
               }}
-            >
-              Ajouter
-            </button>
+            >{t('common.add')}</button>
           </div>
 
           {checklist.length > 0 && (
@@ -202,7 +195,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
                         ? 'border-accent bg-accent text-accent-ink'
                         : 'border-line-strong text-transparent'
                     }`}
-                    aria-label={item.done ? 'Decocher' : 'Cocher'}
+                    aria-label={item.done ? t('planner.uncheck') : t('planner.check')}
                   >
                     ✓
                   </button>
@@ -216,7 +209,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
                   <button
                     onClick={() => setChecklist(checklist.filter((i) => i.id !== item.id))}
                     className="btn btn-xs btn-quiet"
-                    aria-label="Retirer"
+                    aria-label={t('common.remove')}
                   >
                     ✕
                   </button>
@@ -249,6 +242,7 @@ function StepRow({
   onMove: (index: number, delta: number) => void
   onDate: (date: string) => void
 }) {
+  const t = useT()
   return (
     <li className="flex flex-wrap items-center gap-3 bg-bg px-4 py-3.5 sm:px-5">
       <span className="display-sm w-7 shrink-0 text-center text-lg text-text-muted">
@@ -260,9 +254,7 @@ function StepRow({
           {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />}
           <span className="display-sm truncate text-lg">{step.name}</span>
           {step.status === 'wishlist' && (
-            <span className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] text-text-muted">
-              envie
-            </span>
+            <span className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] text-text-muted">{t('unit.wish')}</span>
           )}
         </span>
         <span className="mt-0.5 block truncate text-[13px] text-text-muted">
@@ -277,7 +269,7 @@ function StepRow({
         className="field w-auto shrink-0 py-1.5 text-[12px]"
         value={step.visit_date ?? ''}
         onChange={(e) => onDate(e.target.value)}
-        title={step.visit_date ? `Prevu le ${formatDate(step.visit_date)}` : 'Sans date'}
+        title={step.visit_date ? `Prevu le ${formatDate(step.visit_date)}` : t('trips.noStep')}
       />
 
       <span className="flex shrink-0 gap-1">
@@ -285,7 +277,7 @@ function StepRow({
           onClick={() => onMove(index, -1)}
           className="btn btn-xs btn-quiet"
           disabled={busy || index === 0}
-          aria-label="Monter l'etape"
+          aria-label={t('planner.moveUp')}
         >
           ↑
         </button>
@@ -293,7 +285,7 @@ function StepRow({
           onClick={() => onMove(index, 1)}
           className="btn btn-xs btn-quiet"
           disabled={busy || index === total - 1}
-          aria-label="Descendre l'etape"
+          aria-label={t('planner.moveDown')}
         >
           ↓
         </button>

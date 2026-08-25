@@ -8,10 +8,12 @@ import Reveal from '../components/Reveal'
 import { plural } from '../lib/stats'
 import Lightbox from '../components/Lightbox'
 import { errorMessage } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 type Filter = { kind: 'all' } | { kind: 'country'; value: string } | { kind: 'trip'; value: string }
 
 export default function GalleryPage() {
+  const t = useT()
   const { user } = useAuth()
   const { places, trips, countries } = usePlaces()
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -58,14 +60,11 @@ export default function GalleryPage() {
       <div className="mx-auto w-full max-w-6xl px-5 pb-24 sm:px-8">
         <section className="border-b border-line py-12 sm:py-16">
           <Reveal>
-            <p className="eyebrow">Galerie</p>
+            <p className="eyebrow">{t('nav.gallery')}</p>
             <h1 className="display mt-4 text-[clamp(2.2rem,6vw,4rem)]">
-              {plural(photos.length, 'photo')}
+              {plural(photos.length, t('unit.photo'))}
             </h1>
-            <p className="lede mt-5 max-w-xl">
-              Toutes les photos du carnet, du plus recent au plus ancien. Filtrez par pays ou par
-              voyage, cliquez pour voir en grand.
-            </p>
+            <p className="lede mt-5 max-w-xl">{t('gallery.intro')}</p>
           </Reveal>
         </section>
 
@@ -74,9 +73,7 @@ export default function GalleryPage() {
           <button
             onClick={() => setFilter({ kind: 'all' })}
             className={`pill ${filter.kind === 'all' ? 'pill-active' : ''}`}
-          >
-            Tout
-          </button>
+          >{t('common.all')}</button>
           {countries.map((country) => (
             <button
               key={country}
@@ -111,10 +108,8 @@ export default function GalleryPage() {
           </div>
         ) : visible.length === 0 ? (
           <div className="panel mt-10 px-8 py-14 text-center">
-            <h2 className="display-sm text-2xl">Aucune photo ici</h2>
-            <p className="lede mx-auto mt-3 max-w-md">
-              Les photos s'ajoutent depuis le panneau d'un lieu, sur la carte.
-            </p>
+            <h2 className="display-sm text-2xl">{t('gallery.emptyTitle')}</h2>
+            <p className="lede mx-auto mt-3 max-w-md">{t('gallery.emptyBody')}</p>
           </div>
         ) : (
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

@@ -9,8 +9,10 @@ import type { TravelEvent } from '../lib/types'
 import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import EventForm from '../components/EventForm'
+import { useI18n, useT } from '../i18n/I18nContext'
 
 export default function EventsPage() {
+  const t = useT()
   const { events, places, trips, categories, removeEvent, loading } = usePlaces()
   const [editing, setEditing] = useState<TravelEvent | 'new' | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -38,19 +40,14 @@ export default function EventsPage() {
       <div className="mx-auto w-full max-w-6xl px-5 pb-24 sm:px-8">
         <section className="border-b border-line py-12 sm:py-16">
           <Reveal>
-            <p className="eyebrow">Evenements</p>
+            <p className="eyebrow">{t('nav.events')}</p>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
               <h1 className="display text-[clamp(2.2rem,6vw,4rem)]">
-                {upcoming.length > 0 ? plural(upcoming.length, 'a venir', 'a venir') : 'Le calendrier'}
+                {upcoming.length > 0 ? plural(upcoming.length, 'a venir', 'a venir') : t('events.calendar')}
               </h1>
-              <button onClick={() => setEditing('new')} className="btn btn-accent">
-                Nouvel evenement
-              </button>
+              <button onClick={() => setEditing('new')} className="btn btn-accent">{t('events.new')}</button>
             </div>
-            <p className="lede mt-5 max-w-xl">
-              Concerts, marches, festivals, fetes locales. Avec leurs dates, leur recurrence, leur
-              prix et l'endroit ou ils se tiennent.
-            </p>
+            <p className="lede mt-5 max-w-xl">{t('events.intro')}</p>
           </Reveal>
         </section>
 
@@ -67,18 +64,13 @@ export default function EventsPage() {
         )}
 
         {loading ? (
-          <p className="mt-10 text-[13px] text-text-muted">Chargement...</p>
+          <p className="mt-10 text-[13px] text-text-muted">{t('common.loading')}</p>
         ) : events.length === 0 && !editing ? (
           <Reveal className="mt-10">
             <div className="panel px-8 py-14 text-center">
-              <h2 className="display-sm text-2xl">Aucun evenement</h2>
-              <p className="lede mx-auto mt-3 max-w-md">
-                Notez ce qui se passe la ou vous allez : un marche le samedi, un festival chaque
-                ete, un concert dans trois semaines.
-              </p>
-              <button onClick={() => setEditing('new')} className="btn btn-accent mt-7">
-                Creer un evenement
-              </button>
+              <h2 className="display-sm text-2xl">{t('events.emptyTitle')}</h2>
+              <p className="lede mx-auto mt-3 max-w-md">{t('events.emptyBody')}</p>
+              <button onClick={() => setEditing('new')} className="btn btn-accent mt-7">{t('events.createOne')}</button>
             </div>
           </Reveal>
         ) : (
@@ -86,7 +78,7 @@ export default function EventsPage() {
             {upcoming.length > 0 && (
               <section className="mt-12">
                 <Reveal className="mb-6">
-                  <p className="eyebrow">A venir</p>
+                  <p className="eyebrow">{t('events.upcoming')}</p>
                 </Reveal>
                 <ul className="space-y-4">
                   {upcoming.map((event, i) => (
@@ -118,7 +110,7 @@ export default function EventsPage() {
             {past.length > 0 && (
               <section className="mt-14">
                 <Reveal className="mb-6">
-                  <p className="eyebrow">Passes</p>
+                  <p className="eyebrow">{t('events.past')}</p>
                 </Reveal>
                 <ul className="space-y-4 opacity-70">
                   {past.map((event, i) => (
@@ -174,6 +166,7 @@ function EventCard({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const { t, locale } = useI18n()
   const next = nextOccurrence(event, now)
   const repeat = RECURRENCES.find((r) => r.value === event.recurrence)
 
@@ -193,18 +186,18 @@ function EventCard({
                 </span>
               )}
               {event.recurrence !== 'none' && repeat && (
-                <span className="pill">{repeat.fr}</span>
+                <span className="pill">{t(repeat.label)}</span>
               )}
             </div>
 
             <h3 className="display-sm mt-2 text-2xl">{event.title}</h3>
 
             <p className="mt-1.5 text-[13px] text-text-soft">
-              {formatEventDate(event, 'fr-FR', next)}
+              {formatEventDate(event, locale, next)}
             </p>
 
             <p className="mt-1 text-[13px] text-text-muted">
-              {placeName ?? event.venue ?? 'Lieu non precise'}
+              {placeName ?? event.venue ?? t('events.noPlace')}
               {tripTitle && ` · ${tripTitle}`}
             </p>
 
@@ -217,16 +210,14 @@ function EventCard({
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="pill">
                 {event.is_free
-                  ? 'Entree libre'
+                  ? t('events.free')
                   : event.price !== null
                     ? formatMoney(event.price, event.currency)
-                    : 'Prix non precise'}
+                    : t('events.noPrice')}
               </span>
               {event.organizer && <span className="pill">{event.organizer}</span>}
               {event.url && (
-                <a href={event.url} target="_blank" rel="noreferrer" className="pill">
-                  Site
-                </a>
+                <a href={event.url} target="_blank" rel="noreferrer" className="pill">{t('events.site')}</a>
               )}
             </div>
 
@@ -237,18 +228,14 @@ function EventCard({
 
           <div className="flex shrink-0 gap-2">
             {event.place_id && (
-              <Link to={`/carte?lieu=${event.place_id}`} className="btn btn-xs">
-                Sur la carte
-              </Link>
+              <Link to={`/carte?lieu=${event.place_id}`} className="btn btn-xs">{t('events.onMap')}</Link>
             )}
-            <button onClick={onEdit} className="btn btn-xs btn-quiet">
-              Modifier
-            </button>
+            <button onClick={onEdit} className="btn btn-xs btn-quiet">{t('common.edit')}</button>
             <button
               onClick={onDelete}
               className={`btn btn-xs ${confirming ? 'border-red-500/60 text-red-400' : 'btn-quiet'}`}
             >
-              {confirming ? 'Confirmer' : 'Supprimer'}
+              {confirming ? t('common.confirm') : t('common.delete')}
             </button>
           </div>
         </div>

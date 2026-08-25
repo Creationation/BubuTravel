@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { useTracker } from '../context/TrackerContext'
 import { reverseGeocode } from '../lib/geocode'
-import { currentPosition } from '../lib/geolocation'
+import { GeoError, currentPosition } from '../lib/geolocation'
 import type { Place } from '../lib/types'
 import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
@@ -14,6 +14,7 @@ import TrackRecorder from '../components/TrackRecorder'
 import TrackSidebar from '../components/TrackSidebar'
 import MapFilters, { applyFilter, emptyFilter } from '../components/MapFilters'
 import type { MapFilter } from '../components/MapFilters'
+import { useT } from '../i18n/I18nContext'
 import { errorMessage } from '../lib/errors'
 
 type Panel =
@@ -34,6 +35,7 @@ export default function MapPage() {
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [filter, setFilter] = useState<MapFilter>(emptyFilter)
+  const t = useT()
 
   const selected = useMemo(
     () => (panel.kind === 'place' ? (places.find((p) => p.id === panel.id) ?? null) : null),
@@ -45,18 +47,18 @@ export default function MapPage() {
   )
 
   // Arrivee depuis la bucketlist : le formulaire s'ouvre en mode envie
-  const wantWish = params.get('envie')
+  const wantWish = params.get(t('unit.wish'))
   useEffect(() => {
     if (!wantWish) return
     setDraft({ ...emptyDraft, status: 'wishlist' })
     setPanel({ kind: 'new' })
     setPicking(true)
-    params.delete('envie')
+    params.delete(t('unit.wish'))
     setParams(params, { replace: true })
   }, [wantWish, params, setParams])
 
   // Ouverture directe d'un lieu depuis la timeline du carnet
-  const wanted = params.get('lieu')
+  const wanted = params.get(t('unit.place'))
   useEffect(() => {
     if (!wanted || places.length === 0) return
     const place = places.find((p) => p.id === wanted)
@@ -64,7 +66,7 @@ export default function MapPage() {
       setPanel({ kind: 'place', id: place.id })
       setFocus([place.lat, place.lng])
     }
-    params.delete('lieu')
+    params.delete(t('unit.place'))
     setParams(params, { replace: true })
   }, [wanted, places, params, setParams])
 
@@ -130,7 +132,8 @@ export default function MapPage() {
       setPanel({ kind: 'new' })
       setFocus([fix.lat, fix.lng])
     } catch (err) {
-      setScanError(errorMessage(err))
+      // Une GeoError transporte une cle de traduction, pas un texte
+      setScanError(err instanceof GeoError ? t(err.key) : errorMessage(err))
     } finally {
       setScanning(false)
     }
@@ -173,9 +176,9 @@ export default function MapPage() {
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         <div className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3 sm:px-8">
           <div className="min-w-0">
-            <p className="eyebrow mb-1.5">Carte</p>
+            <p className="eyebrow mb-1.5">{t('map.eyebrow')}</p>
             {loading ? (
-              <p className="text-[13px] text-text-soft">Chargement du carnet...</p>
+              <p className="text-[13px] text-text-soft">{t('map.loadingJournal')}</p>
             ) : (
               <MapFilters
                 value={filter}
@@ -187,7 +190,7 @@ export default function MapPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void scanHere()} className="btn" disabled={scanning}>
-              {scanning ? 'Reperage...' : 'Je suis ici'}
+              {scanning ? t('map.locating') : t('map.here')}
             </button>
             <button
               onClick={() => {
@@ -198,10 +201,10 @@ export default function MapPage() {
               }}
               className="btn"
             >
-              Ajouter une envie
+              {t('map.addWish')}
             </button>
             <button onClick={openNew} className="btn btn-accent">
-              Ajouter un lieu
+              {t('journal.addPlace')}
             </button>
           </div>
         </div>
@@ -248,7 +251,7 @@ export default function MapPage() {
             {picking && (
               <div className="pointer-events-none absolute inset-x-0 top-5 z-[1000] flex justify-center px-4">
                 <span className="fade-in panel px-4 py-2 text-[13px] text-text-soft shadow-lg">
-                  Cliquez sur la carte pour poser le marqueur
+                  {t('map.clickToPlace')}
                 </span>
               </div>
             )}
@@ -256,8 +259,7 @@ export default function MapPage() {
             {!loading && places.length === 0 && panel.kind === 'none' && (
               <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[1000] flex justify-center px-4 md:bottom-8 md:pl-64">
                 <span className="fade-in panel px-5 py-3 text-center text-[13px] text-text-soft shadow-lg">
-                  Aucun lieu pour le moment. « Je suis ici » releve votre position, « Ajouter un
-                  lieu » vous laisse choisir.
+                  {t('map.emptyHint')}
                 </span>
               </div>
             )}

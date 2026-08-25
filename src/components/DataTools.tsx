@@ -5,9 +5,11 @@ import { fetchAllPhotos } from '../lib/api'
 import { exportBackup, exportPlacesCsv, exportTrackGpx } from '../lib/export'
 import { errorMessage } from '../lib/errors'
 import type { Photo } from '../lib/types'
+import { useT } from '../i18n/I18nContext'
 
 /** Sauvegarde et exports : rien ne doit rester prisonnier de l'app. */
 export default function DataTools() {
+  const t = useT()
   const { user } = useAuth()
   const { places, trips, tracks, categories } = usePlaces()
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -42,27 +44,19 @@ export default function DataTools() {
           onClick={() => run(() => exportBackup({ places, trips, tracks, categories, photos }))}
           className="btn btn-accent"
           disabled={busy}
-        >
-          Sauvegarde complete
-        </button>
+        >{t('profile.backupFull')}</button>
         <button
           onClick={() => run(() => exportPlacesCsv(places, categories, trips))}
           className="btn"
           disabled={busy || places.length === 0}
-        >
-          Lieux en CSV
-        </button>
+        >{t('profile.backupCsv')}</button>
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
-        La sauvegarde contient les lieux, voyages, parcours, categories et la liste des photos.
-        Les images elles-memes restent dans le stockage, elles ne sont pas incluses dans le
-        fichier.
-      </p>
+      <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{t('profile.backupNote')}</p>
 
       {tracks.length > 0 && (
         <div className="mt-5">
-          <p className="label">Parcours en GPX</p>
+          <p className="label">{t('profile.gpxLabel')}</p>
           <div className="flex flex-wrap gap-2">
             {tracks.map((track) => (
               <button
@@ -71,7 +65,7 @@ export default function DataTools() {
                 className="pill"
                 disabled={busy || track.points.length < 2}
                 title={
-                  track.points.length < 2 ? 'Ce parcours a trop peu de points' : 'Telecharger en GPX'
+                  track.points.length < 2 ? t('track.tooFewPoints') : t('track.downloadGpx')
                 }
               >
                 {track.name}
@@ -81,10 +75,7 @@ export default function DataTools() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-text-muted">
-            Le GPX s'ouvre dans Garmin, Strava, Komoot et la plupart des applications de
-            randonnee.
-          </p>
+          <p className="mt-2 text-[11px] text-text-muted">{t('profile.gpxHint')}</p>
         </div>
       )}
 

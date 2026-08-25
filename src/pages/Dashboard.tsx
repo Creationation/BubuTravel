@@ -8,13 +8,15 @@ import type { Place } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import TripCover from '../components/TripCover'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
   const { places, visited, wishlist, trips, countries, stats, loading, error } = usePlaces()
   const [covers, setCovers] = useState<Record<string, string>>({})
+  const { t, locale } = useI18n()
 
-  const name = profile?.display_name || user?.email?.split('@')[0] || 'Voyageur'
+  const name = profile?.display_name || user?.email?.split('@')[0] || t('common.traveller')
 
   // Une photo par lieu, pour illustrer la timeline sans charger la galerie
   useEffect(() => {
@@ -57,39 +59,40 @@ export default function Dashboard() {
         {/* En-tete editorial */}
         <section className="border-b border-line py-14 sm:py-20">
           <Reveal>
-            <p className="eyebrow">Carnet de voyage</p>
+            <p className="eyebrow">{t('journal.eyebrow')}</p>
             <div className="mt-5 flex flex-wrap items-end justify-between gap-6">
               <h1 className="display max-w-2xl text-[clamp(2.6rem,7vw,5rem)]">
-                Les voyages de {name}
+                {t('journal.title', { name })}
               </h1>
               <Link to="/profil" className="flex items-center gap-3">
                 <Avatar url={profile?.avatar_url} name={name} size={44} />
                 <span className="text-[13px] text-text-muted underline-offset-4 hover:underline">
-                  Modifier le profil
+                  {t('journal.editProfile')}
                 </span>
               </Link>
             </div>
             <p className="lede mt-6 max-w-xl">
               {stats.countries > 0
-                ? `${plural(stats.countries, 'pays', 'pays')}, ${plural(stats.cities, 'ville')}, ${formatKm(
+                ? `${plural(stats.countries, t('unit.country'), t('unit.country'))}, ${plural(stats.cities, t('unit.city'))}, ${formatKm(
                     stats.km,
                   )} ${stats.km > 1 ? 'kilometres parcourus' : 'kilometre parcouru'}${
                     stats.firstYear ? ` depuis ${stats.firstYear}` : ''
                   }.`
-                : 'Tout commence par un premier lieu sur la carte.'}
+                : t('journal.firstPlace')}
             </p>
             <div className="mt-8 flex flex-wrap gap-2.5">
               <Link to="/carte" className="btn btn-accent">
-                Ouvrir la carte
+                {t('journal.openMap')}
               </Link>
               <Link to="/voyages" className="btn">
-                Mes voyages
+                {t('journal.myTrips')}
               </Link>
               <Link to="/bucketlist" className="btn">
-                Envies{wishlist.length > 0 ? ` (${wishlist.length})` : ''}
+                {t('nav.wishlist')}
+                {wishlist.length > 0 ? ` (${wishlist.length})` : ''}
               </Link>
               <Link to="/galerie" className="btn">
-                Galerie
+                {t('nav.gallery')}
               </Link>
             </div>
           </Reveal>
@@ -99,22 +102,24 @@ export default function Dashboard() {
 
         {/* Compteurs */}
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">
-          <Stat label="Pays" value={stats.countries} delay={0} />
-          <Stat label="Villes" value={stats.cities} delay={60} />
-          <Stat label="Photos" value={stats.photos} delay={120} />
-          <Stat label="Kilometres" value={formatKm(stats.km)} hint="a vol d'oiseau" delay={180} />
+          <Stat label={t('stat.countries')} value={stats.countries} delay={0} />
+          <Stat label={t('stat.cities')} value={stats.cities} delay={60} />
+          <Stat label={t('stat.photos')} value={stats.photos} delay={120} />
+          <Stat
+            label={t('stat.kilometres')}
+            value={formatKm(stats.km)}
+            hint={t('stat.asCrowFlies')}
+            delay={180}
+          />
         </section>
 
         {empty && (
           <Reveal className="mt-10">
             <div className="panel px-8 py-14 text-center">
-              <h2 className="display-sm text-2xl">Le carnet est encore vierge</h2>
-              <p className="lede mx-auto mt-3 max-w-md">
-                Ajoutez un premier lieu depuis la carte : une recherche d'adresse, ou un simple
-                clic sur le point qui vous interesse.
-              </p>
+              <h2 className="display-sm text-2xl">{t('journal.emptyTitle')}</h2>
+              <p className="lede mx-auto mt-3 max-w-md">{t('journal.emptyBody')}</p>
               <Link to="/carte" className="btn btn-accent mt-7">
-                Ajouter un lieu
+                {t('journal.addPlace')}
               </Link>
             </div>
           </Reveal>
@@ -125,11 +130,11 @@ export default function Dashboard() {
           <section className="mt-16">
             <Reveal className="mb-6 flex items-baseline justify-between gap-4">
               <div>
-                <p className="eyebrow">Derniers voyages</p>
-                <h2 className="display-sm mt-2 text-3xl">Par deplacement</h2>
+                <p className="eyebrow">{t('journal.recentTrips')}</p>
+                <h2 className="display-sm mt-2 text-3xl">{t('journal.byTrip')}</h2>
               </div>
               <Link to="/voyages" className="text-[13px] text-text-muted hover:text-text">
-                Tout voir
+                {t('common.seeAll')}
               </Link>
             </Reveal>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -147,9 +152,9 @@ export default function Dashboard() {
                       <div className="p-5">
                         <h3 className="display-sm text-xl">{trip.title}</h3>
                         <p className="mt-1.5 text-[13px] text-text-muted">
-                          {formatRange(trip.start_date, trip.end_date)}
+                          {formatRange(trip.start_date, trip.end_date, t, locale)}
                         </p>
-                        <p className="mt-3 text-[13px] text-text-soft">{plural(count, 'lieu', 'lieux')}</p>
+                        <p className="mt-3 text-[13px] text-text-soft">{plural(count, t('unit.place'), t('unit.places'))}</p>
                       </div>
                     </Link>
                   </Reveal>
@@ -163,7 +168,7 @@ export default function Dashboard() {
         {topCountries.length > 0 && (
           <section className="mt-16">
             <Reveal className="mb-6">
-              <p className="eyebrow">Passeport</p>
+              <p className="eyebrow">{t('journal.passport')}</p>
               <h2 className="display-sm mt-2 text-3xl">
                 {plural(countries.length, 'pays visite', 'pays visites')}
               </h2>
@@ -183,8 +188,8 @@ export default function Dashboard() {
         {years.length > 0 && (
           <section className="mt-16">
             <Reveal className="mb-8">
-              <p className="eyebrow">Chronologie</p>
-              <h2 className="display-sm mt-2 text-3xl">Du plus recent au plus ancien</h2>
+              <p className="eyebrow">{t('journal.timeline')}</p>
+              <h2 className="display-sm mt-2 text-3xl">{t('journal.newestFirst')}</h2>
             </Reveal>
 
             <div className="space-y-12">
@@ -196,7 +201,7 @@ export default function Dashboard() {
                       <span className="ornament-dot" />
                     </span>
                     <span className="text-[13px] text-text-muted">
-                      {plural(items.length, 'lieu', 'lieux')}
+                      {plural(items.length, t('unit.place'), t('unit.places'))}
                     </span>
                   </Reveal>
 
@@ -254,6 +259,7 @@ function TimelineRow({
   tripTitle?: string
   delay: number
 }) {
+  const { t, locale } = useI18n()
   return (
     <Reveal as="li" delay={delay} className="bg-bg">
       <Link
@@ -282,8 +288,8 @@ function TimelineRow({
 
         <span className="shrink-0 text-right text-[13px] text-text-muted">
           {place.visit_date
-            ? formatDate(place.visit_date, { day: 'numeric', month: 'short' })
-            : 'sans date'}
+            ? formatDate(place.visit_date, { day: 'numeric', month: 'short' }, locale)
+            : t('journal.noDate')}
         </span>
       </Link>
     </Reveal>

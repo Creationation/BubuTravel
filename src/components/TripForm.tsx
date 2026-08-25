@@ -3,6 +3,7 @@ import { usePlaces } from '../context/PlacesContext'
 import CoverPicker from './CoverPicker'
 import type { Trip, TripStatus } from '../lib/types'
 import { errorMessage } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 type Props = {
   trip?: Trip
@@ -12,6 +13,7 @@ type Props = {
 
 /** Creation et modification d'un voyage, meme formulaire dans les deux cas. */
 export default function TripForm({ trip, onDone, onCancel }: Props) {
+  const t = useT()
   const { addTrip, editTrip } = usePlaces()
   const [title, setTitle] = useState(trip?.title ?? '')
   const [start, setStart] = useState(trip?.start_date ?? '')
@@ -25,7 +27,7 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (start && end && end < start) {
-      setError('La date de fin est avant la date de debut.')
+      setError(t('trips.endBeforeStart'))
       return
     }
     setBusy(true)
@@ -52,27 +54,23 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
   return (
     <form onSubmit={onSubmit} className="panel space-y-4 p-6">
       <div>
-        <label className="label">Ce voyage</label>
+        <label className="label">{t('trips.thisTrip')}</label>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setStatus('planning')}
             className={`pill justify-center ${status === 'planning' ? 'pill-active' : ''}`}
-          >
-            A preparer
-          </button>
+          >{t('trips.statusPlanning')}</button>
           <button
             type="button"
             onClick={() => setStatus('done')}
             className={`pill justify-center ${status === 'done' ? 'pill-active' : ''}`}
-          >
-            Deja fait
-          </button>
+          >{t('trips.statusDone')}</button>
         </div>
       </div>
 
       <div>
-        <label className="label">Titre du voyage</label>
+        <label className="label">{t('trips.titleLabel')}</label>
         <input
           className="field"
           value={title}
@@ -85,7 +83,7 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label">Debut</label>
+          <label className="label">{t('trips.start')}</label>
           <input
             className="field"
             type="date"
@@ -94,7 +92,7 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
           />
         </div>
         <div>
-          <label className="label">Fin</label>
+          <label className="label">{t('trips.end')}</label>
           <input
             className="field"
             type="date"
@@ -105,23 +103,23 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
       </div>
 
       <div>
-        <label className="label">Photo de couverture</label>
+        <label className="label">{t('trips.cover')}</label>
         <CoverPicker value={cover} onChange={setCover} />
         <input
           className="field mt-2"
           value={cover}
           onChange={(e) => setCover(e.target.value)}
-          placeholder="Ou collez l'adresse d'une image"
+          placeholder={t('trips.coverPaste')}
         />
       </div>
 
       <div>
-        <label className="label">Notes</label>
+        <label className="label">{t('common.notes')}</label>
         <textarea
           className="field min-h-20 resize-y"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Le fil du voyage, les personnes, les surprises..."
+          placeholder={t('trips.notesPlaceholder')}
         />
       </div>
 
@@ -129,11 +127,9 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
 
       <div className="flex gap-2">
         <button type="submit" className="btn btn-accent" disabled={busy}>
-          {busy ? 'Enregistrement...' : trip ? 'Enregistrer' : 'Creer le voyage'}
+          {busy ? t('common.saving') : trip ? t('common.save') : t('trips.createAction')}
         </button>
-        <button type="button" onClick={onCancel} className="btn btn-quiet">
-          Annuler
-        </button>
+        <button type="button" onClick={onCancel} className="btn btn-quiet">{t('common.cancel')}</button>
       </div>
     </form>
   )

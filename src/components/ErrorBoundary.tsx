@@ -1,5 +1,23 @@
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
+import { fr } from '../i18n/fr'
+import { en } from '../i18n/en'
+import type { Key } from '../i18n/fr'
+
+/**
+ * Ce garde-fou est un composant de classe, il ne peut donc pas utiliser de
+ * hook, et il doit de toute facon survivre a un contexte casse : c'est
+ * precisement quand tout a lache qu'il s'affiche. Il lit donc la langue
+ * directement dans le stockage local.
+ */
+function translate(key: Key): string {
+  try {
+    const lang = localStorage.getItem('bubutravel:lang')
+    return (lang === 'en' ? en : fr)[key]
+  } catch {
+    return fr[key]
+  }
+}
 
 type Props = { children: ReactNode }
 type State = { error: Error | null }
@@ -29,22 +47,16 @@ export default class ErrorBoundary extends Component<Props, State> {
           <span className="mx-auto mb-6 flex h-14 w-11 items-end justify-center rounded-t-full border border-line bg-surface-2 pb-2.5">
             <span className="h-2 w-2 rotate-45 border border-accent" />
           </span>
-          <h1 className="display-sm text-2xl">Quelque chose a lache</h1>
-          <p className="lede mt-3 text-[14px]">
-            L'affichage s'est arrete net. Recharger la page suffit presque toujours.
-          </p>
+          <h1 className="display-sm text-2xl">{translate('error.title')}</h1>
+          <p className="lede mt-3 text-[14px]">{translate('error.body')}</p>
 
           <p className="notice notice-bad mt-5 break-words text-left font-mono text-[11px]">
             {error.message}
           </p>
 
           <div className="mt-6 flex justify-center gap-2">
-            <button onClick={() => window.location.reload()} className="btn btn-accent">
-              Recharger
-            </button>
-            <a href="/" className="btn">
-              Retour au carnet
-            </a>
+            <button onClick={() => window.location.reload()} className="btn btn-accent">{translate('error.reload')}</button>
+            <a href="/" className="btn">{translate('error.home')}</a>
           </div>
         </div>
       </div>

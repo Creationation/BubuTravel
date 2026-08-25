@@ -21,11 +21,7 @@ export function errorMessage(err: unknown): string {
 
 const MISSING_TABLE = /does not exist|schema cache|Could not find the (table|function)/i
 
-/** Message clair quand la migration 002 n'a pas encore ete executee. */
-export function friendlyError(err: unknown): string {
-  const raw = errorMessage(err)
-  if (MISSING_TABLE.test(raw)) {
-    return "Une table ou une fonction manque cote Supabase. Executez supabase/migrations/002_trips_gallery_sharing.sql dans le SQL Editor."
-  }
-  return raw
+/** Vrai quand une migration n'a pas encore ete executee cote Supabase. */
+export function isMissingTable(err: unknown): boolean {
+  return MISSING_TABLE.test(errorMessage(err))
 }

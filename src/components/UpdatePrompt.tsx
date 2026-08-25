@@ -1,4 +1,5 @@
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { useT } from '../i18n/I18nContext'
 
 /**
  * L'app est installable et fonctionne hors ligne. Un service worker garde
@@ -7,6 +8,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
  * jours sur un telephone qui ne ferme jamais l'onglet.
  */
 export default function UpdatePrompt() {
+  const t = useT()
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -20,13 +22,11 @@ export default function UpdatePrompt() {
       <div className="panel flex items-center gap-3 px-4 py-3 shadow-xl">
         <p className="min-w-0 flex-1 text-[13px] text-text-soft">
           {needRefresh
-            ? 'Une nouvelle version est prete.'
-            : 'BuBuTravel fonctionne maintenant hors ligne.'}
+            ? t('pwa.updateReady')
+            : t('pwa.offlineReady')}
         </p>
         {needRefresh && (
-          <button onClick={() => void updateServiceWorker(true)} className="btn btn-accent btn-xs">
-            Mettre a jour
-          </button>
+          <button onClick={() => void updateServiceWorker(true)} className="btn btn-accent btn-xs">{t('pwa.update')}</button>
         )}
         <button
           onClick={() => {
@@ -34,7 +34,7 @@ export default function UpdatePrompt() {
             setNeedRefresh(false)
           }}
           className="btn btn-quiet btn-xs"
-          aria-label="Fermer"
+          aria-label={t('common.close')}
         >
           ✕
         </button>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
 import type { Category } from '../lib/types'
+import { useT } from '../i18n/I18nContext'
 
 const PALETTE = [
   '#c4653d',
@@ -16,6 +17,7 @@ const PALETTE = [
 
 /** Creation, renommage, recoloration et suppression des categories. */
 export default function CategoryManager() {
+  const t = useT()
   const { categories, places, addCategory, editCategory, removeCategory, seedDefaultCategories } =
     usePlaces()
   const [name, setName] = useState('')
@@ -35,7 +37,7 @@ export default function CategoryManager() {
       // 23505 : l'index unique sur (user_id, lower(name))
       setError(
         raw.includes('categories_user_name_key') || raw.includes('duplicate key')
-          ? 'Une categorie porte deja ce nom.'
+          ? t('cat.duplicate')
           : raw,
       )
     } finally {
@@ -49,7 +51,7 @@ export default function CategoryManager() {
     <div>
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1">
-          <label className="label">Nouvelle categorie</label>
+          <label className="label">{t('cat.new')}</label>
           <input
             className="field"
             value={name}
@@ -62,7 +64,7 @@ export default function CategoryManager() {
                 })
               }
             }}
-            placeholder="Randonnee, cafe, point de vue..."
+            placeholder={t('cat.placeholder')}
           />
         </div>
         <Swatches value={color} onChange={setColor} />
@@ -75,23 +77,19 @@ export default function CategoryManager() {
           }
           className="btn btn-accent"
           disabled={busy || !name.trim()}
-        >
-          Ajouter
-        </button>
+        >{t('common.add')}</button>
       </div>
 
       {error && <p className="notice notice-bad mt-3">{error}</p>}
 
       {categories.length === 0 ? (
         <div className="mt-5 rounded-xl border border-dashed border-line px-4 py-6 text-center">
-          <p className="text-[13px] text-text-muted">Aucune categorie pour l'instant.</p>
+          <p className="text-[13px] text-text-muted">{t('cat.none')}</p>
           <button
             onClick={() => void run(seedDefaultCategories)}
             className="btn btn-xs mt-3"
             disabled={busy}
-          >
-            Partir d'une liste de base
-          </button>
+          >{t('cat.seed')}</button>
         </div>
       ) : (
         <ul className="mt-5 space-y-2">
@@ -119,9 +117,7 @@ export default function CategoryManager() {
                   <span className="shrink-0 text-[12px] text-text-muted">
                     {countOf(cat.id)} lieu{countOf(cat.id) > 1 ? 'x' : ''}
                   </span>
-                  <button onClick={() => setEditingId(cat.id)} className="btn btn-xs btn-quiet">
-                    Modifier
-                  </button>
+                  <button onClick={() => setEditingId(cat.id)} className="btn btn-xs btn-quiet">{t('common.edit')}</button>
                   <button
                     onClick={() => {
                       if (confirmId !== cat.id) {
@@ -138,7 +134,7 @@ export default function CategoryManager() {
                     }`}
                     disabled={busy}
                   >
-                    {confirmId === cat.id ? 'Confirmer' : 'Supprimer'}
+                    {confirmId === cat.id ? t('common.confirm') : t('common.delete')}
                   </button>
                 </div>
               )}
@@ -147,10 +143,7 @@ export default function CategoryManager() {
         </ul>
       )}
 
-      <p className="mt-4 text-[11px] leading-relaxed text-text-muted">
-        Supprimer une categorie ne supprime aucun lieu : ceux qui la portaient se retrouvent
-        simplement sans categorie.
-      </p>
+      <p className="mt-4 text-[11px] leading-relaxed text-text-muted">{t('cat.deleteNote')}</p>
     </div>
   )
 }
@@ -168,6 +161,7 @@ function EditRow({
 }) {
   const [name, setName] = useState(category.name)
   const [color, setColor] = useState(category.color)
+  const t = useT()
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -182,12 +176,8 @@ function EditRow({
         onClick={() => onSave({ name: name.trim() || category.name, color })}
         className="btn btn-xs btn-accent"
         disabled={busy}
-      >
-        Enregistrer
-      </button>
-      <button onClick={onCancel} className="btn btn-xs btn-quiet">
-        Annuler
-      </button>
+      >{t('common.save')}</button>
+      <button onClick={onCancel} className="btn btn-xs btn-quiet">{t('common.cancel')}</button>
     </div>
   )
 }

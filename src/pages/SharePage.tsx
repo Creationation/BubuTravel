@@ -11,6 +11,7 @@ import ThemeToggle from '../components/ThemeToggle'
 import { Avatar } from '../components/AppShell'
 import type { Place } from '../lib/types'
 import { errorMessage } from '../lib/errors'
+import { useI18n } from '../i18n/I18nContext'
 
 /**
  * Vue publique en lecture seule. Aucun compte n'est requis : tout passe par
@@ -18,6 +19,7 @@ import { errorMessage } from '../lib/errors'
  * Rien n'est modifiable ici, et l'email du proprietaire n'est jamais renvoye.
  */
 export default function SharePage() {
+  const { t, locale } = useI18n()
   const { token = '' } = useParams()
   const [data, setData] = useState<SharedData | null>(null)
   const [urls, setUrls] = useState<Record<string, string>>({})
@@ -55,7 +57,7 @@ export default function SharePage() {
   if (loading) {
     return (
       <Frame>
-        <p className="text-[13px] text-text-muted">Ouverture du carnet...</p>
+        <p className="text-[13px] text-text-muted">{t('share.opening')}</p>
       </Frame>
     )
   }
@@ -63,15 +65,13 @@ export default function SharePage() {
   if (error || !data || !data.profile) {
     return (
       <Frame>
-        <h1 className="display-sm text-3xl">Ce lien ne fonctionne plus</h1>
-        <p className="lede mx-auto mt-3 max-w-md">
-          Le partage a peut-etre ete desactive ou regenere par son proprietaire.
-        </p>
+        <h1 className="display-sm text-3xl">{t('share.dead')}</h1>
+        <p className="lede mx-auto mt-3 max-w-md">{t('share.deadBody')}</p>
       </Frame>
     )
   }
 
-  const name = data.profile.display_name || 'Un voyageur'
+  const name = data.profile.display_name || t('share.aTraveller')
   // Les vues partagees n'ont pas de user_id, on complete pour reutiliser les calculs
   const places = data.places.map((p) => ({ ...p, user_id: '', created_at: '' })) as Place[]
   const stats = buildStats(places, data.photos.length)
@@ -82,8 +82,8 @@ export default function SharePage() {
       <header className="sticky top-0 z-[900] border-b border-line bg-bg/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-5 sm:px-8">
           <span className="h-2 w-2 rounded-full bg-accent" />
-          <span className="display-sm text-xl">BuBuTravel</span>
-          <span className="pill ml-2 hidden sm:inline-flex">Lecture seule</span>
+          <span className="display-sm text-xl">{t('app.name')}</span>
+          <span className="pill ml-2 hidden sm:inline-flex">{t('share.readOnly')}</span>
           <div className="ml-auto">
             <ThemeToggle />
           </div>
@@ -95,14 +95,14 @@ export default function SharePage() {
           <Reveal>
             <div className="flex items-center gap-4">
               <Avatar url={data.profile.avatar_url} name={name} size={52} />
-              <p className="eyebrow mb-0">Le carnet de {name}</p>
+              <p className="eyebrow mb-0">{t('share.journalOf')}</p>
             </div>
             <h1 className="display mt-6 text-[clamp(2.4rem,7vw,4.6rem)]">
-              {plural(stats.countries, 'pays', 'pays')}, {plural(stats.places, 'lieu', 'lieux')}
+              {plural(stats.countries, t('unit.country'), t('unit.country'))}, {plural(stats.places, t('unit.place'), t('unit.places'))}
             </h1>
             <p className="lede mt-5 max-w-xl">
-              {formatKm(stats.km)} {stats.km > 1 ? 'kilometres' : 'kilometre'} a vol d'oiseau,{' '}
-              {plural(stats.photos, 'photo')}
+              {formatKm(stats.km)} {stats.km > 1 ? t('unit.kms') : t('unit.km')} a vol d'oiseau,{' '}
+              {plural(stats.photos, t('unit.photo'))}
               {stats.firstYear ? `, depuis ${stats.firstYear}` : ''}.
             </p>
           </Reveal>
@@ -127,7 +127,7 @@ export default function SharePage() {
         {data.trips.length > 0 && (
           <section className="mt-16">
             <Reveal className="mb-6">
-              <p className="eyebrow">Voyages</p>
+              <p className="eyebrow">{t('nav.trips')}</p>
             </Reveal>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {data.trips.map((trip, i) => (
@@ -139,7 +139,7 @@ export default function SharePage() {
                     <div className="p-5">
                       <h3 className="display-sm text-xl">{trip.title}</h3>
                       <p className="mt-1.5 text-[13px] text-text-muted">
-                        {formatRange(trip.start_date, trip.end_date)}
+                        {formatRange(trip.start_date, trip.end_date, t, locale)}
                       </p>
                     </div>
                   </div>
@@ -165,7 +165,7 @@ export default function SharePage() {
                     <Reveal key={place.id} delay={i * 50}>
                       <article className="border-b border-line pb-8">
                         <p className="eyebrow">
-                          {place.visit_date ? formatDate(place.visit_date) : 'Sans date'}
+                          {place.visit_date ? formatDate(place.visit_date) : t('trips.noStep')}
                         </p>
                         <h4 className="display-sm mt-2 text-2xl">{place.name}</h4>
                         <p className="mt-1 text-[13px] text-text-muted">

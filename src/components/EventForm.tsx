@@ -4,6 +4,8 @@ import { errorMessage } from '../lib/errors'
 import { RECURRENCES, isoToLocalInput, localInputToIso } from '../lib/events'
 import { CURRENCIES } from './PlaceExtras'
 import type { TravelEvent } from '../lib/types'
+import type { Key } from '../i18n/fr'
+import { useT } from '../i18n/I18nContext'
 
 type Props = {
   event?: TravelEvent
@@ -12,18 +14,19 @@ type Props = {
 }
 
 /** Suggestions de nature, pour reconnaitre un evenement d'un coup d'oeil. */
-const KINDS = [
-  'Concert',
-  'Festival',
-  'Marche',
-  'Exposition',
-  'Spectacle',
-  'Sport',
-  'Fete locale',
-  'Atelier',
+const KINDS: Key[] = [
+  'kind.concert',
+  'kind.festival',
+  'kind.market',
+  'kind.exhibition',
+  'kind.show',
+  'kind.sport',
+  'kind.localFete',
+  'kind.workshop',
 ]
 
 export default function EventForm({ event, onDone, onCancel }: Props) {
+  const t = useT()
   const { places, trips, categories, addEvent, editEvent } = usePlaces()
 
   const [form, setForm] = useState({
@@ -56,11 +59,11 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.startsAt) {
-      setError('La date de debut est obligatoire.')
+      setError(t('events.startRequired'))
       return
     }
     if (form.endsAt && form.endsAt < form.startsAt) {
-      setError('La fin est avant le debut.')
+      setError(t('events.endBeforeStart'))
       return
     }
 
@@ -109,29 +112,29 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
   return (
     <form onSubmit={onSubmit} className="panel space-y-5 p-6">
       <div>
-        <label className="label">Titre</label>
+        <label className="label">{t('events.title')}</label>
         <input
           className="field"
           value={form.title}
           onChange={(e) => set('title', e.target.value)}
-          placeholder="Marche de Noel du Rathausplatz"
+          placeholder={t('events.titlePlaceholder')}
           required
           autoFocus
         />
       </div>
 
       <div>
-        <label className="label">Nature</label>
+        <label className="label">{t('events.kind')}</label>
         <input
           className="field"
           value={form.kind}
           onChange={(e) => set('kind', e.target.value)}
-          placeholder="Concert, marche, festival..."
+          placeholder={t('events.kindPlaceholder')}
           list="event-kinds"
         />
         <datalist id="event-kinds">
           {KINDS.map((k) => (
-            <option key={k} value={k} />
+            <option key={k} value={t(k)} />
           ))}
         </datalist>
       </div>
@@ -152,13 +155,11 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
                 endsAt: prev.endsAt ? prev.endsAt.slice(0, allDay ? 10 : 16) : '',
               }))
             }}
-          />
-          Journee entiere
-        </label>
+          />{t('events.allDay')}</label>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="label">Debut</label>
+            <label className="label">{t('trips.start')}</label>
             <input
               className="field"
               type={form.allDay ? 'date' : 'datetime-local'}
@@ -168,7 +169,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             />
           </div>
           <div>
-            <label className="label">Fin</label>
+            <label className="label">{t('trips.end')}</label>
             <input
               className="field"
               type={form.allDay ? 'date' : 'datetime-local'}
@@ -180,7 +181,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="label">Recurrence</label>
+            <label className="label">{t('events.recurrence')}</label>
             <select
               className="field"
               value={form.recurrence}
@@ -188,14 +189,14 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             >
               {RECURRENCES.map((r) => (
                 <option key={r.value} value={r.value}>
-                  {r.fr}
+                  {t(r.label)}
                 </option>
               ))}
             </select>
           </div>
           {form.recurrence !== 'none' && (
             <div>
-              <label className="label">Jusqu'au</label>
+              <label className="label">{t('events.until')}</label>
               <input
                 className="field"
                 type="date"
@@ -210,13 +211,13 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
       {/* Ou */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="label">Lieu du carnet</label>
+          <label className="label">{t('events.venuePlace')}</label>
           <select
             className="field"
             value={form.placeId}
             onChange={(e) => set('placeId', e.target.value)}
           >
-            <option value="">Ailleurs</option>
+            <option value="">{t('events.elsewhere')}</option>
             {places.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}, {p.country}
@@ -226,12 +227,12 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
         </div>
         {!form.placeId && (
           <div>
-            <label className="label">Adresse ou salle</label>
+            <label className="label">{t('events.venue')}</label>
             <input
               className="field"
               value={form.venue}
               onChange={(e) => set('venue', e.target.value)}
-              placeholder="Rathausplatz, Vienne"
+              placeholder={t('events.venuePlaceholder')}
             />
           </div>
         )}
@@ -239,9 +240,9 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="label">Voyage</label>
+          <label className="label">{t('common.trip')}</label>
           <select className="field" value={form.tripId} onChange={(e) => set('tripId', e.target.value)}>
-            <option value="">Aucun</option>
+            <option value="">{t('common.none')}</option>
             {trips.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title}
@@ -250,13 +251,13 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
           </select>
         </div>
         <div>
-          <label className="label">Categorie</label>
+          <label className="label">{t('common.category')}</label>
           <select
             className="field"
             value={form.categoryId}
             onChange={(e) => set('categoryId', e.target.value)}
           >
-            <option value="">Aucune</option>
+            <option value="">{t('common.none')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -273,14 +274,12 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             type="checkbox"
             checked={form.isFree}
             onChange={(e) => set('isFree', e.target.checked)}
-          />
-          Entree libre
-        </label>
+          />{t('events.free')}</label>
 
         {!form.isFree && (
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <label className="label">Prix</label>
+              <label className="label">{t('common.price')}</label>
               <input
                 className="field"
                 inputMode="decimal"
@@ -290,7 +289,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
               />
             </div>
             <div>
-              <label className="label">Devise</label>
+              <label className="label">{t('common.currency')}</label>
               <select
                 className="field"
                 value={form.currency}
@@ -307,19 +306,19 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
         )}
 
         <div className="mt-3">
-          <label className="label">Reservation</label>
+          <label className="label">{t('events.booking')}</label>
           <input
             className="field"
             value={form.bookingNote}
             onChange={(e) => set('bookingNote', e.target.value)}
-            placeholder="Billet a prendre sur place, reserver 2 jours avant..."
+            placeholder={t('events.bookingPlaceholder')}
           />
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="label">Organisateur</label>
+          <label className="label">{t('events.organizer')}</label>
           <input
             className="field"
             value={form.organizer}
@@ -328,7 +327,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
           />
         </div>
         <div>
-          <label className="label">Lien</label>
+          <label className="label">{t('events.link')}</label>
           <input
             className="field"
             type="url"
@@ -340,12 +339,12 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
       </div>
 
       <div>
-        <label className="label">Description</label>
+        <label className="label">{t('events.description')}</label>
         <textarea
           className="field min-h-20 resize-y"
           value={form.description}
           onChange={(e) => set('description', e.target.value)}
-          placeholder="Ce qu'il faut savoir, ce qui vaut le detour..."
+          placeholder={t('events.descriptionPlaceholder')}
         />
       </div>
 
@@ -353,11 +352,9 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
 
       <div className="flex gap-2">
         <button type="submit" className="btn btn-accent" disabled={busy}>
-          {busy ? 'Enregistrement...' : event ? 'Enregistrer' : "Creer l'evenement"}
+          {busy ? t('common.saving') : event ? t('common.save') : t('events.createAction')}
         </button>
-        <button type="button" onClick={onCancel} className="btn btn-quiet">
-          Annuler
-        </button>
+        <button type="button" onClick={onCancel} className="btn btn-quiet">{t('common.cancel')}</button>
       </div>
     </form>
   )

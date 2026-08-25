@@ -35,7 +35,8 @@ import type {
 import { buildStats } from '../lib/stats'
 import type { Stats } from '../lib/stats'
 import { useAuth } from './AuthContext'
-import { friendlyError } from '../lib/errors'
+import { errorMessage, isMissingTable } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 type PlacesValue = {
   /** Tous les lieux, visites et souhaites confondus. */
@@ -77,6 +78,7 @@ const PlacesContext = createContext<PlacesValue | null>(null)
 
 export function PlacesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const t = useT()
   const [places, setPlaces] = useState<Place[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [tracks, setTracks] = useState<Track[]>([])
@@ -115,11 +117,11 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       setEvents(ev)
       setPhotoCount(c)
     } catch (err) {
-      setError(friendlyError(err))
+      setError(isMissingTable(err) ? t('error.missingTable') : errorMessage(err))
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, t])
 
   useEffect(() => {
     void reload()
@@ -149,7 +151,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       stats: buildStats(visited, photoCount),
       placesOfTrip: (tripId) => sortPlaces(places.filter((p) => p.trip_id === tripId)).reverse(),
       async add(input) {
-        if (!user) throw new Error('Non connecte')
+        if (!user) throw new Error(t('error.notSignedIn'))
         const created = await createPlace({ ...input, user_id: user.id })
         setPlaces((prev) => sortPlaces([created, ...prev]))
         return created
@@ -165,7 +167,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         void refreshPhotoCount()
       },
       async addTrip(input) {
-        if (!user) throw new Error('Non connecte')
+        if (!user) throw new Error(t('error.notSignedIn'))
         const created = await createTrip({ ...input, user_id: user.id })
         setTrips((prev) => sortTrips([created, ...prev]))
         return created
@@ -187,7 +189,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         setTracks((prev) => prev.filter((t) => t.id !== id))
       },
       async addCategory(name, color) {
-        if (!user) throw new Error('Non connecte')
+        if (!user) throw new Error(t('error.notSignedIn'))
         const created = await createCategory({ user_id: user.id, name, color, icon: null })
         setCategories((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'fr')))
         return created
@@ -208,7 +210,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
         )
       },
       async seedDefaultCategories() {
-        if (!user) throw new Error('Non connecte')
+        if (!user) throw new Error(t('error.notSignedIn'))
         const created = await seedCategories(user.id)
         setCategories((prev) =>
           [...prev, ...created].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
@@ -216,7 +218,7 @@ export function PlacesProvider({ children }: { children: ReactNode }) {
       },
       categoryOf: (place) => (place.category_id ? (byId.get(place.category_id) ?? null) : null),
       async addEvent(input) {
-        if (!user) throw new Error('Non connecte')
+        if (!user) throw new Error(t('error.notSignedIn'))
         const created = await createEvent({ ...input, user_id: user.id })
         setEvents((prev) => [...prev, created])
         return created

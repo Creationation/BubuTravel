@@ -1,4 +1,7 @@
 import type { Place } from './types'
+import type { Key } from '../i18n/fr'
+
+type Translate = (key: Key, params?: Record<string, string | number>) => string
 
 const EARTH_RADIUS_KM = 6371
 
@@ -71,32 +74,52 @@ export function formatKm(km: number): string {
   return String(km)
 }
 
-export function formatDate(iso: string | null, opts?: Intl.DateTimeFormatOptions): string {
+export function formatDate(
+  iso: string | null,
+  opts?: Intl.DateTimeFormatOptions,
+  locale = 'fr-FR',
+): string {
   if (!iso) return ''
   return new Date(`${iso}T00:00:00`).toLocaleDateString(
-    'fr-FR',
+    locale,
     opts ?? { day: 'numeric', month: 'long', year: 'numeric' },
   )
 }
 
 /** "12 au 20 mars 2026", ou une seule date si les deux sont identiques. */
-export function formatRange(start: string | null, end: string | null): string {
-  if (!start && !end) return 'Dates non renseignees'
-  if (start && !end) return `A partir du ${formatDate(start)}`
-  if (!start && end) return `Jusqu'au ${formatDate(end)}`
-  if (start === end) return formatDate(start)
+export function formatRange(
+  start: string | null,
+  end: string | null,
+  t: Translate,
+  locale = 'fr-FR',
+): string {
+  if (!start && !end) return t('trips.datesUnset')
+  if (start && !end) return t('trips.rangeFrom', { date: formatDate(start, undefined, locale) })
+  if (!start && end) return t('trips.rangeUntil', { date: formatDate(end, undefined, locale) })
+  if (start === end) return formatDate(start, undefined, locale)
+
   const s = new Date(`${start}T00:00:00`)
   const e = new Date(`${end}T00:00:00`)
   const sameYear = s.getFullYear() === e.getFullYear()
   const sameMonth = sameYear && s.getMonth() === e.getMonth()
+
+  // Meme mois : seul le quantieme change, inutile de le repeter en entier
   if (sameMonth) {
-    return `${s.getDate()} au ${formatDate(end)}`
+    return t('trips.rangeTo', {
+      start: String(s.getDate()),
+      end: formatDate(end, undefined, locale),
+    })
   }
   if (sameYear) {
-    const left = s.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
-    return `${left} au ${formatDate(end)}`
+    return t('trips.rangeTo', {
+      start: s.toLocaleDateString(locale, { day: 'numeric', month: 'long' }),
+      end: formatDate(end, undefined, locale),
+    })
   }
-  return `${formatDate(start)} au ${formatDate(end)}`
+  return t('trips.rangeTo', {
+    start: formatDate(start, undefined, locale),
+    end: formatDate(end, undefined, locale),
+  })
 }
 
 /** Regroupe des lieux par annee, du plus recent au plus ancien. */

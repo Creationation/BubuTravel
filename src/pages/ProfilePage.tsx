@@ -7,10 +7,13 @@ import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import CategoryManager from '../components/CategoryManager'
 import DataTools from '../components/DataTools'
+import LanguageSwitch from '../i18n/LanguageSwitch'
+import { useT } from '../i18n/I18nContext'
 import { useTheme } from '../context/ThemeContext'
 import { errorMessage } from '../lib/errors'
 
 export default function ProfilePage() {
+  const t = useT()
   const { user, profile, refreshProfile, changePassword } = useAuth()
   const { stats } = usePlaces()
   const { theme, setTheme } = useTheme()
@@ -26,7 +29,7 @@ export default function ProfilePage() {
   const [shareBusy, setShareBusy] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'Voyageur'
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || t('common.traveller')
 
   useEffect(() => {
     setName(profile?.display_name ?? '')
@@ -72,7 +75,7 @@ export default function ProfilePage() {
 
   async function savePassword() {
     if (password.length < 6) {
-      setError('Mot de passe trop court, 6 caracteres minimum.')
+      setError(t('auth.passwordShort'))
       return
     }
     setBusy(true)
@@ -112,7 +115,7 @@ export default function ProfilePage() {
       <div className="mx-auto w-full max-w-3xl px-5 pb-24 sm:px-8">
         <section className="border-b border-line py-12 sm:py-16">
           <Reveal>
-            <p className="eyebrow">Profil</p>
+            <p className="eyebrow">{t('nav.profile')}</p>
             <h1 className="display mt-4 text-[clamp(2.2rem,6vw,4rem)]">{displayName}</h1>
             <p className="lede mt-4">{user?.email}</p>
           </Reveal>
@@ -121,19 +124,17 @@ export default function ProfilePage() {
         {/* Identite */}
         <Reveal className="mt-10">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Identite</h2>
+            <h2 className="display-sm text-2xl">{t('profile.identity')}</h2>
 
             <div className="mt-6 flex flex-wrap items-center gap-5">
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={busy}
                 className="group relative rounded-full"
-                title="Changer la photo de profil"
+                title={t('profile.changePhotoTitle')}
               >
                 <Avatar url={profile?.avatar_url} name={displayName} size={72} />
-                <span className="absolute inset-0 hidden items-center justify-center rounded-full bg-bg-deep/70 text-[11px] text-text group-hover:flex">
-                  Changer
-                </span>
+                <span className="absolute inset-0 hidden items-center justify-center rounded-full bg-bg-deep/70 text-[11px] text-text group-hover:flex">{t('profile.changePhoto')}</span>
               </button>
               <input
                 ref={fileRef}
@@ -147,7 +148,7 @@ export default function ProfilePage() {
               />
 
               <div className="min-w-56 flex-1">
-                <label className="label">Nom affiche</label>
+                <label className="label">{t('profile.displayName')}</label>
                 <div className="flex gap-2">
                   <input
                     className="field"
@@ -156,7 +157,7 @@ export default function ProfilePage() {
                     onKeyDown={(e) => e.key === 'Enter' && void saveName()}
                   />
                   <button onClick={() => void saveName()} className="btn" disabled={busy}>
-                    {saved ? 'Enregistre' : 'Enregistrer'}
+                    {saved ? t('common.saved') : t('common.save')}
                   </button>
                 </div>
               </div>
@@ -167,23 +168,28 @@ export default function ProfilePage() {
         {/* Apparence */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Apparence</h2>
-            <p className="lede mt-2 text-[14px]">
-              Le theme suit votre systeme tant que vous n'avez rien choisi ici.
-            </p>
+            <h2 className="display-sm text-2xl">{t('profile.appearance')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.themeFollows')}</p>
             <div className="mt-5 flex gap-2">
               <button
                 onClick={() => setTheme('dark')}
                 className={`pill ${theme === 'dark' ? 'pill-active' : ''}`}
-              >
-                Sombre
-              </button>
+              >{t('profile.dark')}</button>
               <button
                 onClick={() => setTheme('light')}
                 className={`pill ${theme === 'light' ? 'pill-active' : ''}`}
-              >
-                Clair
-              </button>
+              >{t('profile.light')}</button>
+            </div>
+          </section>
+        </Reveal>
+
+        {/* Langue */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">{t('profile.language')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.languageHint')}</p>
+            <div className="mt-5">
+              <LanguageSwitch />
             </div>
           </section>
         </Reveal>
@@ -191,10 +197,8 @@ export default function ProfilePage() {
         {/* Securite */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Mot de passe</h2>
-            <p className="lede mt-2 text-[14px]">
-              Changez-le quand vous voulez, sans passer par un email.
-            </p>
+            <h2 className="display-sm text-2xl">{t('auth.password')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.passwordHint')}</p>
             <div className="mt-5 flex max-w-md flex-wrap gap-2">
               <input
                 className="field min-w-48 flex-1"
@@ -202,7 +206,7 @@ export default function ProfilePage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nouveau mot de passe"
+                placeholder={t('auth.newPassword')}
                 minLength={6}
               />
               <button
@@ -210,7 +214,7 @@ export default function ProfilePage() {
                 className="btn"
                 disabled={busy || password.length < 6}
               >
-                {passwordDone ? 'Change' : 'Changer'}
+                {passwordDone ? t('profile.passwordChanged') : t('profile.changePhoto')}
               </button>
             </div>
           </section>
@@ -219,11 +223,8 @@ export default function ProfilePage() {
         {/* Categories */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Categories</h2>
-            <p className="lede mt-2 text-[14px]">
-              Pour ranger les lieux : ville, nature, restaurant, ce que vous voulez. Elles servent
-              de filtre dans la bucketlist et dans la galerie.
-            </p>
+            <h2 className="display-sm text-2xl">{t('common.categories')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.categoriesHint')}</p>
             <div className="mt-6">
               <CategoryManager />
             </div>
@@ -233,11 +234,8 @@ export default function ProfilePage() {
         {/* Partage */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Partage en lecture seule</h2>
-            <p className="lede mt-2 text-[14px]">
-              Un lien unique donne acces a une version consultable de votre carnet, sans compte et
-              sans possibilite de modifier quoi que ce soit. Votre email n'y figure jamais.
-            </p>
+            <h2 className="display-sm text-2xl">{t('profile.share')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.shareHint')}</p>
 
             {share?.is_active && shareUrl ? (
               <div className="mt-5 space-y-3">
@@ -251,31 +249,23 @@ export default function ProfilePage() {
                     }}
                     className="btn btn-accent"
                   >
-                    {copied ? 'Copie' : 'Copier'}
+                    {copied ? t('profile.shareCopied') : t('profile.shareCopy')}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <a href={shareUrl} target="_blank" rel="noreferrer" className="btn btn-xs">
-                    Ouvrir le lien
-                  </a>
+                  <a href={shareUrl} target="_blank" rel="noreferrer" className="btn btn-xs">{t('profile.shareOpen')}</a>
                   <button
                     onClick={() => void runShare('rotate')}
                     className="btn btn-xs"
                     disabled={shareBusy}
-                  >
-                    Regenerer le lien
-                  </button>
+                  >{t('profile.shareRotate')}</button>
                   <button
                     onClick={() => void runShare('off')}
                     className="btn btn-xs btn-quiet"
                     disabled={shareBusy}
-                  >
-                    Desactiver
-                  </button>
+                  >{t('profile.shareDisable')}</button>
                 </div>
-                <p className="text-[11px] text-text-muted">
-                  Regenerer coupe immediatement l'ancien lien pour tout le monde.
-                </p>
+                <p className="text-[11px] text-text-muted">{t('profile.shareRotateHint')}</p>
               </div>
             ) : (
               <button
@@ -283,7 +273,7 @@ export default function ProfilePage() {
                 className="btn btn-accent mt-5"
                 disabled={shareBusy}
               >
-                {shareBusy ? 'Un instant...' : 'Activer le partage'}
+                {shareBusy ? t('common.wait') : t('profile.shareEnable')}
               </button>
             )}
           </section>
@@ -292,10 +282,8 @@ export default function ProfilePage() {
         {/* Sauvegarde */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">Sauvegarde et export</h2>
-            <p className="lede mt-2 text-[14px]">
-              Vos donnees vous appartiennent : emportez-les quand vous voulez.
-            </p>
+            <h2 className="display-sm text-2xl">{t('profile.backup')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('profile.backupHint')}</p>
             <div className="mt-6">
               <DataTools />
             </div>
@@ -305,12 +293,12 @@ export default function ProfilePage() {
         {/* Chiffres */}
         <Reveal className="mt-6">
           <section className="panel p-6 sm:p-8">
-            <h2 className="display-sm text-2xl">En chiffres</h2>
+            <h2 className="display-sm text-2xl">{t('profile.figures')}</h2>
             <div className="mt-5 grid grid-cols-2 gap-5 sm:grid-cols-4">
-              <Fig label="Pays" value={stats.countries} />
-              <Fig label="Villes" value={stats.cities} />
-              <Fig label="Lieux" value={stats.places} />
-              <Fig label="Photos" value={stats.photos} />
+              <Fig label={t('common.country')} value={stats.countries} />
+              <Fig label={t('stat.cities')} value={stats.cities} />
+              <Fig label={t('profile.places')} value={stats.places} />
+              <Fig label={t('common.photos')} value={stats.photos} />
             </div>
           </section>
         </Reveal>

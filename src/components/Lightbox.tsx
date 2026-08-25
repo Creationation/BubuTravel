@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import { useT } from '../i18n/I18nContext'
 
 type Props = {
   urls: string[]
@@ -10,6 +11,7 @@ type Props = {
 
 /** Visionneuse plein ecran, navigable au clavier et aux fleches. */
 export default function Lightbox({ urls, index, onIndexChange, onClose, caption }: Props) {
+  const t = useT()
   const go = useCallback(
     (delta: number) => {
       if (urls.length === 0) return
@@ -46,9 +48,7 @@ export default function Lightbox({ urls, index, onIndexChange, onClose, caption 
         <span>
           {index + 1} / {urls.length}
         </span>
-        <button onClick={onClose} className="btn btn-quiet btn-xs" aria-label="Fermer">
-          Fermer
-        </button>
+        <button onClick={onClose} className="btn btn-quiet btn-xs" aria-label={t('common.close')}>{t('common.close')}</button>
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center px-4 pb-4">
@@ -70,10 +70,10 @@ export default function Lightbox({ urls, index, onIndexChange, onClose, caption 
           className="flex items-center justify-center gap-3 pb-6"
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={() => go(-1)} className="btn btn-icon" aria-label="Photo precedente">
+          <button onClick={() => go(-1)} className="btn btn-icon" aria-label={t('gallery.previous')}>
             ‹
           </button>
-          <button onClick={() => go(1)} className="btn btn-icon" aria-label="Photo suivante">
+          <button onClick={() => go(1)} className="btn btn-icon" aria-label={t('gallery.next')}>
             ›
           </button>
         </div>

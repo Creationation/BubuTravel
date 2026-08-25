@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { createTrack } from '../lib/api'
 import { formatDuration } from '../lib/geolocation'
 import type { Track } from '../lib/types'
+import { useT } from '../i18n/I18nContext'
 import { errorMessage } from '../lib/errors'
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
  * trace au moment de l'arret.
  */
 export default function TrackRecorder({ onSaved }: Props) {
+  const t = useT()
   const { recording, distanceKm, error, start, pause, resume, discard, finish } = useTracker()
   const { trips } = usePlaces()
   const { user } = useAuth()
@@ -47,7 +49,7 @@ export default function TrackRecorder({ onSaved }: Props) {
       const track = await createTrack({
         user_id: user.id,
         trip_id: tripId || null,
-        name: name.trim() || 'Parcours sans nom',
+        name: name.trim() || t('track.unnamed'),
         points: finishing.points,
         distance_km: Number(finishing.distanceKm.toFixed(3)),
         started_at: finishing.startedAt,
@@ -69,7 +71,7 @@ export default function TrackRecorder({ onSaved }: Props) {
   if (finishing) {
     return (
       <div className="panel fade-in w-72 p-4 shadow-xl">
-        <p className="eyebrow">Parcours termine</p>
+        <p className="eyebrow">{t('track.done')}</p>
         <p className="display-sm mt-2 text-2xl">
           {finishing.distanceKm.toFixed(2).replace('.', ',')} km
         </p>
@@ -82,7 +84,7 @@ export default function TrackRecorder({ onSaved }: Props) {
           className="field mt-3"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nom du parcours"
+          placeholder={t('track.nameLabel')}
           autoFocus
         />
         {trips.length > 0 && (
@@ -91,7 +93,7 @@ export default function TrackRecorder({ onSaved }: Props) {
             value={tripId}
             onChange={(e) => setTripId(e.target.value)}
           >
-            <option value="">Sans voyage</option>
+            <option value="">{t('track.noTrip')}</option>
             {trips.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title}
@@ -104,11 +106,9 @@ export default function TrackRecorder({ onSaved }: Props) {
 
         <div className="mt-3 flex gap-2">
           <button onClick={() => void save()} className="btn btn-accent btn-xs flex-1" disabled={busy}>
-            {busy ? 'Enregistrement...' : 'Enregistrer'}
+            {busy ? t('common.saving') : t('common.save')}
           </button>
-          <button onClick={() => setFinishing(null)} className="btn btn-quiet btn-xs">
-            Jeter
-          </button>
+          <button onClick={() => setFinishing(null)} className="btn btn-quiet btn-xs">{t('track.throwAway')}</button>
         </div>
       </div>
     )
@@ -123,7 +123,7 @@ export default function TrackRecorder({ onSaved }: Props) {
             className={`h-2 w-2 rounded-full ${recording.paused ? 'bg-text-muted' : 'animate-pulse bg-accent'}`}
           />
           <p className="eyebrow mb-0">
-            {recording.paused ? 'En pause' : 'Enregistrement'}
+            {recording.paused ? t('track.paused') : t('track.recording')}
           </p>
         </div>
 
@@ -135,9 +135,9 @@ export default function TrackRecorder({ onSaved }: Props) {
           {formatDuration(recording.startedAt, now) || 'moins d une minute'}
         </p>
 
-        {error && <p className="notice notice-bad mt-2">{error}</p>}
+        {error && <p className="notice notice-bad mt-2">{t(error)}</p>}
         {recording.points.length === 0 && !error && (
-          <p className="notice mt-2">En attente du premier point GPS...</p>
+          <p className="notice mt-2">{t('track.waitingFix')}</p>
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -145,7 +145,7 @@ export default function TrackRecorder({ onSaved }: Props) {
             onClick={() => (recording.paused ? resume() : pause())}
             className="btn btn-xs flex-1"
           >
-            {recording.paused ? 'Reprendre' : 'Pause'}
+            {recording.paused ? t('track.resume') : t('track.pause')}
           </button>
           <button
             onClick={() => {
@@ -154,22 +154,16 @@ export default function TrackRecorder({ onSaved }: Props) {
             }}
             className="btn btn-accent btn-xs flex-1"
             disabled={recording.points.length < 2}
-            title={recording.points.length < 2 ? 'Il faut au moins deux points' : undefined}
-          >
-            Terminer
-          </button>
-          <button onClick={discard} className="btn btn-quiet btn-xs w-full">
-            Abandonner
-          </button>
+            title={recording.points.length < 2 ? t('track.needTwoPoints') : undefined}
+          >{t('track.finish')}</button>
+          <button onClick={discard} className="btn btn-quiet btn-xs w-full">{t('track.discard')}</button>
         </div>
       </div>
     )
   }
 
   return (
-    <button onClick={start} className="btn shadow-lg" title="Enregistrer un parcours GPS">
-      <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-      Enregistrer un parcours
-    </button>
+    <button onClick={start} className="btn shadow-lg" title={t('track.recordHint')}>
+      <span className="h-1.5 w-1.5 rounded-full bg-accent" />{t('track.record')}</button>
   )
 }

@@ -1,5 +1,6 @@
 import { haversineKm } from './stats'
 import type { TrackPoint } from './types'
+import type { Key } from '../i18n/fr'
 
 export type Fix = { lat: number; lng: number; accuracy: number }
 
@@ -15,7 +16,7 @@ export function geolocationAvailable(): boolean {
 export function currentPosition(timeoutMs = 15000): Promise<Fix> {
   return new Promise((resolve, reject) => {
     if (!geolocationAvailable()) {
-      reject(new Error("Ce navigateur ne sait pas donner la position."))
+      reject(new GeoError('geo.unsupported'))
       return
     }
     navigator.geolocation.getCurrentPosition(
@@ -25,22 +26,36 @@ export function currentPosition(timeoutMs = 15000): Promise<Fix> {
           lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         }),
-      (err) => reject(new Error(messageFor(err))),
+      (err) => reject(new GeoError(messageFor(err))),
       { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
     )
   })
 }
 
-export function messageFor(err: GeolocationPositionError): string {
+/**
+ * Erreur qui transporte une cle de traduction plutot qu'un texte : la couche
+ * geolocalisation ne connait pas la langue affichee.
+ */
+export class GeoError extends Error {
+  readonly key: Key
+
+  constructor(key: Key) {
+    super(key)
+    this.key = key
+    this.name = 'GeoError'
+  }
+}
+
+export function messageFor(err: GeolocationPositionError): Key {
   switch (err.code) {
     case err.PERMISSION_DENIED:
-      return "Position refusee. Autorisez la localisation pour ce site dans le navigateur."
+      return 'geo.denied'
     case err.POSITION_UNAVAILABLE:
-      return 'Position indisponible. Le signal GPS ne passe peut-etre pas ici.'
+      return 'geo.unavailable'
     case err.TIMEOUT:
-      return 'La position met trop de temps a arriver. Reessayez dehors ou pres d une fenetre.'
+      return 'geo.timeout'
     default:
-      return err.message || 'Position indisponible.'
+      return 'geo.unavailable'
   }
 }
 

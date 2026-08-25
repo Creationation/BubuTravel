@@ -1,15 +1,17 @@
 import { useTheme } from '../context/ThemeContext'
+import { useT } from '../i18n/I18nContext'
 
 export default function ThemeToggle() {
   const { theme, toggle } = useTheme()
+  const t = useT()
   const isDark = theme === 'dark'
 
   return (
     <button
       onClick={toggle}
       className="btn btn-icon btn-quiet"
-      title={isDark ? 'Passer en clair' : 'Passer en sombre'}
-      aria-label={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
+      title={isDark ? t('theme.toLight') : t('theme.toDark')}
+      aria-label={isDark ? t('theme.toLightLong') : t('theme.toDarkLong')}
     >
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
         {isDark ? (

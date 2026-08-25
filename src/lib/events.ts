@@ -1,11 +1,12 @@
 import type { Recurrence, TravelEvent } from './types'
+import type { Key } from '../i18n/fr'
 
-export const RECURRENCES: { value: Recurrence; fr: string; en: string }[] = [
-  { value: 'none', fr: 'Une seule fois', en: 'One time only' },
-  { value: 'daily', fr: 'Tous les jours', en: 'Every day' },
-  { value: 'weekly', fr: 'Toutes les semaines', en: 'Every week' },
-  { value: 'monthly', fr: 'Tous les mois', en: 'Every month' },
-  { value: 'yearly', fr: 'Tous les ans', en: 'Every year' },
+export const RECURRENCES: { value: Recurrence; label: Key }[] = [
+  { value: 'none', label: 'recurrence.none' },
+  { value: 'daily', label: 'recurrence.daily' },
+  { value: 'weekly', label: 'recurrence.weekly' },
+  { value: 'monthly', label: 'recurrence.monthly' },
+  { value: 'yearly', label: 'recurrence.yearly' },
 ]
 
 /**

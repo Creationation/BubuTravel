@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { appendPoint, messageFor, trackDistanceKm } from '../lib/geolocation'
 import type { TrackPoint } from '../lib/types'
+import type { Key } from '../i18n/fr'
 
 const DRAFT_KEY = 'bubutravel:track-draft'
 
@@ -17,7 +18,8 @@ type Recording = {
 type TrackerValue = {
   recording: Recording | null
   distanceKm: number
-  error: string | null
+  /** Cle de traduction : ce contexte ne connait pas la langue affichee. */
+  error: Key | null
   start: () => void
   pause: () => void
   resume: () => void
@@ -47,7 +49,7 @@ function loadDraft(): Recording | null {
  */
 export function TrackerProvider({ children }: { children: ReactNode }) {
   const [recording, setRecording] = useState<Recording | null>(loadDraft)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Key | null>(null)
   const watchRef = useRef<number | null>(null)
   const lastPersistRef = useRef(0)
   const recordingRef = useRef(recording)
@@ -94,7 +96,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!('geolocation' in navigator)) {
-      setError('Ce navigateur ne sait pas suivre la position.')
+      setError('geo.noWatch')
       return
     }
 

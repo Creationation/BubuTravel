@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { errorMessage } from '../lib/errors'
 import ThemeToggle from '../components/ThemeToggle'
+import { useT } from '../i18n/I18nContext'
 
 /**
  * Ecran d'arrivee du lien de reinitialisation. Supabase ouvre une session de
@@ -11,6 +12,7 @@ import ThemeToggle from '../components/ThemeToggle'
  */
 export default function PasswordPage() {
   const { session, loading, changePassword } = useAuth()
+  const t = useT()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -27,11 +29,11 @@ export default function PasswordPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password.length < 6) {
-      setError('Mot de passe trop court, 6 caracteres minimum.')
+      setError(t('auth.passwordShort'))
       return
     }
     if (password !== confirm) {
-      setError('Les deux mots de passe ne sont pas identiques.')
+      setError(t('auth.passwordsDiffer'))
       return
     }
     setBusy(true)
@@ -57,28 +59,25 @@ export default function PasswordPage() {
           <span className="mx-auto mb-7 flex h-16 w-12 items-end justify-center rounded-t-full border border-line bg-surface-2 pb-3">
             <span className="h-2 w-2 rotate-45 border border-accent" />
           </span>
-          <h1 className="display text-[clamp(2rem,8vw,2.8rem)]">Nouveau mot de passe</h1>
+          <h1 className="display text-[clamp(2rem,8vw,2.8rem)]">{t('auth.newPassword')}</h1>
         </div>
 
         <div className="panel p-7">
           {loading ? (
-            <p className="text-[13px] text-text-muted">Verification du lien...</p>
+            <p className="text-[13px] text-text-muted">{t('auth.checkingLink')}</p>
           ) : done ? (
-            <p className="notice">Mot de passe mis a jour. Redirection vers le carnet...</p>
+            <p className="notice">{t('auth.passwordUpdated')}</p>
           ) : !session ? (
             <div className="space-y-4">
-              <p className="notice notice-bad">
-                Ce lien n'est plus valide. Les liens de reinitialisation expirent vite, demandez-en
-                un nouveau.
-              </p>
+              <p className="notice notice-bad">{t('auth.linkExpired')}</p>
               <Link to="/login" className="btn w-full">
-                Retour a la connexion
+                {t('auth.backToSignIn')}
               </Link>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
-                <label className="label">Nouveau mot de passe</label>
+                <label className="label">{t('auth.newPassword')}</label>
                 <input
                   className="field"
                   type="password"
@@ -91,7 +90,7 @@ export default function PasswordPage() {
                 />
               </div>
               <div>
-                <label className="label">Confirmer</label>
+                <label className="label">{t('auth.confirmPassword')}</label>
                 <input
                   className="field"
                   type="password"
@@ -106,7 +105,7 @@ export default function PasswordPage() {
               {error && <p className="notice notice-bad">{error}</p>}
 
               <button type="submit" className="btn btn-accent w-full py-3" disabled={busy}>
-                {busy ? 'Enregistrement...' : 'Enregistrer'}
+                {busy ? t('common.saving') : t('common.save')}
               </button>
             </form>
           )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { signPhotoUrls } from '../lib/api'
+import { useT } from '../i18n/I18nContext'
 
 /**
  * Une couverture peut etre une adresse web collee a la main, ou un chemin
@@ -62,11 +63,12 @@ export default function TripCover({
   className?: string
 }) {
   const url = useCoverUrl(coverUrl)
+  const t = useT()
 
   if (!url) {
     return (
       <div className={`flex items-center justify-center bg-surface-2 ${className}`}>
-        <span className="eyebrow">Sans couverture</span>
+        <span className="eyebrow">{t('trips.noCover')}</span>
       </div>
     )
   }

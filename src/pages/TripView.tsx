@@ -11,8 +11,10 @@ import Reveal from '../components/Reveal'
 import TripForm from '../components/TripForm'
 import TripPlanner from '../components/TripPlanner'
 import Lightbox from '../components/Lightbox'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function TripView() {
+  const { t, locale } = useI18n()
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -61,7 +63,7 @@ export default function TripView() {
   if (loading) {
     return (
       <AppShell>
-        <p className="mx-auto max-w-6xl px-5 py-16 text-[13px] text-text-muted">Chargement...</p>
+        <p className="mx-auto max-w-6xl px-5 py-16 text-[13px] text-text-muted">{t('common.loading')}</p>
       </AppShell>
     )
   }
@@ -70,11 +72,9 @@ export default function TripView() {
     return (
       <AppShell>
         <div className="mx-auto max-w-6xl px-5 py-20 text-center sm:px-8">
-          <h1 className="display-sm text-3xl">Voyage introuvable</h1>
-          <p className="lede mt-3">Il a peut-etre ete supprime.</p>
-          <Link to="/voyages" className="btn mt-6">
-            Retour aux voyages
-          </Link>
+          <h1 className="display-sm text-3xl">{t('trips.notFound')}</h1>
+          <p className="lede mt-3">{t('trips.maybeDeleted')}</p>
+          <Link to="/voyages" className="btn mt-6">{t('trips.backToTrips')}</Link>
         </div>
       </AppShell>
     )
@@ -96,13 +96,13 @@ export default function TripView() {
               <div>
                 <p className="eyebrow">
                   {trip.status === 'planning' ? 'En preparation · ' : ''}
-                  {formatRange(trip.start_date, trip.end_date)}
+                  {formatRange(trip.start_date, trip.end_date, t, locale)}
                 </p>
                 <h1 className="display mt-3 text-[clamp(2.2rem,6vw,4.2rem)]">{trip.title}</h1>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setEditing((v) => !v)} className="btn btn-xs">
-                  {editing ? 'Annuler' : 'Modifier'}
+                  {editing ? t('common.cancel') : t('common.edit')}
                 </button>
                 <button
                   onClick={async () => {
@@ -115,13 +115,13 @@ export default function TripView() {
                   }}
                   className={`btn btn-xs ${confirmDelete ? 'border-red-500/60 text-red-400' : 'btn-quiet'}`}
                 >
-                  {confirmDelete ? 'Confirmer la suppression' : 'Supprimer'}
+                  {confirmDelete ? t('trips.deleteConfirm') : t('common.delete')}
                 </button>
               </div>
             </div>
             {trip.notes && <p className="lede mt-5 max-w-2xl">{trip.notes}</p>}
             <p className="mt-5 text-[13px] text-text-muted">
-              {plural(steps.length, 'etape')}
+              {plural(steps.length, t('unit.step'))}
               {countries.length > 0 && ` · ${countries.join(', ')}`}
               {km > 0 && ` · ${km} km a vol d'oiseau`}
             </p>
@@ -158,7 +158,7 @@ export default function TripView() {
         {tripTracks.length > 0 && (
           <section className="mt-12">
             <Reveal className="mb-4">
-              <p className="eyebrow">Parcours</p>
+              <p className="eyebrow">{t('trips.tracks')}</p>
             </Reveal>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {tripTracks.map((track, i) => (
@@ -186,19 +186,14 @@ export default function TripView() {
         {/* Timeline des etapes */}
         <section className={`mt-14 ${trip.status === 'planning' ? 'hidden' : ''}`}>
           <Reveal className="mb-8">
-            <p className="eyebrow">Deroule</p>
-            <h2 className="display-sm mt-2 text-3xl">Etape par etape</h2>
+            <p className="eyebrow">{t('trips.sequence')}</p>
+            <h2 className="display-sm mt-2 text-3xl">{t('trips.stepByStep')}</h2>
           </Reveal>
 
           {steps.length === 0 ? (
             <div className="panel px-8 py-12 text-center">
-              <p className="lede">
-                Aucune etape rattachee. Ouvrez un lieu sur la carte et choisissez ce voyage dans son
-                panneau.
-              </p>
-              <Link to="/carte" className="btn mt-6">
-                Aller a la carte
-              </Link>
+              <p className="lede">{t('trips.noSteps')}</p>
+              <Link to="/carte" className="btn mt-6">{t('trips.goToMap')}</Link>
             </div>
           ) : (
             <ol className="relative space-y-8 border-l border-line pl-6 sm:pl-8">
@@ -208,7 +203,7 @@ export default function TripView() {
                   <Reveal as="li" key={step.id} delay={i * 60} className="relative">
                     <span className="absolute -left-[1.85rem] top-2 h-2.5 w-2.5 rounded-full bg-accent sm:-left-[2.35rem]" />
                     <p className="eyebrow">
-                      {step.visit_date ? formatDate(step.visit_date) : 'Sans date'}
+                      {step.visit_date ? formatDate(step.visit_date) : t('trips.noStep')}
                     </p>
                     <h3 className="display-sm mt-2 text-2xl">{step.name}</h3>
                     <p className="mt-1 text-[13px] text-text-muted">

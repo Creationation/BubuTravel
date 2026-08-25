@@ -8,6 +8,7 @@ import { formatDate } from '../lib/stats'
 import Lightbox from './Lightbox'
 import PlaceExtras, { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
+import { useT } from '../i18n/I18nContext'
 
 type Props = {
   place: Place
@@ -15,6 +16,7 @@ type Props = {
 }
 
 export default function PlaceSidebar({ place, onClose }: Props) {
+  const t = useT()
   const { user } = useAuth()
   const { remove, edit, trips, categories, categoryOf, bumpPhotoCount } = usePlaces()
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -183,18 +185,18 @@ export default function PlaceSidebar({ place, onClose }: Props) {
             <button
               onClick={() => setEditing((v) => !v)}
               className="btn btn-xs btn-quiet"
-              aria-label="Modifier ce lieu"
+              aria-label={t('place.editTitle')}
             >
-              {editing ? 'Annuler' : 'Modifier'}
+              {editing ? t('common.cancel') : t('common.edit')}
             </button>
-            <button onClick={onClose} className="btn btn-icon btn-quiet" aria-label="Fermer">
+            <button onClick={onClose} className="btn btn-icon btn-quiet" aria-label={t('common.close')}>
               ✕
             </button>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
-          <span>{place.visit_date ? formatDate(place.visit_date) : 'Date non renseignee'}</span>
+          <span>{place.visit_date ? formatDate(place.visit_date) : t('place.dateUnset')}</span>
           <span className="h-1 w-1 rounded-full bg-line-strong" />
           <span className="font-mono text-[11px]">
             {place.lat.toFixed(3)}, {place.lng.toFixed(3)}
@@ -208,18 +210,14 @@ export default function PlaceSidebar({ place, onClose }: Props) {
             }
             className={`pill justify-center ${place.status !== 'wishlist' ? 'pill-active' : ''}`}
             disabled={busy}
-          >
-            Visite
-          </button>
+          >{t('place.visitedShort')}</button>
           <button
             onClick={() =>
               void edit(place.id, { status: 'wishlist' }).catch((err) => setError(errorMessage(err)))
             }
             className={`pill justify-center ${place.status === 'wishlist' ? 'pill-active' : ''}`}
             disabled={busy}
-          >
-            A visiter
-          </button>
+          >{t('map.toVisit')}</button>
         </div>
       </header>
 
@@ -227,9 +225,9 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         {/* Edition du lieu */}
         {editing && (
           <section className="space-y-3 rounded-xl border border-line bg-surface-2 p-4">
-            <p className="label mb-0">Modifier ce lieu</p>
+            <p className="label mb-0">{t('place.editTitle')}</p>
             <div>
-              <label className="label">Nom</label>
+              <label className="label">{t('common.name')}</label>
               <input
                 className="field"
                 value={form.name}
@@ -238,7 +236,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Pays</label>
+                <label className="label">{t('common.country')}</label>
                 <input
                   className="field"
                   value={form.country}
@@ -246,7 +244,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 />
               </div>
               <div>
-                <label className="label">Ville</label>
+                <label className="label">{t('common.city')}</label>
                 <input
                   className="field"
                   value={form.city}
@@ -255,7 +253,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               </div>
             </div>
             <div>
-              <label className="label">Date de visite</label>
+              <label className="label">{t('place.visitDate')}</label>
               <input
                 className="field"
                 type="date"
@@ -264,13 +262,13 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               />
             </div>
             <div>
-              <label className="label">Categorie</label>
+              <label className="label">{t('common.category')}</label>
               <select
                 className="field"
                 value={form.category_id}
                 onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               >
-                <option value="">Sans categorie</option>
+                <option value="">{t('place.noCategory')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -278,14 +276,12 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 ))}
               </select>
               {categories.length === 0 && (
-                <p className="mt-1.5 text-[11px] text-text-muted">
-                  Aucune categorie creee. Elles se gerent dans le profil.
-                </p>
+                <p className="mt-1.5 text-[11px] text-text-muted">{t('place.categoriesInProfile')}</p>
               )}
             </div>
 
             <div>
-              <label className="label">Notes</label>
+              <label className="label">{t('common.notes')}</label>
               <textarea
                 className="field min-h-24 resize-y"
                 value={form.notes}
@@ -293,28 +289,28 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               />
             </div>
             <div>
-              <label className="label">Votre note</label>
+              <label className="label">{t('extras.yourRating')}</label>
               <Stars value={form.rating} onChange={(rating) => setForm({ ...form, rating })} />
             </div>
 
             <div>
-              <label className="label">Avis</label>
+              <label className="label">{t('extras.review')}</label>
               <textarea
                 className="field min-h-20 resize-y"
                 value={form.review}
                 onChange={(e) => setForm({ ...form, review: e.target.value })}
-                placeholder="Ce qu'on en a pense..."
+                placeholder={t('place.reviewShort')}
               />
             </div>
 
             <div>
-              <label className="label">Fourchette de prix</label>
+              <label className="label">{t('extras.priceRange')}</label>
               <div className="flex gap-2">
                 {PRICE_LEVELS.map((lvl) => (
                   <button
                     key={lvl.value}
                     type="button"
-                    title={lvl.hint}
+                    title={t(lvl.hint)}
                     onClick={() =>
                       setForm({
                         ...form,
@@ -333,7 +329,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
 
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
-                <label className="label">Depense sur place</label>
+                <label className="label">{t('extras.spent')}</label>
                 <input
                   className="field"
                   inputMode="decimal"
@@ -343,7 +339,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 />
               </div>
               <div>
-                <label className="label">Devise</label>
+                <label className="label">{t('common.currency')}</label>
                 <select
                   className="field"
                   value={form.currency}
@@ -359,19 +355,19 @@ export default function PlaceSidebar({ place, onClose }: Props) {
             </div>
 
             <div>
-              <label className="label">Bon plan</label>
+              <label className="label">{t('extras.deal')}</label>
               <input
                 className="field"
                 value={form.promo_note}
                 onChange={(e) => setForm({ ...form, promo_note: e.target.value })}
-                placeholder="Deuxieme nuit offerte, menu du midi..."
+                placeholder={t('place.dealShort')}
               />
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input
                   className="field font-mono"
                   value={form.promo_code}
                   onChange={(e) => setForm({ ...form, promo_code: e.target.value })}
-                  placeholder="CODE PROMO"
+                  placeholder={t('extras.promoCode')}
                 />
                 <input
                   className="field"
@@ -384,20 +380,18 @@ export default function PlaceSidebar({ place, onClose }: Props) {
             </div>
 
             <button onClick={() => void saveEdits()} className="btn btn-accent w-full" disabled={busy}>
-              {busy ? 'Enregistrement...' : 'Enregistrer les modifications'}
+              {busy ? t('common.saving') : t('place.saveEdits')}
             </button>
           </section>
         )}
 
         {/* Voyage */}
         <section>
-          <p className="label">Voyage</p>
+          <p className="label">{t('common.trip')}</p>
           {trips.length === 0 ? (
             <p className="text-[13px] text-text-muted">
               Aucun voyage cree pour l'instant.{' '}
-              <Link to="/voyages" className="text-accent underline-offset-4 hover:underline">
-                En creer un
-              </Link>
+              <Link to="/voyages" className="text-accent underline-offset-4 hover:underline">{t('place.createOne')}</Link>
             </p>
           ) : (
             <select
@@ -411,7 +405,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 )
               }}
             >
-              <option value="">Lieu isole</option>
+              <option value="">{t('place.standalone')}</option>
               {trips.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
@@ -428,10 +422,10 @@ export default function PlaceSidebar({ place, onClose }: Props) {
 
         {/* Notes */}
         <section className={editing ? 'hidden' : ''}>
-          <p className="label">Notes</p>
+          <p className="label">{t('common.notes')}</p>
           <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">
             {place.notes?.trim() || (
-              <span className="text-text-muted">Aucune note pour ce lieu.</span>
+              <span className="text-text-muted">{t('place.noNote')}</span>
             )}
           </p>
         </section>
@@ -443,7 +437,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               Photos {photos.length > 0 && <span className="text-text-muted">{photos.length}</span>}
             </p>
             <label className="btn btn-xs cursor-pointer">
-              {busy ? 'Envoi...' : 'Ajouter'}
+              {busy ? t('place.sending') : t('common.add')}
               <input
                 type="file"
                 accept="image/*"
@@ -459,11 +453,9 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           </div>
 
           {loading ? (
-            <p className="text-[13px] text-text-muted">Chargement...</p>
+            <p className="text-[13px] text-text-muted">{t('common.loading')}</p>
           ) : photos.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line px-4 py-9 text-center text-[13px] text-text-muted">
-              Pas encore de photo ici.
-            </p>
+            <p className="rounded-xl border border-dashed border-line px-4 py-9 text-center text-[13px] text-text-muted">{t('place.noPhoto')}</p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo, i) => (
@@ -485,7 +477,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                   <button
                     onClick={() => void onDeletePhoto(photo)}
                     className="absolute right-1.5 top-1.5 hidden h-6 w-6 items-center justify-center rounded-full border border-line bg-bg/85 text-[11px] text-text-soft backdrop-blur group-hover:flex"
-                    aria-label="Supprimer la photo"
+                    aria-label={t('place.deletePhoto')}
                   >
                     ✕
                   </button>
@@ -504,7 +496,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           disabled={busy}
           className={`btn btn-xs w-full ${confirmDelete ? 'border-red-500/60 text-red-400' : 'btn-quiet'}`}
         >
-          {confirmDelete ? 'Confirmer : supprimer le lieu et ses photos' : 'Supprimer ce lieu'}
+          {confirmDelete ? t('place.deleteConfirm') : t('place.deleteAction')}
         </button>
       </footer>
 

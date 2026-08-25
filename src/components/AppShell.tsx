@@ -2,15 +2,17 @@ import { NavLink, Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import ThemeToggle from './ThemeToggle'
+import { useT } from '../i18n/I18nContext'
+import type { Key } from '../i18n/fr'
 
-const NAV = [
-  { to: '/', label: 'Carnet', end: true },
-  { to: '/voyages', label: 'Voyages' },
-  { to: '/carte', label: 'Carte' },
-  { to: '/bucketlist', label: 'Envies' },
-  { to: '/planificateur', label: 'Planifier' },
-  { to: '/evenements', label: 'Evenements' },
-  { to: '/galerie', label: 'Galerie' },
+const NAV: { to: string; label: Key; end?: boolean }[] = [
+  { to: '/', label: 'nav.journal', end: true },
+  { to: '/voyages', label: 'nav.trips' },
+  { to: '/carte', label: 'nav.map' },
+  { to: '/bucketlist', label: 'nav.wishlist' },
+  { to: '/planificateur', label: 'nav.planner' },
+  { to: '/evenements', label: 'nav.events' },
+  { to: '/galerie', label: 'nav.gallery' },
 ]
 
 /** Coquille commune : en-tete fixe, navigation, bascule de theme. */
@@ -22,7 +24,8 @@ export default function AppShell({
   wide?: boolean
 }) {
   const { profile, user, signOut } = useAuth()
-  const name = profile?.display_name || user?.email?.split('@')[0] || 'Voyageur'
+  const t = useT()
+  const name = profile?.display_name || user?.email?.split('@')[0] || t('common.traveller')
 
   return (
     <div className="flex min-h-full flex-col">
@@ -34,7 +37,7 @@ export default function AppShell({
         >
           <Link to="/" className="flex items-center gap-2.5">
             <span className="h-2 w-2 rounded-full bg-accent" />
-            <span className="display-sm text-xl">BuBuTravel</span>
+            <span className="display-sm text-xl">{t('app.name')}</span>
           </Link>
 
           <nav className="hidden items-center gap-1 sm:flex">
@@ -51,7 +54,7 @@ export default function AppShell({
                   }`
                 }
               >
-                {item.label}
+                {t(item.label)}
               </NavLink>
             ))}
           </nav>
@@ -66,7 +69,7 @@ export default function AppShell({
               <span className="max-w-28 truncate text-[13px] text-text-soft">{name}</span>
             </Link>
             <button onClick={() => void signOut()} className="btn btn-quiet btn-xs">
-              Sortir
+              {t('nav.signOut')}
             </button>
           </div>
         </div>
@@ -84,7 +87,7 @@ export default function AppShell({
                 }`
               }
             >
-              {item.label}
+              {t(item.label)}
             </NavLink>
           ))}
         </nav>
