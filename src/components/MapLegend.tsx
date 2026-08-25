@@ -1,4 +1,5 @@
 import { useT } from '../i18n/I18nContext'
+import { pinSvg } from './mapIcon'
 
 /**
  * Legende des marqueurs. Deux etats seulement, mais ils portent une
@@ -22,20 +23,16 @@ export default function MapLegend() {
   )
 }
 
+/**
+ * La legende reutilise le dessin des marqueurs, pas une copie : une pastille
+ * qui ne ressemble pas au marqueur ne legende rien.
+ */
 function Pin({ fill, hollow = false }: { fill: string; hollow?: boolean }) {
   return (
-    <svg viewBox="0 0 26 34" width="13" height="17" aria-hidden>
-      <path
-        d="M13 1.6c-6.1 0-11 4.9-11 11 0 8 9.4 18.8 9.8 19.2a1.6 1.6 0 0 0 2.4 0c.4-.4 9.8-11.2 9.8-19.2 0-6.1-4.9-11-11-11z"
-        fill={fill}
-        stroke="var(--bg)"
-        strokeWidth="2"
-      />
-      {hollow ? (
-        <circle cx="13" cy="12.4" r="3.9" fill="none" stroke="var(--bg)" strokeWidth="2.4" />
-      ) : (
-        <circle cx="13" cy="12.4" r="4.1" fill="var(--bg)" />
-      )}
-    </svg>
+    <span
+      aria-hidden
+      className="inline-block leading-none"
+      dangerouslySetInnerHTML={{ __html: pinSvg(fill, hollow, false, 0.62) }}
+    />
   )
 }

@@ -523,12 +523,13 @@ body::before {
 /* Marqueurs maison, aucune image externe */
 .pin {
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: 50% 100%;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+  /* La punaise pivote autour de sa pointe, comme un vrai objet plante */
+  transform-origin: 50% 97%;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3));
 }
 
 .pin:hover {
-  transform: translateY(-2px) scale(1.08);
+  transform: scale(1.12);
 }
 
 .pin svg {
@@ -551,8 +552,8 @@ body::before {
 
 .halo-ring {
   display: block;
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
   background: var(--halo);
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);

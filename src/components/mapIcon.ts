@@ -11,24 +11,33 @@ import L from 'leaflet'
  * disparaitre, Leaflet.markercluster ne retrouvant plus son element. L'etat
  * selectionne est donc rendu par une couche separee, en dehors des grappes.
  */
-/**
- * Deux etats, deux lectures.
- *
- * Le lieu visite est terracotta a coeur plein, l'envie est olive a coeur
- * creux : la couleur distingue au premier coup d'oeil, et la forme du coeur
- * prend le relais pour qui ne separe pas bien le rouge du vert.
- */
-function pinSvg(fill: string, hollow = false, dashed = false): string {
-  const heart = hollow
-    ? `<circle cx="13" cy="12.4" r="3.9" fill="none" stroke="var(--bg)" stroke-width="2.4" />`
-    : `<circle cx="13" cy="12.4" r="4.1" fill="var(--bg)" />`
 
-  return `<svg viewBox="0 0 26 34" width="26" height="34" xmlns="http://www.w3.org/2000/svg">
-    <path d="M13 1.6c-6.1 0-11 4.9-11 11 0 8 9.4 18.8 9.8 19.2a1.6 1.6 0 0 0 2.4 0c.4-.4 9.8-11.2 9.8-19.2 0-6.1-4.9-11-11-11z"
+/** Dessin commun : une punaise droite, tete ronde et aiguille fine. */
+export function pinSvg(fill: string, hollow = false, dashed = false, size = 1): string {
+  const w = Math.round(22 * size)
+  const h = Math.round(30 * size)
+
+  // Le coeur creux distingue l'envie du lieu visite meme sans la couleur
+  const heart = hollow
+    ? '<circle cx="11" cy="9" r="3.2" fill="none" stroke="var(--bg)" stroke-width="2.1" />'
+    : ''
+
+  return `<svg viewBox="0 0 22 30" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <!-- Aiguille : effilee vers la pointe, qui tombe pile sur la coordonnee -->
+    <path d="M10.25 14 L11 29.4 L11.75 14 Z" fill="var(--text-muted)" />
+    <path d="M11 14 L11 29.4" stroke="var(--bg)" stroke-width="0.5" opacity="0.5" />
+
+    <!-- Tete -->
+    <circle cx="11" cy="9" r="7.4"
       fill="${fill}"
       stroke="var(--bg)"
-      stroke-width="2"
-      ${dashed ? 'stroke-dasharray="3 3"' : ''} />
+      stroke-width="1.8"
+      ${dashed ? 'stroke-dasharray="2.6 2.6"' : ''} />
+
+    <!-- Reflet : ce qui fait lire une bille plutot qu'un rond plat -->
+    <ellipse cx="8.4" cy="6.2" rx="2.4" ry="1.7" fill="#fff" opacity="0.34"
+      transform="rotate(-28 8.4 6.2)" />
+
     ${heart}
   </svg>`
 }
@@ -37,17 +46,17 @@ function pin(html: string, extra = ''): L.DivIcon {
   return L.divIcon({
     html,
     className: `pin ${extra}`,
-    iconSize: [26, 34],
-    // La pointe du pin doit tomber sur la coordonnee, pas son centre
-    iconAnchor: [13, 33],
-    popupAnchor: [0, -30],
-    tooltipAnchor: [0, -30],
+    iconSize: [22, 30],
+    // La pointe de l'aiguille, pas le centre de l'icone
+    iconAnchor: [11, 29],
+    popupAnchor: [0, -26],
+    tooltipAnchor: [0, -26],
   })
 }
 
-/** Lieu deja visite : terracotta plein. */
+/** Lieu deja visite : terracotta, tete pleine. */
 export const placeIcon = pin(pinSvg('var(--color-clay)'))
-/** Envie a visiter : olive, coeur creux. */
+/** Envie a visiter : olive, tete percee. */
 export const wishIcon = pin(pinSvg('var(--color-olive)', true), 'pin-wish')
 /** Marqueur provisoire, le temps de valider le formulaire. */
 export const draftIcon = pin(pinSvg('var(--color-ochre)', false, true), 'pin-draft')
@@ -56,13 +65,13 @@ export const draftIcon = pin(pinSvg('var(--color-ochre)', false, true), 'pin-dra
 export const haloIcon = L.divIcon({
   html: '<span class="halo-ring"></span>',
   className: 'halo',
-  iconSize: [46, 46],
-  iconAnchor: [23, 23],
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
 })
 
 /** Grappe : le diametre suit le nombre de points, sans jamais devenir enorme. */
 export function clusterIcon(count: number): L.DivIcon {
-  const size = count < 10 ? 34 : count < 50 ? 40 : count < 200 ? 46 : 52
+  const size = count < 10 ? 32 : count < 50 ? 38 : count < 200 ? 44 : 50
   return L.divIcon({
     html: `<div class="cluster" style="width:${size}px;height:${size}px">${count}</div>`,
     className: 'cluster-wrap',
