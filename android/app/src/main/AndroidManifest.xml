@@ -18,6 +18,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                « Partager vers BuBuTravel » depuis TikTok, Instagram, YouTube,
+                Google Maps... : le lien partage est envoye a /idees, qui le
+                met directement a l'analyse (voir MainActivity).
+            -->
+            <intent-filter android:label="@string/share_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <provider
