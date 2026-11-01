@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { checkPin, loadPin, setPin } from '../../lib/vault'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
@@ -45,6 +47,7 @@ export default function PinGate({
   const [waitUntil, setWaitUntil] = useState(0)
   const [success, setSuccess] = useState(false)
   const [, tick] = useState(0)
+  const navigate = useNavigate()
 
   useEffect(() => {
     void loadPin().then((r) => {
@@ -144,6 +147,20 @@ export default function PinGate({
     if (next.length === 5) window.setTimeout(() => void submit(next), 140)
   }
 
+  const locked = !(open && !change) && !(open && change && !success) && record !== undefined
+  // Ecran du code : rien ne defile derriere
+  useEffect(() => {
+    if (!locked) return
+    const html = document.documentElement
+    const prev = [document.body.style.overflow, html.style.overflow]
+    document.body.style.overflow = 'hidden'
+    html.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev[0]
+      html.style.overflow = prev[1]
+    }
+  }, [locked])
+
   if (open && !change) return <>{children}</>
   if (open && change && !success) return <>{children}</>
   if (record === undefined) return null
@@ -155,8 +172,18 @@ export default function PinGate({
     confirm: 'vault.pin.confirm',
   }
 
-  return (
-    <div className="mx-auto flex max-w-xs flex-col items-center px-5 py-10">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[2000] flex touch-none select-none flex-col items-center justify-center overflow-hidden overscroll-none px-6 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]"
+      style={{ background: 'var(--app-bg, var(--bg))' }}
+    >
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute left-4 top-[calc(1rem+env(safe-area-inset-top))] rounded-full bg-surface px-4 py-2 text-[14px] font-bold shadow-[var(--shadow-sm)] active:scale-95"
+      >
+        ← {t('common.back')}
+      </button>
+      <div className="flex w-full max-w-[20rem] flex-col items-center">
       {/* Etapes */}
       {flow.length > 0 && (
         <div className="mb-6 flex w-full items-center justify-center gap-2">
@@ -205,7 +232,7 @@ export default function PinGate({
         </p>
       </div>
 
-      <div className="mt-4 grid w-full grid-cols-3 gap-3">
+      <div className="mt-[min(1rem,2dvh)] grid w-full grid-cols-3 gap-[min(0.9rem,1.8dvh)]">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((k, i) =>
           k === '' ? (
             <span key={i} />
@@ -215,13 +242,15 @@ export default function PinGate({
               onClick={() => (k === '⌫' ? setCode((c) => c.slice(0, -1)) : press(k))}
               disabled={waiting || success}
               aria-label={k === '⌫' ? t('common.erase') : k}
-              className="aspect-square rounded-full border border-line bg-surface text-[1.6rem] font-bold shadow-[var(--shadow-sm)] active:bg-[var(--halo)]"
+              className="mx-auto flex aspect-square h-[min(4.8rem,9.5dvh)] items-center justify-center rounded-full border border-line bg-surface text-[1.6rem] font-bold shadow-[var(--shadow-sm)] transition-transform active:scale-90 active:bg-[var(--halo)]"
             >
               {k}
             </button>
           ),
         )}
       </div>
-    </div>
+      </div>
+    </div>,
+    document.body,
   )
 }

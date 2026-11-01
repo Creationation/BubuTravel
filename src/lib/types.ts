@@ -72,6 +72,8 @@ export type PlaceStatus = 'visited' | 'wishlist'
 
 export type PlaceDetails = {
   name: string
+  /** Nom complet et officiel (le nom court sert aux cartes). */
+  full_name?: string
   kind: string
   summary: string
   address: string

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { runAiJob } from '../lib/aiJobs'
+import { useAiJobs } from '../context/AiJobsContext'
+import AiGauge from './AiGauge'
 import { useAnalyzerOnline } from '../lib/ideas'
 import type { Place, PlaceDetails } from '../lib/types'
-import { usePlaces } from '../context/PlacesContext'
 import { useI18n } from '../i18n/I18nContext'
 import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
 import ClampText from './ClampText'
@@ -68,101 +68,75 @@ function videoLink(notes: string | null): string | null {
 export function PlaceHero({ place, onZoom }: { place: Place; onZoom: (urls: string[], i: number) => void }) {
   const images = [...new Set([...(place.gallery ?? []), ...(place.image_url ? [place.image_url] : [])])]
   const [failed, setFailed] = useState<Set<string>>(new Set())
+  const [index, setIndex] = useState(0)
   const shown = images.filter((u) => !failed.has(u))
   if (shown.length === 0) return null
-  const [main, ...rest] = shown
   return (
     <div className="relative">
-      <button onClick={() => onZoom(shown, 0)} className="block h-56 w-full overflow-hidden bg-surface-2 sm:h-64">
-        <img
-          src={main}
-          alt=""
-          referrerPolicy="no-referrer"
-          onError={() => setFailed((s) => new Set(s).add(main))}
-          className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-        />
-      </button>
+      {/* Carrousel : on balaie de gauche a droite, chaque photo s'aimante */}
+      <div
+        className="nav-scroll flex h-64 snap-x snap-mandatory overflow-x-auto overscroll-x-contain bg-surface-2 sm:h-72"
+        onScroll={(e) => {
+          const el = e.currentTarget
+          const i = Math.round(el.scrollLeft / el.clientWidth)
+          if (i !== index) setIndex(i)
+        }}
+      >
+        {shown.map((u, i) => (
+          <button key={u} onClick={() => onZoom(shown, i)} className="h-full w-full shrink-0 snap-center snap-always">
+            <img
+              src={u}
+              alt=""
+              loading={i < 2 ? 'eager' : 'lazy'}
+              referrerPolicy="no-referrer"
+              draggable={false}
+              onError={() => setFailed((s) => new Set(s).add(u))}
+              className="h-full w-full object-cover"
+            />
+          </button>
+        ))}
+      </div>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-      {rest.length > 0 && (
-        <div className="nav-scroll absolute inset-x-3 bottom-3 flex gap-2 overflow-x-auto">
-          {rest.slice(0, 8).map((u, i) => (
-            <button
-              key={u}
-              onClick={() => onZoom(shown, i + 1)}
-              className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 border-white/70 shadow-lg"
-            >
-              <img
-                src={u}
-                alt=""
-                referrerPolicy="no-referrer"
-                onError={() => setFailed((s) => new Set(s).add(u))}
-                className="h-full w-full object-cover"
-              />
-            </button>
-          ))}
-        </div>
+      {shown.length > 1 && (
+        <>
+          <span className="num pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-[12px] font-bold text-white backdrop-blur-md">
+            {index + 1} / {shown.length}
+          </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center gap-1.5">
+            {shown.slice(0, 12).map((u, i) => (
+              <span key={u} className={`h-1.5 rounded-full bg-white shadow transition-all duration-300 ${i === index ? 'w-5' : 'w-1.5 opacity-60'}`} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-type Proposal = PlaceDetails & { lat?: number | null; lng?: number | null; images?: string[]; gps_exact?: boolean }
-
 export default function PlaceDetailsView({ place }: { place: Place }) {
   const { t, lang } = useI18n()
-  const { edit } = usePlaces()
   const online = useAnalyzerOnline()
+  const { queue, activeFor, jobs } = useAiJobs()
   const d = place.details
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [proposal, setProposal] = useState<Proposal | null>(null)
-  const [useName, setUseName] = useState(true)
-  const [saved, setSaved] = useState(false)
+  const running = activeFor('place_info', 'place_id', place.id)
+  const failed = jobs.find((j) => j.kind === 'place_info' && j.input?.place_id === place.id && j.status === 'error')
 
   // Changement de lieu : on repart de zero
   useEffect(() => {
-    setProposal(null)
     setError(null)
-    setSaved(false)
   }, [place.id])
 
-  /** Recherche en mode apercu : rien n'est ecrit avant « Appliquer ». */
+  /**
+   * La recherche part sur le PC et tourne en fond : on peut fermer la fiche,
+   * en lancer d'autres, quitter l'app. La fiche se met a jour toute seule.
+   */
   async function fill() {
-    setBusy(true)
     setError(null)
-    setSaved(false)
     try {
-      const res = await runAiJob<Proposal>('place_info', { place_id: place.id, lang, preview: true }, place.trip_id)
-      setProposal(res)
-      setUseName(Boolean(res.name) && res.name.trim().toLowerCase() !== place.name.trim().toLowerCase())
+      await queue('place_info', { place_id: place.id, lang }, place.trip_id)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function apply() {
-    if (!proposal) return
-    setBusy(true)
-    try {
-      const images = proposal.images ?? []
-      const frames = (place.gallery ?? []).filter((u) => u.includes('idea-frames'))
-      const gallery = [...images, ...frames.filter((u) => !images.includes(u))].slice(0, 10)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { lat, lng, ...details } = proposal
-      await edit(place.id, {
-        details: { ...details, gps_exact: lat != null && lng != null },
-        ...(gallery.length ? { gallery, image_url: gallery[0] } : {}),
-        ...(lat != null && lng != null ? { lat, lng } : {}),
-        ...(useName && proposal.name ? { name: proposal.name.slice(0, 120) } : {}),
-      })
-      setProposal(null)
-      setSaved(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -216,61 +190,30 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
         </a>
       </div>
 
-      {/* Remplir les informations (avec validation) */}
-      {!proposal && (
-        <div className="card-feature p-4">
-          <button onClick={() => void fill()} disabled={busy || online === false} className="btn btn-accent w-full">
-            <SparkIcon size={15} />
-            {busy ? t('common.wait') : t('pd.fill')}
-          </button>
-          <p className="mt-2 text-[12px] leading-snug text-text-muted">
-            {busy ? t('pd.waiting') : online === false ? t('pd.offline') : t('pd.fillHint')}
-          </p>
-          {saved && <p className="chip chip-ok mt-2">{t('pd.applied')}</p>}
-        </div>
-      )}
+      {/* Remplir les informations : en fond, plusieurs a la fois */}
+      <div className="card-feature p-4">
+        <button onClick={() => void fill()} disabled={Boolean(running) || online === false} className="btn btn-accent w-full">
+          <SparkIcon size={15} />
+          {running ? t('pd.filling') : d ? t('pd.refill') : t('pd.fill')}
+        </button>
+        {running && (
+          <div className="mt-3">
+            <AiGauge job={running} />
+          </div>
+        )}
+        <p className="mt-2 text-[12px] leading-snug text-text-muted">
+          {running ? t('pd.fillingHint') : online === false ? t('pd.offline') : t('pd.fillHint')}
+        </p>
+        {failed && !running && <p className="mt-2 text-[12px] text-[#b4533f]">⚠️ {failed.error}</p>}
+      </div>
       {error && <p className="notice notice-bad">{error}</p>}
 
-      {proposal && (
-        <div className="overflow-hidden rounded-2xl border-2 border-accent/50 bg-surface">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
-            <p className="eyebrow eyebrow-dot">{t('pd.previewTitle')}</p>
-            {(proposal.images?.length ?? 0) > 0 && (
-              <span className="chip num py-0">{t('pd.photos', { n: proposal.images!.length })}</span>
-            )}
-          </div>
-          {(proposal.images?.length ?? 0) > 0 && (
-            <div className="nav-scroll flex gap-2 overflow-x-auto p-3">
-              {proposal.images!.map((u) => (
-                <img key={u} src={u} alt="" referrerPolicy="no-referrer" className="h-24 w-32 shrink-0 rounded-xl object-cover" />
-              ))}
-            </div>
-          )}
-          <div className="space-y-3 px-3.5 pb-3.5">
-            <p className="text-[16px] font-bold">{proposal.name}</p>
-            {proposal.address && <p className="text-[13px] text-text-muted">{proposal.address}</p>}
-            <Info d={proposal} />
-            {proposal.name && proposal.name !== place.name && (
-              <label className="flex items-center gap-2 text-[13px]">
-                <input type="checkbox" checked={useName} onChange={(e) => setUseName(e.target.checked)} />
-                {t('pd.applyName', { name: proposal.name })}
-              </label>
-            )}
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => void apply()} disabled={busy} className="btn btn-accent flex-1">
-                {t('pd.apply')}
-              </button>
-              <button onClick={() => setProposal(null)} className="btn">
-                {t('pd.discard')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {d && !proposal && (
+      {d && (
         <>
           {d.kind && <p className="eyebrow eyebrow-dot">{d.kind}</p>}
+          {d.full_name && d.full_name !== place.name && (
+            <p className="-mt-2 text-[14px] font-semibold text-text-soft">{d.full_name}</p>
+          )}
           {d.summary && <ClampText text={d.summary} lines={3} className="text-[15px] leading-relaxed text-text-soft" />}
           <Info d={d} />
           {d.sources.length > 0 && (

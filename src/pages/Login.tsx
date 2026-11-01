@@ -73,22 +73,8 @@ export default function Login() {
               {t('auth.resetIntro')}
             </p>
           ) : (
-            <div className="mb-6 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setMode('signin')}
-                className={`pill flex-1 justify-center ${mode === 'signin' ? 'pill-active' : ''}`}
-              >
-                {t('auth.signIn')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('signup')}
-                className={`pill flex-1 justify-center ${mode === 'signup' ? 'pill-active' : ''}`}
-              >
-                {t('auth.signUp')}
-              </button>
-            </div>
+            // Application privee (Diego et Vesna) : plus d'inscription
+            <p className="mb-6 text-center text-[1.15rem] font-extrabold">{t('auth.signIn')}</p>
           )}
 
           <form onSubmit={onSubmit} className="space-y-4">

@@ -17,9 +17,11 @@ import { countryName, categoryLabel } from '../lib/countryName'
 type Props = {
   place: Place
   onClose: () => void
+  /** Revenir la ou l'on etait (page precedente ou carte). */
+  onBack?: () => void
 }
 
-export default function PlaceSidebar({ place, onClose }: Props) {
+export default function PlaceSidebar({ place, onClose, onBack }: Props) {
   const t = useT()
   const { user } = useAuth()
   const { remove, edit, trips, categories, categoryOf, bumpPhotoCount } = usePlaces()
@@ -178,6 +180,12 @@ export default function PlaceSidebar({ place, onClose }: Props) {
   return (
     <aside className="panel-enter fixed inset-0 z-[1150] flex flex-col bg-bg md:static md:z-auto md:w-[25rem] md:shrink-0 md:border-l md:border-line">
       <div className="min-h-0 flex-1 overflow-y-auto">
+      <button
+        onClick={onBack ?? onClose}
+        className="sticky left-3 top-3 z-20 -mb-12 ml-3 mt-3 flex h-10 w-fit items-center gap-1.5 rounded-full bg-black/50 px-4 text-[14px] font-bold text-white shadow-lg backdrop-blur-md transition-transform active:scale-95"
+      >
+        ← {t('common.back')}
+      </button>
       <PlaceHero place={place} onZoom={(urls, index) => setHeroZoom({ urls, index })} />
       <header className="border-b border-line px-6 pb-5 pt-6">
         <div className="flex items-start justify-between gap-3">

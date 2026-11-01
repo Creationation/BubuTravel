@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { BellIcon, CheckIcon, TodoKindIcon, TrashIcon } from './icons'
 import { countryName } from '../../lib/countryName'
+import { TOPICS, topicOf } from '../../lib/discover'
 
 export const KINDS: TodoKind[] = ['todo', 'booking', 'admin', 'packing']
 const kindKey = (k: TodoKind): Key => `todo.kind.${k}` as Key
@@ -46,6 +47,8 @@ function groupOf(todo: TripTodo, today: string): Group {
 export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAdd?: boolean }) {
   const { t } = useI18n()
   const [filter, setFilter] = useState<TodoKind | 'all'>('all')
+  // Rangement : par theme (papiers, transport...) ou par urgence
+  const [sortBy, setSortBy] = useState<'topic' | 'date'>('topic')
   // '*' = tous les pays, '' = check-list generale, sinon le nom du pays
   const [place, setPlace] = useState<string>('*')
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +76,15 @@ export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
   }, [visible, today])
 
   const done = hub.todos.filter((x) => x.done).length
+  const byTopic = useMemo(() => {
+    const open = visible.filter((x) => !x.done)
+    return TOPICS.map((tp) => ({
+      ...tp,
+      items: open
+        .filter((x) => topicOf(x.title, x.notes, x.kind) === tp.id)
+        .sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999') || a.position - b.position),
+    })).filter((tp) => tp.items.length > 0)
+  }, [visible])
 
   return (
     <div className="space-y-8">
@@ -123,8 +135,58 @@ export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
         )}
       </div>
 
+      <div className="flex gap-1.5">
+        <button onClick={() => setSortBy('topic')} className={`pill ${sortBy === 'topic' ? 'pill-active' : ''}`}>
+          🗂️ {t('todo.byTopic')}
+        </button>
+        <button onClick={() => setSortBy('date')} className={`pill ${sortBy === 'date' ? 'pill-active' : ''}`}>
+          📅 {t('todo.byDate')}
+        </button>
+      </div>
+
       {visible.length === 0 ? (
         <p className="py-10 text-center text-text-muted">{t('todo.empty')}</p>
+      ) : sortBy === 'topic' ? (
+        <>
+          {byTopic.map((tp) => (
+            <section key={tp.id}>
+              <p className="mb-3 text-[15px] font-extrabold">
+                {tp.emoji} {t(tp.label)} <span className="num text-[13px] font-medium text-text-muted">{tp.items.length}</span>
+              </p>
+              <ul className="overflow-hidden rounded-[20px] border border-line bg-surface">
+                {tp.items.map((todo) => (
+                  <TodoRow
+                    key={todo.id}
+                    todo={todo}
+                    stops={hub.stops}
+                    late={groupOf(todo, today) === 'late'}
+                    onToggle={() => hub.editTodo(todo.id, { done: !todo.done }).catch((e) => setError(errorMessage(e)))}
+                    onRemove={() => hub.removeTodo(todo.id).catch((e) => setError(errorMessage(e)))}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+          {grouped.done.length > 0 && (
+            <section>
+              <p className="eyebrow mb-3">
+                {t('todo.group.done')} <span className="num font-medium normal-case tracking-normal">{grouped.done.length}</span>
+              </p>
+              <ul className="overflow-hidden rounded-[20px] border border-line bg-surface opacity-70">
+                {grouped.done.map((todo) => (
+                  <TodoRow
+                    key={todo.id}
+                    todo={todo}
+                    stops={hub.stops}
+                    late={false}
+                    onToggle={() => hub.editTodo(todo.id, { done: !todo.done }).catch((e) => setError(errorMessage(e)))}
+                    onRemove={() => hub.removeTodo(todo.id).catch((e) => setError(errorMessage(e)))}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       ) : (
         GROUPS.map((g) =>
           grouped[g].length === 0 ? null : (

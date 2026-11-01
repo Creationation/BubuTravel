@@ -23,6 +23,8 @@ import UpdatePrompt from './components/UpdatePrompt'
 import { useT } from './i18n/I18nContext'
 import VaultPage from './pages/VaultPage'
 import Greeting from './components/Greeting'
+import { AiJobsProvider } from './context/AiJobsContext'
+import AiDock from './components/AiDock'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -30,7 +32,10 @@ function Protected({ children }: { children: ReactNode }) {
   if (!session) return <Navigate to="/login" replace />
   return (
     <PlacesProvider>
-      <TrackerProvider>{children}</TrackerProvider>
+      <AiJobsProvider>
+        <TrackerProvider>{children}</TrackerProvider>
+        <AiDock />
+      </AiJobsProvider>
     </PlacesProvider>
   )
 }

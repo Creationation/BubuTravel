@@ -1,15 +1,15 @@
 import { addDaysIso, currentAndNext, daysBetween, nowLocalIso, shortDate, shortDateTime, todayIso } from '../../lib/tripDates'
 import type { Place, Trip } from '../../lib/types'
-import { useNavigate } from 'react-router-dom'
 import { usePlaces } from '../../context/PlacesContext'
 import { flagOf } from '../../lib/countries'
-import { isStay, photoScore } from '../../lib/schedule'
+import { photoScore } from '../../lib/schedule'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import { modeKey } from './StopForm'
+import DiscoverSection from './DiscoverSection'
 import { DocIcon, RouteIcon, ShareIcon, ShieldIcon, TodoKindIcon, TransportIcon } from './icons'
 
-export type HubTab = 'overview' | 'route' | 'todo' | 'docs' | 'countries' | 'ideas' | 'memories'
+export type HubTab = 'overview' | 'day' | 'route' | 'todo' | 'docs' | 'countries' | 'ideas' | 'assistant' | 'memories'
 
 /**
  * Le tableau de bord du voyage : ce qui arrive, ce qu'il ne faut pas oublier
@@ -81,7 +81,7 @@ export default function Overview({
     )
   }
 
-  const navigate = useNavigate()
+
   const { places } = usePlaces()
   const tripPlaces = places.filter((p) => p.trip_id === trip.id)
   const imageOf = (p: Place) => p.gallery?.find((u) => !u.includes('idea-frames')) || p.image_url || p.gallery?.[0] || null
@@ -92,11 +92,6 @@ export default function Overview({
       .sort((a, b) => photoScore(b) - photoScore(a))[0]
     return best ? imageOf(best) : null
   }
-  const discover = tripPlaces
-    .filter((p) => p.status === 'wishlist' && imageOf(p) && !isStay(p))
-    .sort((a, b) => photoScore(b) - photoScore(a))
-    .slice(0, 12)
-
   return (
     <div className="space-y-9">
       {/* Prochain trajet */}
@@ -170,27 +165,8 @@ export default function Overview({
         </section>
       )}
 
-      {/* A decouvrir : carrousel de lieux en photo */}
-      {discover.length > 0 && (
-        <section>
-          <SectionHead title={t('ov.discover')} action={t('ov.seeMap')} onAction={() => navigate('/carte')} />
-          <div className="nav-scroll -mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8">
-            {discover.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => navigate(`/carte?lieu=${p.id}`)}
-                className="w-40 shrink-0 snap-start text-left sm:w-48"
-              >
-                <div className="aspect-[4/5] overflow-hidden rounded-[22px] bg-surface-2 shadow-[var(--shadow-sm)]">
-                  <img src={imageOf(p)!} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-                </div>
-                <p className="mt-2 line-clamp-2 text-[14px] font-bold leading-snug">{p.name}</p>
-                {p.city && <p className="text-[12px] text-text-muted">{p.city}</p>}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* A decouvrir : tout, range par famille, et le bouton magique */}
+      <DiscoverSection trip={trip} />
 
       {/* Listes facon reglages iOS */}
       <div className="grid gap-6 lg:grid-cols-2">

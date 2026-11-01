@@ -25,6 +25,8 @@ import SharePanel from '../components/hub/SharePanel'
 import TripAssistant from '../components/hub/TripAssistant'
 import IdeasTab from '../components/hub/IdeasTab'
 import CountriesTab from '../components/hub/CountriesTab'
+import DayPlanTab from '../components/hub/DayPlanTab'
+import AssistantChat from '../components/hub/AssistantChat'
 import { MODES, modeKey } from '../components/hub/StopForm'
 import { useI18n } from '../i18n/I18nContext'
 import TripHero from '../components/hub/TripHero'
@@ -35,11 +37,13 @@ import { countryName } from '../lib/countryName'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
+  { id: 'day', label: 'hub.tab.day' },
   { id: 'route', label: 'hub.tab.route' },
   { id: 'todo', label: 'hub.tab.todo' },
   { id: 'docs', label: 'hub.tab.docs' },
   { id: 'countries', label: 'hub.tab.countries' },
   { id: 'ideas', label: 'hub.tab.ideas' },
+  { id: 'assistant', label: 'hub.tab.assistant' },
   { id: 'memories', label: 'hub.tab.memories' },
 ]
 
@@ -167,6 +171,8 @@ export default function TripView() {
               onOpenShare={() => setSharing(true)}
             />
           )}
+          {tab === 'day' && <DayPlanTab trip={trip} hub={hub} />}
+          {tab === 'assistant' && <AssistantChat trip={trip} hub={hub} />}
           {tab === 'route' && <RouteTab trip={trip} hub={hub} autoAdd={autoAdd} onOpenAssistant={() => setAssistant(true)} />}
           {tab === 'todo' && <TodoTab hub={hub} autoAdd={autoAdd} />}
           {tab === 'docs' && <DocsTab hub={hub} autoAdd={autoAdd} />}

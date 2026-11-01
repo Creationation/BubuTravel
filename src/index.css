@@ -1125,3 +1125,52 @@ body {
     animation: none;
   }
 }
+
+/* Jauge de l'IA : degrade chaud, reflet qui glisse (decor, pas progression) */
+.ai-gauge-fill {
+  background: linear-gradient(90deg, #ff7f57, #ffb020 60%, #ffd36e);
+  box-shadow: 0 0 12px rgba(255, 150, 60, 0.45);
+  overflow: hidden;
+}
+.ai-gauge-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: ai-shine 1.8s ease-in-out infinite;
+}
+@keyframes ai-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+.ai-spin {
+  animation: ai-spin 2.4s linear infinite;
+}
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Panneau qui monte du bas */
+.sheet-in {
+  animation: sheet-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-gauge-fill::after,
+  .ai-spin,
+  .sheet-in {
+    animation: none;
+  }
+}

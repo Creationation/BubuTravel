@@ -48,7 +48,7 @@ try:
 except Exception:
     pass
 
-VERSION = "2.0"
+VERSION = "2.1"
 # Modele utilise par Claude Code (alias : opus, sonnet...). Compte sur l'abonnement Claude.
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "opus")
 SB_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
@@ -500,6 +500,10 @@ class MenuItem(BaseModel):
 
 class PlaceDetails(BaseModel):
     name: str = Field(description="Nom COURT du lieu (40 caracteres max) : son vrai nom propre, ex. « Eagle Nest Bar », « Wat Pho ». Pas de description, pas de parentheses")
+    full_name: str = Field(description="Nom COMPLET et officiel du lieu, tel qu'affiche sur place ou sur Google Maps, ex. « Wat Phra Chetuphon Wimon Mangkhalaram (Wat Pho) »")
+    family: Literal["culture", "nature", "food", "nightlife", "market", "activity", "wellness", "other"] = Field(
+        description="Famille : culture (temples, musees, monuments), nature (plages, iles, parcs, points de vue), food (restaurants, cafes, street food), nightlife (bars, rooftops, festivals), market (marches, shopping), activity (excursions, cours, sports), wellness (spa, massage, sante), other"
+    )
     kind: str = Field(description="restaurant, bar, cafe, temple, plage, atelier, spa, marche...")
     summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 phrases maximum")
     address: str = Field(description="Adresse complete : numero, rue, quartier, ville")
@@ -513,7 +517,7 @@ class PlaceDetails(BaseModel):
     best_time: str = Field(description="COURT, 70 caracteres max")
     duration: str = Field(description="COURT, 30 caracteres max : ex. « 2 h »")
     tips: list[str] = Field(description="3 a 5 conseils concrets, une phrase courte chacun")
-    images: list[str] = Field(description="2 a 6 URL DIRECTES d'images (.jpg/.png/.webp) montrant CE lieu : site officiel, Wikimedia, Tripadvisor, Google... jamais une image d'un autre lieu")
+    images: list[str] = Field(description="4 a 8 URL DIRECTES d'images (.jpg/.png/.webp) montrant CE lieu : site officiel, Wikimedia, Tripadvisor, Google... jamais une image d'un autre lieu")
     sources: list[Source]
 
 
@@ -540,6 +544,9 @@ miniature Instagram, un logo, une capture avec du texte, une carte ou un lieu vo
 chaque URL est bien un fichier image de CE lieu avant de la donner.
 N'invente rien : laisse vide ce que tu ne trouves pas.
 {lang}
+
+Si le nom donne est vague ou generique (ex. « buffet », « bar sur le toit », « cours de cuisine »),
+trouve le VRAI lieu grace aux notes et a la ville, et donne son vrai nom propre.
 
 Lieu : {name}
 Ville : {city}, {country}
@@ -669,11 +676,50 @@ def inline_schema(model: type[BaseModel]) -> dict:
     return resolve(schema)
 
 
-def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900) -> dict:
+# Demande IA en cours sur ce fil : sa jauge avance avec les vraies etapes
+CURRENT = threading.local()
+EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14}
+
+
+def progress(pct: int, step: str | None = None, *, force: bool = False) -> None:
+    """Ecrit l'avancement reel de la demande (au plus toutes les 1,5 s)."""
+    job_id = getattr(CURRENT, "job_id", None)
+    if not job_id:
+        return
+    pct = max(getattr(CURRENT, "pct", 0), min(99, int(pct)))
+    now = time.time()
+    if not force and now - getattr(CURRENT, "at", 0) < 1.5 and step == getattr(CURRENT, "step", None):
+        return
+    CURRENT.pct, CURRENT.at, CURRENT.step = pct, now, step
+    try:
+        body = {"progress": pct, "updated_at": now_iso()}
+        if step is not None:
+            body["step"] = step[:160]
+        sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}"}, body=body, prefer="return=minimal")
+    except Exception:
+        pass
+
+
+def step_label(name: str, args: dict) -> str:
+    """Etape lisible, en code traduit par l'app : « search:Wat Pho horaires »."""
+    if name == "WebSearch":
+        return f"search:{args.get('query', '')}"
+    if name == "WebFetch":
+        url = str(args.get("url", ""))
+        return "read:" + re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+    if name == "Read":
+        return "photo:" + Path(str(args.get("file_path", ""))).name
+    if name == "StructuredOutput":
+        return "write:"
+    return "think:"
+
+
+def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
     """
-    Appelle Claude Code en mode non interactif avec une sortie structuree.
-    ANTHROPIC_API_KEY est retiree de l'environnement : sans ca, Claude Code
-    facturerait la cle API au lieu d'utiliser l'abonnement Claude.
+    Appelle Claude Code en mode non interactif avec une sortie structuree, en
+    flux : chaque outil utilise (recherche, page lue, photo regardee) fait
+    avancer la jauge. ANTHROPIC_API_KEY est retiree de l'environnement : sans
+    ca, Claude Code facturerait la cle API au lieu de l'abonnement Claude.
     """
     exe = shutil.which("claude")
     if not exe:
@@ -681,37 +727,61 @@ def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[s
     env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
     cmd = [
         exe, "-p",
-        "--output-format", "json",
+        "--output-format", "stream-json", "--verbose",
         "--model", CLAUDE_MODEL,
         "--json-schema", json.dumps(inline_schema(model), ensure_ascii=False),
         "--max-turns", "40",
         "--allowedTools", *tools,
     ]
-    proc = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=str(cwd),
-        env=env,
-        timeout=timeout,
+    lo, hi = span
+    expected = EXPECTED_STEPS.get(getattr(CURRENT, "kind", ""), 10)
+    progress(lo, "think:", force=True)
+    proc = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8", errors="replace", cwd=str(cwd), env=env,
     )
-    out = proc.stdout
-    start = out.find("{")
-    if start < 0:
-        raise RuntimeError(f"Claude Code n'a rien renvoye : {(proc.stderr or out)[:300]}")
-    data = json.loads(out[start:])
-    if data.get("is_error"):
-        raise RuntimeError(f"Claude Code : {str(data.get('result'))[:300]}")
-    result = data.get("structured_output")
+    killer = threading.Timer(timeout, proc.kill)
+    killer.start()
+    final: dict | None = None
+    steps = 0
+    try:
+        assert proc.stdin and proc.stdout
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+        for line in proc.stdout:
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            if ev.get("type") == "assistant":
+                for c in (ev.get("message") or {}).get("content") or []:
+                    if c.get("type") == "tool_use" and c.get("name") != "ToolSearch":
+                        steps += 1
+                        # Courbe qui ralentit sans jamais atteindre le bout tant
+                        # que Claude n'a pas rendu sa fiche
+                        frac = 1 - pow(0.5, steps / max(1.0, expected / 3))
+                        progress(lo + (hi - lo) * frac, step_label(c.get("name", ""), c.get("input") or {}))
+            elif ev.get("type") == "result":
+                final = ev
+        proc.wait(timeout=30)
+    finally:
+        killer.cancel()
+    if final is None:
+        err = (proc.stderr.read() if proc.stderr else "")[:300]
+        raise RuntimeError(f"Claude Code n'a rien renvoye : {err or 'delai depasse'}")
+    if final.get("is_error"):
+        raise RuntimeError(f"Claude Code : {str(final.get('result'))[:300]}")
+    result = final.get("structured_output")
     if result is None:
-        raw = data.get("result") or ""
+        raw = final.get("result") or ""
         i = raw.find("{")
         result = json.loads(raw[i:]) if i >= 0 else None
     if result is None:
         raise RuntimeError("Reponse de Claude sans fiche structuree.")
+    progress(hi, "write:", force=True)
     return model.model_validate(result).model_dump()
 
 
@@ -960,9 +1030,12 @@ def claim_ai_job() -> dict | None:
     # Ce que quelqu'un attend a l'ecran passe avant les traitements de fond :
     # apercus « Remplir les informations », assistant d'itineraire, fiches pays.
     rows = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(itinerary,country_guide)", "order": "created_at.asc", "limit": "1", "select": "*"})
-        or sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.asc", "limit": "1", "select": "*"})
+        # Le reste : la demande la plus recente d'abord (ce qu'on vient de lancer
+        # passe avant les longues files de fond)
+        or sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.desc", "limit": "1", "select": "*"})
     )
     if not rows:
         return None
@@ -979,11 +1052,15 @@ def claim_ai_job() -> dict | None:
 
 def update_ai_job(job_id: str, **fields) -> None:
     fields["updated_at"] = now_iso()
+    if fields.get("status") == "ready":
+        fields["progress"] = 100
+        fields["step"] = "done:"
     sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}"}, body=fields, prefer="return=minimal")
 
 
 def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
+    CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
         req = job.get("input") or {}
@@ -999,8 +1076,10 @@ def process_ai_job(job: dict) -> None:
                 notes=(place.get("notes") or "")[:1500],
             )
             data = claude_json(prompt, PlaceDetails, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
-            images = [u for u in data.get("images", []) if isinstance(u, str) and u.startswith("http")]
-            images = [u for u in images if image_ok(u)]
+            images = gather_images(
+                data.get("images", []), data.get("name") or place["name"], place.get("city") or "", place["id"],
+                commons=data.get("family") in ("culture", "nature", "market"),
+            )
             data["images"] = images
             patch = {"details": data}
             # Photos verifiees du lieu d'abord ; les images de la video (souvent
@@ -1024,14 +1103,17 @@ def process_ai_job(job: dict) -> None:
             if lat is not None and lng is not None:
                 patch.update({"lat": lat, "lng": lng})
                 patch["details"] = {**data, "gps_exact": True}
+            # Le vrai nom trouve remplace un nom vague ou approximatif
+            if data.get("name") and data["name"].strip().lower() != place["name"].strip().lower():
+                patch["name"] = data["name"][:120]
             if "Position approximative" in (place.get("notes") or "") and lat is not None:
-                patch["name"] = data["name"][:120] or place["name"]
                 patch["notes"] = place["notes"].replace(
                     "Position approximative (centre de la ville) : à préciser.",
                     f"Position corrigée : {data.get('address') or data['name']}.",
                 )
+            progress(98, "save:", force=True)
             sb("PATCH", "places", params={"id": f"eq.{place['id']}"}, body=patch, prefer="return=minimal")
-            update_ai_job(job["id"], status="ready", result={"ok": True}, error=None)
+            update_ai_job(job["id"], status="ready", result={"ok": True, "name": patch.get("name") or place["name"], "images": len(images)}, error=None)
             log(f"  fiche du lieu prete : {data['name']} ({len(images)} images)")
             return
         if job["kind"] == "stop_places":
@@ -1063,6 +1145,12 @@ def process_ai_job(job: dict) -> None:
             update_ai_job(job["id"], status="ready", result=data, error=None)
             log(f"  fiche pays prete : {data['country']}")
             return
+        extra = {"schedule_place": job_schedule_place, "arrange_trip": job_arrange_trip, "day_plan": job_day_plan, "chat": job_chat}
+        if job["kind"] in extra:
+            data = extra[job["kind"]](job, req, tmp)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  {job['kind']} pret")
+            return
         if job["kind"] != "itinerary":
             raise RuntimeError(f"Type de demande inconnu : {job['kind']}")
         lines = [
@@ -1087,6 +1175,401 @@ def process_ai_job(job: dict) -> None:
         update_ai_job(job["id"], status="error", error=str(err)[:300])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# --------------------------------------------------------------------------
+# Photos : copie chez nous (bucket public) pour qu'elles ne disparaissent
+# jamais, et recherche de secours sur Wikimedia Commons.
+# --------------------------------------------------------------------------
+
+def rehost_image(url: str, key: str, n: int) -> str | None:
+    """Telecharge une image, la reduit (1280 px) et la range dans idea-frames."""
+    tmp = Path(tempfile.mkdtemp(prefix="bubu-img-"))
+    try:
+        # Wikimedia exige un identifiant d'application, les autres sites un navigateur
+        ua = "BuBuTravel/1.0 (https://bubu-travel.vercel.app)" if "wikimedia.org" in url else UA
+        r = requests.get(url, headers={"User-Agent": ua, "Referer": url}, timeout=25)
+        if r.status_code >= 400 or not r.headers.get("content-type", "").startswith("image/") or len(r.content) < 15000:
+            return None
+        src = tmp / "in"
+        src.write_bytes(r.content)
+        out = tmp / "out.jpg"
+        run(["ffmpeg", "-y", "-i", str(src), "-vf", "scale='min(1280,iw)':-2", "-frames:v", "1", "-q:v", "4", str(out)])
+        if not out.exists() or out.stat().st_size < 8000:
+            return None
+        path = f"places/{key}/{n}-{uuid.uuid4().hex[:8]}.jpg"
+        res = requests.post(
+            f"{SB_URL}/storage/v1/object/{FRAMES_BUCKET}/{path}",
+            headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "image/jpeg", "x-upsert": "true"},
+            data=out.read_bytes(),
+            timeout=60,
+        )
+        return f"{SB_URL}/storage/v1/object/public/{FRAMES_BUCKET}/{path}" if res.status_code < 300 else None
+    except Exception:
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def commons_images(query: str, limit: int = 6) -> list[str]:
+    """Photos libres de droits du lieu sur Wikimedia Commons."""
+    try:
+        r = requests.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={
+                "action": "query", "format": "json", "generator": "search", "gsrsearch": query,
+                "gsrnamespace": 6, "gsrlimit": limit * 2, "prop": "imageinfo", "iiprop": "url|mime", "iiurlwidth": 1280,
+            },
+            headers={"User-Agent": "BuBuTravel/1.0 (https://bubu-travel.vercel.app)"},
+            timeout=20,
+        )
+        pages = (r.json().get("query") or {}).get("pages") or {}
+        out = []
+        for p in sorted(pages.values(), key=lambda x: x.get("index", 99)):
+            info = (p.get("imageinfo") or [{}])[0]
+            if info.get("mime") in ("image/jpeg", "image/png", "image/webp"):
+                out.append(info.get("thumburl") or info.get("url"))
+        return [u for u in out if u][:limit]
+    except Exception:
+        return []
+
+
+def gather_images(found: list[str], name: str, city: str, key: str, want: int = 5, commons: bool = True) -> list[str]:
+    """Images verifiees et copiees chez nous ; complete par Commons s'il en manque."""
+    urls = [u for u in found if isinstance(u, str) and u.startswith("http")]
+    # Commons seulement pour les lieux connus (temples, nature, marches) : pour
+    # un petit restaurant, la recherche ramenerait des photos d'autre chose
+    if commons and len(urls) < want:
+        for q in [f"{name} {city}".strip(), name]:
+            urls += [u for u in commons_images(q) if u not in urls]
+            if len(urls) >= want + 2:
+                break
+    kept: list[str] = []
+    for i, u in enumerate(urls[:14]):
+        if len(kept) >= 8:
+            break
+        progress(82 + 14 * i / max(1, min(len(urls), 14)), f"images:{len(kept)}")
+        hosted = rehost_image(u, key, len(kept))
+        if hosted:
+            kept.append(hosted)
+    return kept
+
+
+# --------------------------------------------------------------------------
+# Le voyage en texte, pour donner tout le contexte a Claude
+# --------------------------------------------------------------------------
+
+def trip_snapshot(trip_id: str, *, max_places: int = 220) -> tuple[str, dict, list[dict], list[dict]]:
+    trip = (sb("GET", "trips", params={"id": f"eq.{trip_id}", "select": "*"}) or [{}])[0]
+    stops = sb("GET", "trip_stops", params={"trip_id": f"eq.{trip_id}", "select": "*", "order": "arrive_date.asc.nullslast,position.asc"}) or []
+    places = sb("GET", "places", params={"trip_id": f"eq.{trip_id}", "select": "*", "order": "created_at.asc"}) or []
+    lines = [
+        f"Voyage : {trip.get('title', '')} du {trip.get('start_date') or '?'} au {trip.get('end_date') or '?'}",
+        "",
+        "Etapes (ou l'on dort) :",
+    ]
+    for s in stops:
+        stays = ", ".join(h.get("stay", "") for h in (s.get("hosts") or []) if h.get("stay")) or (s.get("stay_name") or "")
+        lines.append(f"- {s['name']} ({s.get('country') or ''}) du {s.get('arrive_date') or '?'} au {s.get('leave_date') or '?'}" + (f", logement : {stays}" if stays else ""))
+    lines += ["", "Lieux du voyage (id | nom | ville | statut | jour prevu | heure | duree min | type) :"]
+    for p in places[:max_places]:
+        d = p.get("details") or {}
+        lines.append(
+            " | ".join(
+                str(x)
+                for x in [
+                    p["id"], p["name"], p.get("city") or "", "fait" if p.get("status") == "visited" else "a faire",
+                    p.get("visit_date") or "-", p.get("plan_time") or "-", p.get("plan_minutes") or "-",
+                    (d.get("kind") or "")[:30],
+                ]
+            )
+        )
+    return "\n".join(lines), trip, stops, places
+
+
+def is_stay_place(p: dict) -> bool:
+    text = f"{p.get('name', '')} {(p.get('details') or {}).get('kind', '')}"
+    return bool(re.search(r"h[oô]tel|h[ée]bergement|airbnb|resort|hostel", text, re.I)) and not re.search(r"buffet|brunch|bar|caf[ée]|restaurant", p.get("name", ""), re.I)
+
+
+# --------------------------------------------------------------------------
+# Nouvelles demandes : date proposee, tout mettre en place, plan du jour,
+# assistant prive (conversation avec photos).
+# --------------------------------------------------------------------------
+
+class Slot(BaseModel):
+    date: str = Field(description="AAAA-MM-JJ, un jour du voyage ou l'on est dans la bonne ville")
+    time: str = Field(description="HH:MM, heure de debut conseillee")
+    minutes: int = Field(description="Duree a prevoir en minutes")
+    reason: str = Field(description="Pourquoi ce jour et cette heure, une phrase")
+
+
+class Assignment(BaseModel):
+    place_id: str
+    date: str = Field(description="AAAA-MM-JJ")
+    time: str = Field(description="HH:MM")
+    minutes: int
+    reason: str = Field(description="Une phrase courte")
+
+
+class Skipped(BaseModel):
+    place_id: str
+    reason: str
+
+
+class TripArrangement(BaseModel):
+    summary: str = Field(description="Ce qui a ete organise, trois phrases maximum")
+    assignments: list[Assignment]
+    skipped: list[Skipped] = Field(description="Lieux non places (ville sans etape datee, ferme a ces dates...) et pourquoi")
+
+
+class DayItem(BaseModel):
+    place_id: str = Field(description="id d'un lieu existant, ou chaine vide pour une nouvelle activite")
+    name: str = Field(description="Nom court de l'activite (40 caracteres max)")
+    time: str = Field(description="HH:MM")
+    minutes: int
+    note: str = Field(description="Conseil ou precision courte, chaine vide sinon")
+    lat: float | None = Field(description="Pour une nouvelle activite : latitude si connue, sinon null")
+    lng: float | None
+
+
+class DayPlan(BaseModel):
+    summary: str = Field(description="La journee en deux phrases")
+    items: list[DayItem] = Field(description="Toute la journee, dans l'ordre")
+
+
+class ChatAction(BaseModel):
+    type: Literal["add_place", "schedule", "add_todo"] = Field(
+        description="add_place : ajouter un lieu a visiter ; schedule : placer un lieu existant un jour ; add_todo : ajouter une chose a faire"
+    )
+    label: str = Field(description="Texte du bouton, court, ex. « Ajouter le marché flottant le 15/12 »")
+    place_id: str = Field(description="Pour schedule : id du lieu existant ; sinon chaine vide")
+    name: str = Field(description="Pour add_place : nom court du lieu ; pour add_todo : la tache")
+    city: str
+    country: str
+    lat: float | None
+    lng: float | None
+    date: str = Field(description="AAAA-MM-JJ ou chaine vide")
+    time: str = Field(description="HH:MM ou chaine vide")
+    minutes: int | None
+    notes: str
+
+
+class ChatReply(BaseModel):
+    reply: str = Field(description="La reponse, naturelle et chaleureuse, comme dans une vraie conversation. Pas de pave : paragraphes courts")
+    questions: list[str] = Field(description="Questions a poser s'il manque une information pour bien faire, sinon liste vide")
+    actions: list[ChatAction] = Field(description="Propositions concretes a appliquer d'un toucher (0 a 6)")
+
+
+SLOT_BRIEF = """Propose LE meilleur moment du voyage pour faire cette activite.
+Regles : un jour ou les voyageurs sont dans la bonne ville (voir les etapes), en evitant les journees
+deja chargees et les chevauchements avec ce qui est deja prevu ; tiens compte des horaires d'ouverture,
+du meilleur moment de la journee (lumiere, chaleur, affluence) et du jour de la semaine.
+{lang}
+
+Activite : {name} ({city}) id {place_id}
+Infos connues : {info}
+
+{snapshot}
+"""
+
+ARRANGE_BRIEF = """Organise tout le voyage : place chaque lieu « a faire » NON date dans un jour et a une heure.
+Regles :
+- Un lieu ne peut etre place que pendant les jours ou les voyageurs dorment dans cette ville
+  (voir les etapes). Une ville sans etape datee : laisse le lieu dans « skipped » avec la raison.
+- Journees equilibrees : 4 a 7 h d'activites, pas plus de 9 h, regroupe ce qui est proche,
+  temples et visites le matin, couchers de soleil et bars le soir, repas aux heures des repas.
+- Ne touche jamais aux lieux deja dates ; evite les chevauchements avec eux.
+- Ignore les hebergements (hotels, Airbnb) : ce ne sont pas des activites.
+- Heures au format HH:MM, duree realiste en minutes.
+{lang}
+
+{snapshot}
+"""
+
+DAY_BRIEF = """Refais proprement le plan de cette journee selon la demande des voyageurs.
+Garde les lieux existants (meme id) sauf si la demande dit de les enlever ; tu peux en ajouter
+(place_id vide) si la demande le suggere ou si la journee a un vrai trou. Ordre logique dans
+l'espace (pas d'aller-retour), horaires realistes avec trajets, pauses et repas.
+{lang}
+
+Jour : {day} a {city}
+Demande des voyageurs : {instruction}
+
+Plan actuel de la journee :
+{current}
+
+{snapshot}
+"""
+
+CHAT_BRIEF = """Tu es l'assistant prive de voyage de {who}, pendant la preparation et le voyage lui-meme.
+Reponds comme dans une vraie conversation, en tutoyant, avec chaleur et precision. Tu connais tout le
+voyage (ci-dessous). Si des photos sont jointes (fichiers image dans ce dossier : {images}), regarde-les
+TOUTES avec l'outil Read avant de repondre : elles montrent ce dont on parle (lieu, menu, billet, panneau...).
+Cherche sur le web (WebSearch, WebFetch) quand il faut des infos fiables et a jour.
+S'il manque une information pour bien repondre (quel jour, quelle ville, budget...), pose la question
+dans « questions ». Propose des actions concretes (ajouter un lieu, le placer un jour, une chose a faire)
+seulement quand c'est utile ; les id de lieux viennent de la liste ci-dessous.
+{lang}
+
+{snapshot}
+
+--- Conversation jusqu'ici ---
+{history}
+
+--- Nouveau message ---
+{message}
+"""
+
+
+def place_info_text(p: dict) -> str:
+    d = p.get("details") or {}
+    bits = [d.get("summary"), d.get("hours") and f"Horaires : {d['hours']}", d.get("best_time") and f"Meilleur moment : {d['best_time']}",
+            d.get("duration") and f"Duree : {d['duration']}", (p.get("notes") or "")[:400]]
+    return " / ".join(b for b in bits if b) or "rien de plus"
+
+
+def job_schedule_place(job: dict, req: dict, tmp: Path) -> dict:
+    place = (sb("GET", "places", params={"id": f"eq.{req.get('place_id')}", "select": "*"}) or [None])[0]
+    if not place:
+        raise RuntimeError("Lieu introuvable")
+    snapshot, *_ = trip_snapshot(place["trip_id"])
+    prompt = SLOT_BRIEF.format(lang=lang_line(req.get("lang", "fr")), name=place["name"], city=place.get("city") or "",
+                               place_id=place["id"], info=place_info_text(place), snapshot=snapshot)
+    return claude_json(prompt, Slot, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=900)
+
+
+def job_arrange_trip(job: dict, req: dict, tmp: Path) -> dict:
+    trip_id = job["trip_id"]
+    snapshot, _, stops, places = trip_snapshot(trip_id)
+    prompt = ARRANGE_BRIEF.format(lang=lang_line(req.get("lang", "fr")), snapshot=snapshot)
+    data = claude_json(prompt, TripArrangement, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1800)
+    by_id = {p["id"]: p for p in places}
+    undo, applied = [], 0
+    for a in data["assignments"]:
+        p = by_id.get(a["place_id"])
+        if not p or p.get("visit_date") or p.get("status") == "visited" or is_stay_place(p):
+            continue
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", a["date"]) or not re.match(r"^\d{2}:\d{2}$", a["time"]):
+            continue
+        undo.append({"id": p["id"], "visit_date": p.get("visit_date"), "plan_time": p.get("plan_time"), "plan_minutes": p.get("plan_minutes")})
+        sb("PATCH", "places", params={"id": f"eq.{p['id']}"},
+           body={"visit_date": a["date"], "plan_time": a["time"], "plan_minutes": max(15, min(720, int(a["minutes"])))},
+           prefer="return=minimal")
+        applied += 1
+    return {**data, "applied": applied, "undo": undo}
+
+
+def job_day_plan(job: dict, req: dict, tmp: Path) -> dict:
+    trip_id, day = job["trip_id"], req.get("day")
+    snapshot, _, stops, places = trip_snapshot(trip_id)
+    today = [p for p in places if p.get("visit_date") == day and not is_stay_place(p)]
+    today.sort(key=lambda p: p.get("plan_time") or "99")
+    current = "\n".join(f"- {p.get('plan_time') or '?'} {p['name']} (id {p['id']}, {p.get('plan_minutes') or '?'} min)" for p in today) or "(vide)"
+    stop = next((s for s in stops if s.get("arrive_date") and s["arrive_date"] <= day <= (s.get("leave_date") or s["arrive_date"])), None)
+    prompt = DAY_BRIEF.format(lang=lang_line(req.get("lang", "fr")), day=day, city=(stop or {}).get("name", "?"),
+                              instruction=req.get("instruction") or "Optimise la journee", current=current, snapshot=snapshot)
+    data = claude_json(prompt, DayPlan, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
+    by_id = {p["id"]: p for p in places}
+    undo = [{"id": p["id"], "visit_date": p.get("visit_date"), "plan_time": p.get("plan_time"), "plan_minutes": p.get("plan_minutes")} for p in today]
+    kept, created = set(), []
+    for it in data["items"]:
+        if not re.match(r"^\d{2}:\d{2}$", it["time"] or ""):
+            continue
+        minutes = max(15, min(720, int(it["minutes"] or 60)))
+        if it["place_id"] and it["place_id"] in by_id:
+            kept.add(it["place_id"])
+            sb("PATCH", "places", params={"id": f"eq.{it['place_id']}"},
+               body={"visit_date": day, "plan_time": it["time"], "plan_minutes": minutes}, prefer="return=minimal")
+        elif it["name"]:
+            lat, lng = it.get("lat"), it.get("lng")
+            if lat is None or lng is None:
+                lat, lng = (stop or {}).get("lat"), (stop or {}).get("lng")
+            if lat is None or lng is None:
+                continue
+            row = sb("POST", "places", body={
+                "user_id": job["user_id"], "trip_id": trip_id, "name": it["name"][:120], "country": (stop or {}).get("country") or "",
+                "city": (stop or {}).get("name"), "lat": lat, "lng": lng, "status": "wishlist", "notes": it.get("note") or None,
+                "visit_date": day, "plan_time": it["time"], "plan_minutes": minutes,
+            }, prefer="return=representation")
+            if row:
+                created.append(row[0]["id"])
+    for p in today:
+        if p["id"] not in kept:
+            sb("PATCH", "places", params={"id": f"eq.{p['id']}"}, body={"visit_date": None, "plan_time": None}, prefer="return=minimal")
+    return {"summary": data["summary"], "undo": undo, "created": created}
+
+
+ASSISTANT_BUCKET = "assistant"
+
+
+def job_chat(job: dict, req: dict, tmp: Path) -> dict:
+    msg = (sb("GET", "assistant_messages", params={"id": f"eq.{req.get('message_id')}", "select": "*"}) or [None])[0]
+    if not msg:
+        raise RuntimeError("Message introuvable")
+    trip_id, user_id = msg["trip_id"], msg["user_id"]
+    history_rows = sb("GET", "assistant_messages", params={
+        "trip_id": f"eq.{trip_id}", "user_id": f"eq.{user_id}", "created_at": f"lt.{msg['created_at']}",
+        "order": "created_at.desc", "limit": "24", "select": "role,content",
+    }) or []
+    history = "\n".join(f"{'Moi' if h['role'] == 'user' else 'Assistant'} : {h['content']}" for h in reversed(history_rows)) or "(debut de la conversation)"
+    names = []
+    for i, path in enumerate((msg.get("images") or [])[:20]):
+        r = requests.get(f"{SB_URL}/storage/v1/object/{ASSISTANT_BUCKET}/{path}",
+                         headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"}, timeout=60)
+        if r.status_code < 300:
+            ext = path.rsplit(".", 1)[-1].lower() if "." in path else "jpg"
+            name = f"photo_{i + 1:02d}.{ext}"
+            (tmp / name).write_bytes(r.content)
+            names.append(name)
+    prof = (sb("GET", "profiles", params={"id": f"eq.{user_id}", "select": "display_name,lang"}) or [{}])[0]
+    snapshot, *_ = trip_snapshot(trip_id)
+    prompt = CHAT_BRIEF.format(
+        who=prof.get("display_name") or "ce voyageur", images=", ".join(names) or "aucune",
+        lang=lang_line(req.get("lang") or prof.get("lang") or "fr"), snapshot=snapshot, history=history,
+        message=msg.get("content") or "(photos sans texte)",
+    )
+    tools = ["WebSearch", "WebFetch"] + (["Read"] if names else [])
+    data = claude_json(prompt, ChatReply, cwd=tmp, tools=tools, timeout=1200)
+    text = data["reply"].strip()
+    if data.get("questions"):
+        text += "\n\n" + "\n".join(f"❓ {q}" for q in data["questions"])
+    row = sb("POST", "assistant_messages", body={
+        "trip_id": trip_id, "user_id": user_id, "role": "assistant", "content": text, "actions": data.get("actions") or [],
+    }, prefer="return=representation")
+    sb("PATCH", "assistant_messages", params={"id": f"eq.{msg['id']}"}, body={"status": "done"}, prefer="return=minimal")
+    return {"message_id": row[0]["id"] if row else None}
+
+
+def keep_alive(job_id: str, stop: threading.Event) -> None:
+    """Une demande longue reste « en cours » : elle n'est pas reprise par un autre poste."""
+    while not stop.wait(60):
+        try:
+            sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}", "status": "eq.processing"}, body={"updated_at": now_iso()}, prefer="return=minimal")
+        except Exception:
+            pass
+
+
+AI_WORKERS = max(1, int(os.environ.get("AI_WORKERS", "3")))
+
+
+def ai_worker(n: int) -> None:
+    """Plusieurs demandes IA en parallele : on peut lancer plusieurs recherches a la fois."""
+    while True:
+        try:
+            job = claim_ai_job()
+            if job:
+                stop = threading.Event()
+                threading.Thread(target=keep_alive, args=(job["id"], stop), daemon=True).start()
+                try:
+                    process_ai_job(job)
+                finally:
+                    stop.set()
+                continue
+        except Exception as err:
+            log(f"Erreur (assistant {n}) : {str(err)[:200]}")
+        time.sleep(POLL_SECONDS)
+
 
 
 def check_env() -> None:
@@ -1116,6 +1599,17 @@ def main() -> None:
 
     check_env()
     threading.Thread(target=heartbeat_forever, daemon=True).start()
+    # Au demarrage, rien ne peut etre « en cours » : ce qui l'etait a ete coupe
+    # (PC eteint, analyseur relance). On le remet en file tout de suite.
+    try:
+        sb("PATCH", "ai_jobs", params={"status": "eq.processing"},
+           body={"status": "pending", "progress": 0, "step": None, "updated_at": now_iso()}, prefer="return=minimal")
+        sb("PATCH", "link_ideas", params={"status": "eq.processing"}, body={"status": "pending", "updated_at": now_iso()}, prefer="return=minimal")
+    except Exception:
+        pass
+    if not args.once:
+        for n in range(AI_WORKERS):
+            threading.Thread(target=ai_worker, args=(n + 1,), daemon=True).start()
     log(f"Analyseur BuBuTravel {VERSION} en ligne sous le nom « {NAME} » (Claude via l'abonnement). Ctrl+C pour arreter.")
     last_beat = 0.0
     while True:
@@ -1124,8 +1618,8 @@ def main() -> None:
                 heartbeat()
                 requeue_stuck()
                 last_beat = time.time()
-            # L'assistant d'itineraire passe avant : quelqu'un attend a l'ecran
-            ai_job = claim_ai_job()
+            # Les demandes IA tournent dans leurs propres travailleurs (en parallele)
+            ai_job = claim_ai_job() if args.once else None
             if ai_job:
                 process_ai_job(ai_job)
                 heartbeat()

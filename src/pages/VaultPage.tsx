@@ -25,6 +25,7 @@ import type { VaultInput, VaultItem, VaultKind } from '../lib/vault'
 import { useI18n } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
 import { PlusIcon } from '../components/hub/icons'
+import Lightbox from '../components/Lightbox'
 
 const KINDS: VaultKind[] = ['identity', 'card', 'ticket', 'insurance', 'contact', 'other']
 
@@ -365,26 +366,7 @@ function VaultCard({
 function Viewer({ urls, index, onClose }: { urls: string[]; index: number; onClose: () => void }) {
   const { t } = useI18n()
   const [i, setI] = useState(index)
-  return (
-    <div className="fixed inset-0 z-[1400] flex flex-col bg-white" onClick={onClose}>
-      <div className="flex items-center justify-between p-4 text-[#2a160d]">
-        <span className="text-[13px]">💡 {t('vault.qrHint')}</span>
-        <button onClick={onClose} className="rounded-full bg-black/10 px-3 py-1.5 text-[14px] font-bold">
-          ✕
-        </button>
-      </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-        <img src={urls[i]} alt="" className="max-h-full max-w-full object-contain" />
-      </div>
-      {urls.length > 1 && (
-        <div className="flex justify-center gap-2 p-4" onClick={(e) => e.stopPropagation()}>
-          {urls.map((u, k) => (
-            <button key={u} onClick={() => setI(k)} className={`h-2.5 w-2.5 rounded-full ${k === i ? 'bg-[#2a160d]' : 'bg-black/20'}`} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  return <Lightbox urls={urls} index={i} onIndexChange={setI} onClose={onClose} caption={`💡 ${t('vault.qrHint')}`} light />
 }
 
 function VaultForm({

@@ -15,6 +15,7 @@ import type { Conflict } from '../lib/schedule'
 import { shortDate } from '../lib/tripDates'
 import type { Place, TripStop } from '../lib/types'
 import { useI18n } from '../i18n/I18nContext'
+import { useAiJobs } from '../context/AiJobsContext'
 
 const DURATIONS = [30, 60, 90, 120, 180, 240, 480]
 
@@ -34,6 +35,11 @@ export default function PlanBox({ place }: { place: Place }) {
   const [minutes, setMinutes] = useState<number>(durationOf(place))
   const [issues, setIssues] = useState<Conflict[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const { queue, jobs, activeFor } = useAiJobs()
+  const [usedSlot, setUsedSlot] = useState<string | null>(null)
+  const aiBusy = activeFor('schedule_place', 'place_id', place.id)
+  const aiJob = jobs.find((j) => j.kind === 'schedule_place' && j.input?.place_id === place.id && j.status === 'ready')
+  const aiSlot = aiJob && aiJob.id !== usedSlot ? (aiJob.result as { date: string; time: string; minutes: number; reason: string } | null) : null
 
   useEffect(() => {
     if (!place.trip_id) return
@@ -79,6 +85,44 @@ export default function PlanBox({ place }: { place: Place }) {
     }
   }
 
+  async function askAi() {
+    await queue('schedule_place', { place_id: place.id, lang: locale.startsWith('fr') ? 'fr' : 'en' }, place.trip_id)
+  }
+
+  async function useSlot() {
+    if (!aiSlot || !aiJob) return
+    setUsedSlot(aiJob.id)
+    setBusy(true)
+    try {
+      await edit(place.id, { visit_date: aiSlot.date, plan_time: aiSlot.time, plan_minutes: aiSlot.minutes })
+      setOpen(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const aiCard = aiSlot ? (
+    <div className="fade-in rounded-2xl border-2 border-accent/40 bg-[var(--halo)] p-3.5">
+      <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-accent">✨ {t('plan.aiSuggest')}</p>
+      <p className="mt-1 text-[15px] font-extrabold capitalize">
+        {shortDate(aiSlot.date, locale, true)} · {aiSlot.time} · {fmtMinutes(aiSlot.minutes)}
+      </p>
+      <p className="mt-1 text-[13px] leading-snug text-text-soft">{aiSlot.reason}</p>
+      <div className="mt-3 flex gap-2">
+        <button onClick={() => void useSlot()} disabled={busy} className="btn btn-accent btn-xs flex-1">
+          {t('plan.aiUse')}
+        </button>
+        <button onClick={() => aiJob && setUsedSlot(aiJob.id)} className="btn btn-xs">
+          {t('plan.aiNo')}
+        </button>
+      </div>
+    </div>
+  ) : aiBusy ? (
+    <p className="rounded-2xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-muted">
+      <span className="ai-spin inline-block">✨</span> {t('plan.aiBusy')}
+    </p>
+  ) : null
+
   async function unplan() {
     await edit(place.id, { visit_date: null, plan_time: null, plan_minutes: null })
     setDay('')
@@ -102,9 +146,17 @@ export default function PlanBox({ place }: { place: Place }) {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="btn w-full">
-        {t('plan.title')}
-      </button>
+      <div className="space-y-2">
+        {aiCard}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setOpen(true)} className="btn">
+            📅 {t('plan.title')}
+          </button>
+          <button onClick={() => void askAi()} disabled={Boolean(aiBusy)} className="btn btn-accent">
+            ✨ {t('plan.aiAsk')}
+          </button>
+        </div>
+      </div>
     )
   }
 
@@ -116,6 +168,8 @@ export default function PlanBox({ place }: { place: Place }) {
           {t('common.close')}
         </button>
       </div>
+
+      {aiCard}
 
       {/* Jours proposes */}
       <div>

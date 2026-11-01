@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { useTracker } from '../context/TrackerContext'
@@ -57,26 +57,44 @@ export default function MapPage() {
   )
 
   // Arrivee depuis la bucketlist : le formulaire s'ouvre en mode envie
-  const wantWish = params.get(t('unit.wish'))
+  // Noms de parametres fixes (pas traduits) : les liens marchent dans les deux langues
+  const pushed = useRef(false)
+  const fromLink = useRef(false)
+  useEffect(() => {
+    const onPop = () => {
+      if (pushed.current) {
+        pushed.current = false
+        setPanel({ kind: 'none' })
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const wantWish = params.get('envie') ?? params.get('wish')
   useEffect(() => {
     if (!wantWish) return
     setDraft({ ...emptyDraft, status: 'wishlist' })
     setPanel({ kind: 'new' })
     setPicking(true)
-    params.delete(t('unit.wish'))
+    params.delete('envie')
+    params.delete('wish')
     setParams(params, { replace: true })
   }, [wantWish, params, setParams])
 
   // Ouverture directe d'un lieu depuis la timeline du carnet
-  const wanted = params.get(t('unit.place'))
+  const wanted = params.get('lieu') ?? params.get('place')
   useEffect(() => {
     if (!wanted || places.length === 0) return
     const place = places.find((p) => p.id === wanted)
     if (place) {
       setPanel({ kind: 'place', id: place.id })
       setFocus([place.lat, place.lng])
+      // Venu d'une autre page : « Retour » y ramene
+      fromLink.current = true
     }
-    params.delete(t('unit.place'))
+    params.delete('lieu')
+    params.delete('place')
     setParams(params, { replace: true })
   }, [wanted, places, params, setParams])
 
@@ -153,11 +171,27 @@ export default function MapPage() {
     setPanel({ kind: 'none' })
     setPicking(false)
     setGps(null)
+    pushed.current = false
+    fromLink.current = false
+  }
+
+  /**
+   * « Retour » : revient la ou l'on etait. Fiche ouverte depuis une autre
+   * page : on y retourne. Ouverte sur la carte : on la ferme. Le bouton
+   * retour du telephone fait pareil.
+   */
+  function back() {
+    if (pushed.current || fromLink.current) history.back()
+    else closePanel()
   }
 
   function selectPlace(place: Place) {
     setPicking(false)
     setGps(null)
+    if (!pushed.current && !fromLink.current) {
+      history.pushState({ bubuPanel: true }, '')
+      pushed.current = true
+    }
     setPanel({ kind: 'place', id: place.id })
     setFocus([place.lat, place.lng])
   }
@@ -306,7 +340,7 @@ export default function MapPage() {
           </div>
 
           {panel.kind === 'place' && selected && (
-            <PlaceSidebar key={selected.id} place={selected} onClose={closePanel} />
+            <PlaceSidebar key={selected.id} place={selected} onClose={closePanel} onBack={back} />
           )}
 
           {panel.kind === 'track' && selectedTrack && (
