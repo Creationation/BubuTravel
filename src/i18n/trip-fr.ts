@@ -640,6 +640,7 @@ export const tripFr = {
   'ai.kind.country_guide': "Fiche pays",
   'ai.kind.itinerary': "Itinéraire de {name}",
   'ai.step.think': "Réflexion…",
+  'ai.step.fallback': "Limite Claude atteinte — relais {x}",
   'ai.step.search': "Recherche : {x}",
   'ai.step.read': "Lecture de {x}",
   'ai.step.photo': "Regarde {x}",

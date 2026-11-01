@@ -625,6 +625,7 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'ai.kind.country_guide': "Country guide",
   'ai.kind.itinerary': "Itinerary for {name}",
   'ai.step.think': "Thinking…",
+  'ai.step.fallback': "Claude limit reached — using {x}",
   'ai.step.search': "Searching: {x}",
   'ai.step.read': "Reading {x}",
   'ai.step.photo': "Looking at {x}",

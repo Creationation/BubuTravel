@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { compressImage } from './images'
 
 /**
  * Coffre personnel : copie de secours des papiers, cartes, numeros et
@@ -73,9 +72,9 @@ export async function fetchVault(): Promise<VaultItem[]> {
 
 async function uploadFiles(userId: string, files: File[]): Promise<string[]> {
   const paths: string[] = []
-  for (const input of files) {
-    // Les photos sont compressees (lisibles, legeres) ; les PDF restent tels quels
-    const file = input.type.startsWith('image/') ? (await compressImage(input)).file : input
+  for (const file of files) {
+    // Le coffre garde le fichier original : billets, QR codes et documents
+    // restent lisibles en plein zoom et telechargeables sans perte de qualite.
     const ext = (file.name.split('.').pop() || (file.type.split('/')[1] ?? 'bin')).toLowerCase()
     const path = `${userId}/${crypto.randomUUID()}.${ext}`
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined })

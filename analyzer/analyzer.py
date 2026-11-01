@@ -50,7 +50,14 @@ except Exception:
 
 VERSION = "2.1"
 # Modele utilise par Claude Code (alias : opus, sonnet...). Compte sur l'abonnement Claude.
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "opus")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
+# Secours via Codex CLI connecte au compte ChatGPT (jamais via une cle API).
+# Luna en effort faible suffit pour les fiches structurees et economise le quota.
+CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-6-luna")
+CLAUDE_RETRY_SECONDS = max(60, int(os.environ.get("CLAUDE_RETRY_MINUTES", "15")) * 60)
+CLAUDE_PAUSED_UNTIL = 0.0
+CLAUDE_STATE_LOCK = threading.Lock()
+CLAUDE_CALL_LOCK = threading.Lock()
 SB_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SB_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -120,6 +127,33 @@ def requeue_stuck() -> None:
         body={"status": "pending", "updated_at": now_iso()},
         prefer="return=minimal",
     )
+
+
+def requeue_provider_limits() -> tuple[int, int]:
+    """Reprend les demandes que l'ancienne version a arretees au quota Claude."""
+    counts = []
+    for table in ("link_ideas", "ai_jobs"):
+        rows = sb(
+            "GET", table,
+            params={"status": "eq.error", "select": "id,error", "limit": "1000"},
+        ) or []
+        ids = [
+            row["id"] for row in rows
+            if str(row.get("error") or "").lower().startswith("claude code")
+            and is_claude_usage_limit(RuntimeError(str(row.get("error") or "")))
+        ]
+        if ids:
+            body = {"status": "pending", "error": None, "updated_at": now_iso()}
+            if table == "ai_jobs":
+                body.update({"progress": 0, "step": None})
+            sb(
+                "PATCH", table,
+                params={"id": f"in.({','.join(ids)})"},
+                body=body,
+                prefer="return=minimal",
+            )
+        counts.append(len(ids))
+    return counts[0], counts[1]
 
 
 def heartbeat_forever() -> None:
@@ -668,7 +702,17 @@ def inline_schema(model: type[BaseModel]) -> dict:
         if isinstance(node, dict):
             if "$ref" in node:
                 return resolve(defs[node["$ref"].split("/")[-1]])
-            return {k: resolve(v) for k, v in node.items() if k not in ("title", "default")}
+            # Retirer le titre descriptif genere par Pydantic, mais conserver
+            # une vraie propriete metier nommee « title » dans properties.
+            out = {
+                k: resolve(v) for k, v in node.items()
+                if k != "default" and not (k == "title" and isinstance(v, str))
+            }
+            # Codex applique le mode JSON Schema strict : chaque objet doit
+            # refuser explicitement les proprietes non declarees.
+            if out.get("type") == "object":
+                out["additionalProperties"] = False
+            return out
         if isinstance(node, list):
             return [resolve(v) for v in node]
         return node
@@ -714,7 +758,7 @@ def step_label(name: str, args: dict) -> str:
     return "think:"
 
 
-def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
+def claude_only_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
     """
     Appelle Claude Code en mode non interactif avec une sortie structuree, en
     flux : chaque outil utilise (recherche, page lue, photo regardee) fait
@@ -783,6 +827,83 @@ def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[s
         raise RuntimeError("Reponse de Claude sans fiche structuree.")
     progress(hi, "write:", force=True)
     return model.model_validate(result).model_dump()
+
+
+def codex_json(prompt: str, model: type[BaseModel], *, cwd: Path, timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
+    """Secours structure via Codex CLI et l'abonnement ChatGPT du PC."""
+    exe = shutil.which("codex.cmd") or shutil.which("codex")
+    if not exe:
+        raise RuntimeError("Codex CLI introuvable : le relais ChatGPT ne peut pas demarrer.")
+    schema_path = cwd / "codex-output-schema.json"
+    output_path = cwd / "codex-result.json"
+    schema_path.write_text(json.dumps(inline_schema(model), ensure_ascii=False), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY", "CODEX_API_KEY")}
+    cmd = [
+        exe, "exec", "--ephemeral", "--skip-git-repo-check",
+        "--sandbox", "read-only", "--model", CODEX_MODEL,
+        "-c", 'model_reasoning_effort="low"',
+        "--output-schema", str(schema_path),
+        "--output-last-message", str(output_path),
+        "-",
+    ]
+    lo, hi = span
+    progress(max(lo, getattr(CURRENT, "pct", lo)), "fallback:ChatGPT", force=True)
+    completed = subprocess.run(
+        cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(cwd), env=env, timeout=timeout,
+    )
+    if completed.returncode != 0 or not output_path.exists():
+        detail = (completed.stderr or completed.stdout or "aucune reponse")[-500:]
+        raise RuntimeError(f"Codex/ChatGPT : {detail}")
+    raw = output_path.read_text(encoding="utf-8", errors="replace").strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.I)
+    result = json.loads(raw)
+    progress(hi, "write:", force=True)
+    return model.model_validate(result).model_dump()
+
+
+def is_claude_usage_limit(err: Exception) -> bool:
+    text = str(err).lower()
+    return any(marker in text for marker in (
+        "you've hit your", "usage limit", "rate limit", "limit reached",
+        "quota", "resets at", "resets in",
+    ))
+
+
+def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
+    """
+    Claude Sonnet est prioritaire. Quand son quota est epuise, la demande est
+    terminee par Codex/ChatGPT. Apres la pause, la prochaine demande reteste
+    Claude automatiquement et le remet par defaut des qu'il repond.
+    """
+    global CLAUDE_PAUSED_UNTIL
+    with CLAUDE_CALL_LOCK:
+        with CLAUDE_STATE_LOCK:
+            use_codex = time.time() < CLAUDE_PAUSED_UNTIL
+        if not use_codex:
+            try:
+                result = claude_only_json(prompt, model, cwd=cwd, tools=tools, timeout=timeout, span=span)
+                with CLAUDE_STATE_LOCK:
+                    was_paused = CLAUDE_PAUSED_UNTIL > 0
+                    CLAUDE_PAUSED_UNTIL = 0.0
+                if was_paused:
+                    log("Quota Claude revenu : Sonnet redevient le modele prioritaire.")
+                return result
+            except Exception as err:
+                if not is_claude_usage_limit(err):
+                    raise
+                with CLAUDE_STATE_LOCK:
+                    CLAUDE_PAUSED_UNTIL = time.time() + CLAUDE_RETRY_SECONDS
+                log(f"Limite Claude atteinte : nouvel essai dans {CLAUDE_RETRY_SECONDS // 60} min.")
+        if not getattr(CURRENT, "codex_allowed", False):
+            raise ProviderPausedError("Quota Claude epuise : recherche de fond en pause jusqu'au prochain essai.")
+        log(f"Relais ChatGPT/{CODEX_MODEL} pour une demande immediate.")
+        return codex_json(prompt, model, cwd=cwd, timeout=timeout, span=span)
+
+
+class ProviderPausedError(RuntimeError):
+    """La tache reste en file : on economise ChatGPT jusqu'au retour de Claude."""
 
 
 VIDEO_BRIEF = """Tu aides deux voyageurs a transformer une publication des reseaux sociaux en plan de voyage concret.
@@ -936,6 +1057,7 @@ def analyse(url: str, note: str | None, context: str, lang: str, key: str | None
 
 def process(job: dict) -> None:
     log(f"Lien {job['id'][:8]} : {job['url']}")
+    CURRENT.kind, CURRENT.codex_allowed = "link_idea", False
     try:
         lang = user_lang(job["user_id"])
         context = trip_context(job)
@@ -943,6 +1065,9 @@ def process(job: dict) -> None:
         update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, frames=frames, error=None)
         log(f"  pret : {data.get('name')}")
         link_place({**job, "analysis": data, "thumbnail": thumb, "frames": frames})
+    except ProviderPausedError as err:
+        update_idea(job["id"], status="pending", error=None)
+        log(f"  en pause : {err}")
     except Exception as err:
         traceback.print_exc()
         update_idea(job["id"], status="error", error=str(err)[:300])
@@ -1029,10 +1154,14 @@ def link_place(idea: dict) -> None:
 def claim_ai_job() -> dict | None:
     # Ce que quelqu'un attend a l'ecran passe avant les traitements de fond :
     # apercus « Remplir les informations », assistant d'itineraire, fiches pays.
-    rows = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan)", "order": "created_at.asc", "limit": "1", "select": "*"})
+    immediate = (
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide)", "order": "created_at.asc", "limit": "1", "select": "*"})
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
-        or sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(itinerary,country_guide)", "order": "created_at.asc", "limit": "1", "select": "*"})
+    )
+    with CLAUDE_STATE_LOCK:
+        claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
+    rows = immediate if claude_paused else (
+        immediate
         # Le reste : la demande la plus recente d'abord (ce qu'on vient de lancer
         # passe avant les longues files de fond)
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.desc", "limit": "1", "select": "*"})
@@ -1060,10 +1189,11 @@ def update_ai_job(job_id: str, **fields) -> None:
 
 def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
+    req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
+    CURRENT.codex_allowed = job["kind"] in ("chat", "schedule_place", "day_plan", "itinerary", "country_guide") or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
-        req = job.get("input") or {}
         if job["kind"] == "place_info":
             place = (sb("GET", "places", params={"id": f"eq.{req.get('place_id')}", "select": "*"}) or [None])[0]
             if not place:
@@ -1170,6 +1300,9 @@ def process_ai_job(job: dict) -> None:
         data = claude_json(prompt, Itinerary, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
         update_ai_job(job["id"], status="ready", result=data, error=None)
         log(f"  itineraire pret : {len(data['stops'])} etapes, {len(data['todos'])} a faire")
+    except ProviderPausedError as err:
+        update_ai_job(job["id"], status="pending", progress=0, step=None, error=None)
+        log(f"  en pause : {err}")
     except Exception as err:
         traceback.print_exc()
         update_ai_job(job["id"], status="error", error=str(err)[:300])
@@ -1550,7 +1683,7 @@ def keep_alive(job_id: str, stop: threading.Event) -> None:
             pass
 
 
-AI_WORKERS = max(1, int(os.environ.get("AI_WORKERS", "3")))
+AI_WORKERS = max(1, int(os.environ.get("AI_WORKERS", "1")))
 
 
 def ai_worker(n: int) -> None:
@@ -1605,6 +1738,9 @@ def main() -> None:
         sb("PATCH", "ai_jobs", params={"status": "eq.processing"},
            body={"status": "pending", "progress": 0, "step": None, "updated_at": now_iso()}, prefer="return=minimal")
         sb("PATCH", "link_ideas", params={"status": "eq.processing"}, body={"status": "pending", "updated_at": now_iso()}, prefer="return=minimal")
+        resumed_ideas, resumed_jobs = requeue_provider_limits()
+        if resumed_ideas or resumed_jobs:
+            log(f"Reprise apres quota : {resumed_ideas} liens et {resumed_jobs} recherches remis en file.")
     except Exception:
         pass
     if not args.once:
@@ -1626,7 +1762,9 @@ def main() -> None:
                 if args.once:
                     return
                 continue
-            job = claim()
+            with CLAUDE_STATE_LOCK:
+                can_claim_background = time.time() >= CLAUDE_PAUSED_UNTIL
+            job = claim() if can_claim_background else None
             if job:
                 process(job)
                 heartbeat()
