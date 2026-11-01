@@ -1,6 +1,6 @@
 import { currentLang, tr } from '../i18n/current'
 import { categoryLabel } from './countryName'
-import type { Category, Photo, Place, Track, Trip } from './types'
+import type { Category, Expense, Photo, Place, Track, Trip } from './types'
 
 /** Declenche un telechargement depuis des donnees deja en memoire. */
 function download(filename: string, content: string, type: string) {
@@ -28,6 +28,7 @@ export type Backup = {
   places: Place[]
   trips: Trip[]
   tracks: Track[]
+  expenses: Expense[]
   categories: Category[]
   /** Chemins de stockage, pas les images : les fichiers ne sont pas inclus. */
   photos: Photo[]

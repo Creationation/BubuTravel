@@ -25,6 +25,7 @@ import VaultPage from './pages/VaultPage'
 import Greeting from './components/Greeting'
 import { AiJobsProvider } from './context/AiJobsContext'
 import AiDock from './components/AiDock'
+import ExpensesPage from './pages/ExpensesPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -144,6 +145,14 @@ export default function App() {
               element={
                 <Protected>
                   <VaultPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/depenses"
+              element={
+                <Protected>
+                  <ExpensesPage />
                 </Protected>
               }
             />

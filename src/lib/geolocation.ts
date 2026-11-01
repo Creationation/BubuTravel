@@ -74,7 +74,13 @@ export function appendPoint(
 ): { points: TrackPoint[]; added: boolean } {
   if (fix.accuracy > MAX_ACCURACY_M && points.length > 0) return { points, added: false }
   const last = points[points.length - 1]
-  if (last && haversineKm(last, fix) < MIN_STEP_KM) return { points, added: false }
+  if (last) {
+    const distance = haversineKm(last, fix)
+    if (distance < MIN_STEP_KM) return { points, added: false }
+    const seconds = (fix.t - last.t) / 1000
+    // Saut de relais GPS impossible pour un trajet terrestre normal.
+    if (seconds > 0 && distance > 0.1 && (distance / seconds) * 3600 > 220) return { points, added: false }
+  }
   return { points: [...points, { t: fix.t, lat: fix.lat, lng: fix.lng }], added: true }
 }
 

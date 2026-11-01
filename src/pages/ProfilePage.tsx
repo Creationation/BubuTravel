@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext'
 import { errorMessage } from '../lib/errors'
 import AvatarCropper from '../components/AvatarCropper'
 import Greeting from '../components/Greeting'
+import ErrorLogPanel from '../components/ErrorLogPanel'
 
 export default function ProfilePage() {
   const t = useT()
@@ -381,6 +382,10 @@ export default function ProfilePage() {
               <Fig label={t('common.photos')} value={stats.photos} />
             </div>
           </section>
+        </Reveal>
+
+        <Reveal className="mt-6">
+          <ErrorLogPanel />
         </Reveal>
 
         {error && <p className="notice notice-bad mt-6">{error}</p>}

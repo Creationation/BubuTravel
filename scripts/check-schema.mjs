@@ -31,6 +31,10 @@ const EXPECTED = {
     'id', 'user_id', 'trip_id', 'name', 'points', 'distance_km',
     'started_at', 'ended_at', 'notes', 'created_at',
   ],
+  expenses: [
+    'id', 'user_id', 'trip_id', 'merchant', 'amount', 'currency',
+    'spent_at', 'category', 'notes', 'created_at',
+  ],
   categories: ['id', 'user_id', 'name', 'color', 'icon', 'created_at'],
   public_shares: ['user_id', 'token', 'is_active', 'created_at'],
   events: [

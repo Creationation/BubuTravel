@@ -51,10 +51,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [recording, setRecording] = useState<Recording | null>(loadDraft)
   const [error, setError] = useState<Key | null>(null)
   const watchRef = useRef<number | null>(null)
+  const wakeLockRef = useRef<{ release: () => Promise<void>; released?: boolean } | null>(null)
   const lastPersistRef = useRef(0)
   const recordingRef = useRef(recording)
 
-  recordingRef.current = recording
+  useEffect(() => {
+    recordingRef.current = recording
+  }, [recording])
 
   /**
    * Le suivi ne depend que d'un booleen, jamais de l'objet complet. Sinon
@@ -124,6 +127,45 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return stopWatch
   }, [active, stopWatch, persist])
 
+  // Un verrou d'ecran, quand le navigateur le permet, evite qu'une longue
+  // marche cesse d'etre mesuree parce que le telephone s'endort.
+  useEffect(() => {
+    let cancelled = false
+    const release = async () => {
+      const lock = wakeLockRef.current
+      wakeLockRef.current = null
+      if (lock) await lock.release().catch(() => undefined)
+    }
+    const acquire = async () => {
+      if (!active || document.visibilityState !== 'visible') return
+      const manager = (navigator as Navigator & { wakeLock?: { request: (kind: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock
+      if (!manager) return
+      if (wakeLockRef.current && !wakeLockRef.current.released) return
+      wakeLockRef.current = null
+      try {
+        const lock = await manager.request('screen')
+        if (cancelled) await lock.release()
+        else wakeLockRef.current = lock
+      } catch {
+        // Certains modes economie d'energie refusent le verrou : le GPS reste actif.
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void acquire()
+    }
+    if (active) {
+      void acquire()
+      document.addEventListener('visibilitychange', onVisibility)
+    } else {
+      void release()
+    }
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisibility)
+      void release()
+    }
+  }, [active])
+
   // Une fermeture d'onglet ne doit pas perdre les derniers points
   useEffect(() => {
     function flush() {
@@ -159,7 +201,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         })
       },
       resume() {
-        setRecording((prev) => (prev ? { ...prev, paused: false } : prev))
+        setRecording((prev) => {
+          if (!prev) return prev
+          const next = { ...prev, paused: false }
+          persist(next, true)
+          return next
+        })
       },
       discard() {
         stopWatch()

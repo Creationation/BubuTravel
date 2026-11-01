@@ -13,6 +13,23 @@ type Props = {
   onSaved: (track: Track) => void
 }
 
+const FINISHED_KEY = 'bubutravel:track-finished'
+type FinishedTrack = {
+  points: { t: number; lat: number; lng: number }[]
+  startedAt: string
+  endedAt: string
+  distanceKm: number
+}
+
+function loadFinished(): FinishedTrack | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(FINISHED_KEY) ?? 'null') as FinishedTrack | null
+    return value && Array.isArray(value.points) && value.startedAt ? value : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Panneau flottant d'enregistrement de parcours. Reste visible pendant toute
  * la randonnee, avec distance et duree en direct, et propose de nommer la
@@ -23,12 +40,7 @@ export default function TrackRecorder({ onSaved }: Props) {
   const { recording, distanceKm, error, start, pause, resume, discard, finish } = useTracker()
   const { trips } = usePlaces()
   const { user } = useAuth()
-  const [finishing, setFinishing] = useState<{
-    points: { t: number; lat: number; lng: number }[]
-    startedAt: string
-    endedAt: string
-    distanceKm: number
-  } | null>(null)
+  const [finishing, setFinishing] = useState<FinishedTrack | null>(loadFinished)
   const [name, setName] = useState('')
   const [tripId, setTripId] = useState('')
   const [busy, setBusy] = useState(false)
@@ -41,6 +53,15 @@ export default function TrackRecorder({ onSaved }: Props) {
     const id = setInterval(() => setNow(new Date().toISOString()), 10000)
     return () => clearInterval(id)
   }, [recording])
+
+  useEffect(() => {
+    try {
+      if (finishing) localStorage.setItem(FINISHED_KEY, JSON.stringify(finishing))
+      else localStorage.removeItem(FINISHED_KEY)
+    } catch {
+      // La trace reste en memoire si le stockage local est indisponible.
+    }
+  }, [finishing])
 
   async function save() {
     if (!finishing || !user) return

@@ -305,6 +305,8 @@ export const tripFr = {
   'quick.stopHint': "Une ville de l'itinéraire",
   'quick.photo': "Lieu ou photo",
   'quick.photoHint': "Sur la carte",
+  'quick.expense': 'Scanner un reçu',
+  'quick.expenseHint': 'Dépense et totaux',
   'mode.title': "Affichage",
   'mode.simple': "Simple",
   'mode.simpleHint': "L'essentiel, rien de plus",

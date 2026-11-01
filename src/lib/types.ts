@@ -154,6 +154,21 @@ export type Track = {
   created_at: string
 }
 
+export type Expense = {
+  id: string
+  user_id: string
+  trip_id: string | null
+  merchant: string
+  amount: number
+  currency: string
+  spent_at: string
+  category: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type NewExpense = Omit<Expense, 'id' | 'created_at'> & { id?: string }
+
 export type PublicShare = {
   user_id: string
   token: string
@@ -348,6 +363,7 @@ export type NewTripDocument = Omit<TripDocument, 'id' | 'created_at' | 'created_
 export type NewPlace = Omit<Place, 'id' | 'created_at'>
 export type NewTrip = Omit<Trip, 'id' | 'created_at'>
 export type NewTrack = Omit<Track, 'id' | 'created_at'>
+export type NewExpenseRow = NewExpense
 export type NewCategory = Omit<Category, 'id' | 'created_at'>
 export type NewEvent = Omit<TravelEvent, 'id' | 'created_at'>
 
@@ -389,6 +405,12 @@ export type Database = {
         Row: Track
         Insert: NewTrack
         Update: Partial<NewTrack>
+        Relationships: []
+      }
+      expenses: {
+        Row: Expense
+        Insert: NewExpense
+        Update: Partial<NewExpense>
         Relationships: []
       }
       events: {

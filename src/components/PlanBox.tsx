@@ -89,7 +89,7 @@ export default function PlanBox({ place }: { place: Place }) {
     await queue('schedule_place', { place_id: place.id, lang: locale.startsWith('fr') ? 'fr' : 'en' }, place.trip_id)
   }
 
-  async function useSlot() {
+  async function applyAiSlot() {
     if (!aiSlot || !aiJob) return
     setUsedSlot(aiJob.id)
     setBusy(true)
@@ -109,7 +109,7 @@ export default function PlanBox({ place }: { place: Place }) {
       </p>
       <p className="mt-1 text-[13px] leading-snug text-text-soft">{aiSlot.reason}</p>
       <div className="mt-3 flex gap-2">
-        <button onClick={() => void useSlot()} disabled={busy} className="btn btn-accent btn-xs flex-1">
+        <button onClick={() => void applyAiSlot()} disabled={busy} className="btn btn-accent btn-xs flex-1">
           {t('plan.aiUse')}
         </button>
         <button onClick={() => aiJob && setUsedSlot(aiJob.id)} className="btn btn-xs">

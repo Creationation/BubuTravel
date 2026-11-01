@@ -16,6 +16,7 @@ const NAV: { to: string; label: Key; end?: boolean; advanced?: boolean }[] = [
   { to: '/bucketlist', label: 'nav.wishlist' },
   { to: '/idees', label: 'nav.ideas' },
   { to: '/coffre', label: 'nav.vault' },
+  { to: '/depenses', label: 'nav.expenses' },
   { to: '/planificateur', label: 'nav.planner', advanced: true },
   { to: '/evenements', label: 'nav.events', advanced: true },
   { to: '/galerie', label: 'nav.gallery', advanced: true },
@@ -37,7 +38,7 @@ export default function AppShell({
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-[900] border-b border-line bg-[color-mix(in_srgb,var(--surface-solid)_45%,transparent)] backdrop-blur-2xl backdrop-saturate-150">
+      <header className="sticky top-0 z-[900] border-b border-line bg-[color-mix(in_srgb,var(--surface-solid)_90%,transparent)] shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-2xl backdrop-saturate-150">
         <div
           className={`mx-auto flex h-16 items-center gap-4 px-5 sm:px-8 ${
             wide ? 'max-w-none' : 'max-w-6xl'

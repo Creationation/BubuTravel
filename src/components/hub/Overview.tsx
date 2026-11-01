@@ -29,6 +29,7 @@ export default function Overview({
   onOpenShare: () => void
 }) {
   const { t, locale } = useI18n()
+  const { places } = usePlaces()
   const today = todayIso()
   const now = nowLocalIso()
   const { current, next } = currentAndNext(hub.stops, today)
@@ -82,7 +83,6 @@ export default function Overview({
   }
 
 
-  const { places } = usePlaces()
   const tripPlaces = places.filter((p) => p.trip_id === trip.id)
   const imageOf = (p: Place) => p.gallery?.find((u) => !u.includes('idea-frames')) || p.image_url || p.gallery?.[0] || null
   // Photo d'une etape : le plus beau lieu de la ville (paysage, monument)

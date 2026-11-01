@@ -290,6 +290,8 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'quick.stopHint': "A city on the route",
   'quick.photo': "Place or photo",
   'quick.photoHint': "On the map",
+  'quick.expense': 'Scan a receipt',
+  'quick.expenseHint': 'Expense and totals',
   'mode.title': "Display",
   'mode.simple': "Simple",
   'mode.simpleHint': "The essentials, nothing more",

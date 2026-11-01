@@ -7,6 +7,8 @@ import { errorMessage } from '../lib/errors'
 import type { Photo } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
 import { fmtNum } from '../i18n/current'
+import { fetchExpenses } from '../lib/expenses'
+import type { Expense } from '../lib/types'
 
 /** Sauvegarde et exports : rien ne doit rester prisonnier de l'app. */
 export default function DataTools() {
@@ -14,11 +16,15 @@ export default function DataTools() {
   const { user } = useAuth()
   const { places, trips, tracks, categories } = usePlaces()
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
+    fetchExpenses(user.id)
+      .then(({ rows }) => setExpenses(rows))
+      .catch(() => undefined)
     fetchAllPhotos(user.id)
       .then(setPhotos)
       .catch(() => {
@@ -42,7 +48,7 @@ export default function DataTools() {
     <div>
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => run(() => exportBackup({ places, trips, tracks, categories, photos }))}
+          onClick={() => run(() => exportBackup({ places, trips, tracks, expenses, categories, photos }))}
           className="btn btn-accent"
           disabled={busy}
         >{t('profile.backupFull')}</button>

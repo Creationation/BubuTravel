@@ -3,6 +3,7 @@ import type { ErrorInfo, ReactNode } from 'react'
 import { fr } from '../i18n/fr'
 import { en } from '../i18n/en'
 import type { Key } from '../i18n/fr'
+import { recordAppError } from '../lib/errors'
 
 /**
  * Ce garde-fou est un composant de classe, il ne peut donc pas utiliser de
@@ -35,6 +36,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[bubutravel] erreur de rendu', error, info.componentStack)
+    recordAppError(error, 'react', info.componentStack)
   }
 
   render() {

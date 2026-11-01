@@ -17,6 +17,7 @@ import {
   RouteIcon,
   ShieldIcon,
   SparkIcon,
+  WalletIcon,
 } from './hub/icons'
 
 /**
@@ -35,6 +36,15 @@ export default function MobileNav() {
   // Changer de page ferme la feuille ouverte
   useEffect(() => setSheet(null), [location.pathname, location.search])
 
+  useEffect(() => {
+    if (!sheet) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [sheet])
+
   const go = (path: string) => {
     setSheet(null)
     navigate(path)
@@ -43,7 +53,7 @@ export default function MobileNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-[1000] border-t border-line bg-[color-mix(in_srgb,var(--surface-solid)_62%,transparent)] backdrop-blur-2xl backdrop-saturate-150 sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-[1000] border-t border-line bg-[color-mix(in_srgb,var(--surface-solid)_92%,transparent)] shadow-[0_-4px_18px_rgba(0,0,0,0.06)] backdrop-blur-2xl backdrop-saturate-150 sm:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-2">
@@ -72,9 +82,9 @@ export default function MobileNav() {
       </nav>
 
       {sheet && (
-        <div className="fixed inset-0 z-[990] bg-[#120d09]/40 backdrop-blur-[2px] sm:hidden" onClick={() => setSheet(null)}>
+        <div className="fixed inset-0 z-[1100] isolate touch-none overscroll-contain bg-[#120d09]/50 backdrop-blur-[2px] sm:hidden" onClick={() => setSheet(null)}>
           <div
-            className="panel-enter absolute inset-x-0 bottom-0 rounded-t-[28px] border-t border-line bg-bg px-5 pb-28 pt-3 shadow-[var(--shadow-lg)]"
+            className="panel-enter absolute inset-x-0 bottom-0 max-h-[92dvh] touch-auto overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-line bg-bg px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-[var(--shadow-lg)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line-strong" />
@@ -129,6 +139,7 @@ function QuickAdd({ tripId, go }: { tripId: string | null; go: (path: string) =>
     { label: 'quick.doc', hint: 'quick.docHint', icon: <ShieldIcon size={20} />, path: trip('docs') },
     { label: 'quick.stop', hint: 'quick.stopHint', icon: <RouteIcon size={20} />, path: trip('route') },
     { label: 'quick.photo', hint: 'quick.photoHint', icon: <PinIcon size={20} />, path: '/carte' },
+    { label: 'quick.expense', hint: 'quick.expenseHint', icon: <WalletIcon size={20} />, path: '/depenses' },
   ]
   return (
     <div>
@@ -167,6 +178,7 @@ function More({ go }: { go: (path: string) => void }) {
     { path: '/galerie', label: 'nav.gallery', icon: <FileIcon size={18} />, advancedOnly: true },
     { path: '/planificateur', label: 'nav.planner', icon: <SparkIcon size={18} />, advancedOnly: true },
     { path: '/evenements', label: 'nav.events', icon: <CalendarIcon size={18} />, advancedOnly: true },
+    { path: '/depenses', label: 'nav.expenses', icon: <WalletIcon size={18} /> },
     { path: '/profil', label: 'nav.profile', icon: <ShareIcon2 /> },
   ]
   return (

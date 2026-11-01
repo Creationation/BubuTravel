@@ -722,7 +722,7 @@ def inline_schema(model: type[BaseModel]) -> dict:
 
 # Demande IA en cours sur ce fil : sa jauge avance avec les vraies etapes
 CURRENT = threading.local()
-EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14}
+EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14, "receipt_scan": 3}
 
 
 def progress(pct: int, step: str | None = None, *, force: bool = False) -> None:
@@ -1155,7 +1155,7 @@ def claim_ai_job() -> dict | None:
     # Ce que quelqu'un attend a l'ecran passe avant les traitements de fond :
     # apercus « Remplir les informations », assistant d'itineraire, fiches pays.
     immediate = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan)", "order": "created_at.asc", "limit": "1", "select": "*"})
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
     )
     with CLAUDE_STATE_LOCK:
@@ -1187,11 +1187,20 @@ def update_ai_job(job_id: str, **fields) -> None:
     sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}"}, body=fields, prefer="return=minimal")
 
 
+def redact_receipt_image(job_id: str, req: dict) -> None:
+    """Ne conserve jamais la photo de reçu dans l'historique des tâches IA."""
+    if req.pop("image", None) is not None:
+        try:
+            sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}"}, body={"input": req, "updated_at": now_iso()}, prefer="return=minimal")
+        except Exception as err:
+            log(f"  avertissement : photo de reçu non effacée de la tâche {job_id[:8]} ({str(err)[:100]})")
+
+
 def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
     req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
-    CURRENT.codex_allowed = job["kind"] in ("chat", "schedule_place", "day_plan", "itinerary", "country_guide") or bool(req.get("preview"))
+    CURRENT.codex_allowed = job["kind"] in ("chat", "schedule_place", "day_plan", "itinerary", "country_guide", "receipt_scan") or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
         if job["kind"] == "place_info":
@@ -1275,6 +1284,12 @@ def process_ai_job(job: dict) -> None:
             update_ai_job(job["id"], status="ready", result=data, error=None)
             log(f"  fiche pays prete : {data['country']}")
             return
+        if job["kind"] == "receipt_scan":
+            data = job_receipt_scan(req, tmp)
+            redact_receipt_image(job["id"], req)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  recu lu : {data.get('merchant') or '?'}")
+            return
         extra = {"schedule_place": job_schedule_place, "arrange_trip": job_arrange_trip, "day_plan": job_day_plan, "chat": job_chat}
         if job["kind"] in extra:
             data = extra[job["kind"]](job, req, tmp)
@@ -1305,6 +1320,8 @@ def process_ai_job(job: dict) -> None:
         log(f"  en pause : {err}")
     except Exception as err:
         traceback.print_exc()
+        if job["kind"] == "receipt_scan":
+            redact_receipt_image(job["id"], req)
         update_ai_job(job["id"], status="error", error=str(err)[:300])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1435,6 +1452,36 @@ class Slot(BaseModel):
     time: str = Field(description="HH:MM, heure de debut conseillee")
     minutes: int = Field(description="Duree a prevoir en minutes")
     reason: str = Field(description="Pourquoi ce jour et cette heure, une phrase")
+
+
+class ReceiptScan(BaseModel):
+    merchant: str = Field(description="Nom du commerce, chaine vide si illisible")
+    amount: float | None = Field(description="Total effectivement paye, null si illisible")
+    currency: str = Field(description="Code ISO a trois lettres, EUR par defaut si inconnu")
+    date: str = Field(description="Date AAAA-MM-JJ, chaine vide si illisible")
+    category: str = Field(description="Categorie courte : restaurant, transport, logement, courses, activite ou autre")
+    notes: str = Field(description="Une precision utile tres courte, chaine vide sinon")
+
+
+def job_receipt_scan(req: dict, tmp: Path) -> dict:
+    raw = str(req.get("image") or "")
+    match = re.fullmatch(r"data:image/[a-zA-Z0-9.+-]+;base64,(.+)", raw, re.S)
+    if not match:
+        raise RuntimeError("Image du recu absente ou invalide")
+    try:
+        image = base64.b64decode(match.group(1), validate=True)
+    except Exception as err:
+        raise RuntimeError("Image du recu illisible") from err
+    if len(image) > 5 * 1024 * 1024:
+        raise RuntimeError("Image du recu trop volumineuse")
+    path = tmp / "receipt.jpg"
+    path.write_bytes(image)
+    prompt = f"""Lis attentivement l'image de recu suivante avec l'outil Read : {path}
+Extrais uniquement ce qui est visible. Le montant est le TOTAL effectivement paye, pas un sous-total.
+N'invente rien si une information est illisible. {lang_line(req.get('lang', 'fr'))}
+Pour category, utilise un mot court parmi restaurant, transport, logement, courses, activite, shopping, sante, autre.
+"""
+    return claude_json(prompt, ReceiptScan, cwd=tmp, tools=["Read"], timeout=300, span=(10, 90))
 
 
 class Assignment(BaseModel):
