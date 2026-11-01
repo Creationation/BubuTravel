@@ -430,4 +430,11 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'plan.morning': "Morning",
   'plan.afternoon': "Afternoon",
   'plan.evening': "Evening",
+  'hero.calendar': "Calendar",
+  'ov.journey': "🧭 Your journey",
+  'ov.discover': "✨ To discover",
+  'ov.seeMap': "See on the map",
+  'ov.nights': "{n} nights",
+  'ov.today': "Today",
+  'ov.next': "Next",
 }

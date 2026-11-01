@@ -1,9 +1,13 @@
 import { addDaysIso, currentAndNext, daysBetween, nowLocalIso, shortDate, shortDateTime, todayIso } from '../../lib/tripDates'
-import type { Trip } from '../../lib/types'
+import type { Place, Trip } from '../../lib/types'
+import { useNavigate } from 'react-router-dom'
+import { usePlaces } from '../../context/PlacesContext'
+import { flagOf } from '../../lib/countries'
+import { isStay, photoScore } from '../../lib/schedule'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import { modeKey } from './StopForm'
-import { DocIcon, PinIcon, RouteIcon, ShareIcon, ShieldIcon, SparkIcon, TodoKindIcon, TransportIcon } from './icons'
+import { DocIcon, RouteIcon, ShareIcon, ShieldIcon, TodoKindIcon, TransportIcon } from './icons'
 
 export type HubTab = 'overview' | 'route' | 'todo' | 'docs' | 'countries' | 'ideas' | 'memories'
 
@@ -77,151 +81,192 @@ export default function Overview({
     )
   }
 
+  const navigate = useNavigate()
+  const { places } = usePlaces()
+  const tripPlaces = places.filter((p) => p.trip_id === trip.id)
+  const imageOf = (p: Place) => p.gallery?.find((u) => !u.includes('idea-frames')) || p.image_url || p.gallery?.[0] || null
+  // Photo d'une etape : le plus beau lieu de la ville (paysage, monument)
+  const cityImage = (name: string) => {
+    const best = tripPlaces
+      .filter((p) => norm(p.city) === norm(name) && imageOf(p))
+      .sort((a, b) => photoScore(b) - photoScore(a))[0]
+    return best ? imageOf(best) : null
+  }
+  const discover = tripPlaces
+    .filter((p) => p.status === 'wishlist' && imageOf(p) && !isStay(p))
+    .sort((a, b) => photoScore(b) - photoScore(a))
+    .slice(0, 12)
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-      <div className="space-y-5">
-        {/* Prochain trajet */}
-        {nextTransportStop && (
-          <button onClick={() => go('route')} className="card-feature block w-full p-6 text-left sm:p-7">
-            <p className="eyebrow eyebrow-dot">{t('hub.nextTransport')}</p>
-            <div className="mt-5 flex items-center gap-4">
-              <span className="glyph h-12 w-12 bg-surface">
-                <TransportIcon mode={nextTransportStop.transport_mode} size={22} />
-              </span>
-              <div className="min-w-0">
-                <p className="display-sm truncate text-[1.9rem]">
-                  {nextTransportStop.name}
-                  {afterTransport && <span className="text-text-muted"> → </span>}
-                  {afterTransport?.name}
-                </p>
-                <p className="num mt-1 text-[14px] text-text-soft">
-                  {t(modeKey(nextTransportStop.transport_mode ?? 'other'))} ·{' '}
-                  {shortDateTime(nextTransportStop.transport_departs, locale)}
-                </p>
-              </div>
+    <div className="space-y-9">
+      {/* Prochain trajet */}
+      {nextTransportStop && (
+        <button onClick={() => go('route')} className="card-feature block w-full p-5 text-left sm:p-6">
+          <p className="eyebrow eyebrow-dot">{t('hub.nextTransport')}</p>
+          <div className="mt-4 flex items-center gap-4">
+            <span className="glyph h-12 w-12 bg-surface">
+              <TransportIcon mode={nextTransportStop.transport_mode} size={22} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[1.4rem] font-extrabold">
+                {nextTransportStop.name}
+                {afterTransport && <span className="text-text-muted"> → </span>}
+                {afterTransport?.name}
+              </p>
+              <p className="num mt-0.5 text-[14px] text-text-soft">
+                {t(modeKey(nextTransportStop.transport_mode ?? 'other'))} · {shortDateTime(nextTransportStop.transport_departs, locale)}
+              </p>
             </div>
-            {(nextTransportStop.transport_details || nextTransportStop.transport_ref) && (
-              <div className="mt-5 flex flex-wrap gap-2">
-                {nextTransportStop.transport_details && (
-                  <span className="chip">{nextTransportStop.transport_details}</span>
-                )}
-                {nextTransportStop.transport_ref && (
-                  <span className="chip chip-accent num">{nextTransportStop.transport_ref}</span>
-                )}
-              </div>
-            )}
-          </button>
-        )}
-
-        {/* Etape en cours et suivante */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            { label: t('hub.currentStop'), stop: current },
-            { label: t('hub.nextStop'), stop: next },
-          ].map(({ label, stop }) =>
-            stop ? (
-              <button key={label} onClick={() => go('route')} className="card card-hover p-5 text-left">
-                <p className="eyebrow">{label}</p>
-                <p className="display-sm mt-3 text-2xl">{stop.name}</p>
-                <p className="num mt-1 text-[13px] text-text-muted">
-                  {shortDate(stop.arrive_date, locale, true)}
-                  {stop.leave_date && `  ·  ${shortDate(stop.leave_date, locale, true)}`}
-                </p>
-                {stop.stay_name && (
-                  <p className="mt-3 flex items-center gap-1.5 text-[13px] text-text-soft">
-                    <PinIcon size={13} />
-                    {stop.stay_name}
-                  </p>
-                )}
-              </button>
-            ) : null,
-          )}
-        </div>
-
-        {hub.stops.length === 0 && (
-          <button onClick={onOpenAssistant} className="card card-hover flex w-full items-center gap-4 p-5 text-left">
-            <span className="glyph">
-              <SparkIcon size={18} />
-            </span>
-            <span>
-              <span className="block text-[15px] font-semibold">{t('hub.startRoute')}</span>
-              <span className="block text-[13px] text-text-muted">{t('hub.startRouteHint')}</span>
-            </span>
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-5">
-        {/* A ne pas oublier */}
-        <section className="card p-5">
-          <div className="flex items-center justify-between">
-            <p className="eyebrow">{t('hub.upcomingTodos')}</p>
-            <button onClick={() => go('todo')} className="text-[12px] font-semibold text-accent">
-              {t('hub.allTodos')}
-            </button>
           </div>
-          {upcoming.length === 0 ? (
-            <p className="mt-4 text-[14px] text-text-muted">{t('todo.empty')}</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-line">
-              {upcoming.map((todo) => {
+        </button>
+      )}
+
+      {/* Parcours : une grande carte photo par etape, qu'on fait defiler */}
+      {hub.stops.length > 0 && (
+        <section>
+          <SectionHead title={t('ov.journey')} action={t('hub.allTodos')} onAction={() => go('route')} />
+          <div className="nav-scroll -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8">
+            {hub.stops.map((s, i) => {
+              const img = cityImage(s.name)
+              const nights = s.arrive_date && s.leave_date ? daysBetween(s.arrive_date, s.leave_date) : null
+              const isNow = current?.id === s.id
+              const isNext = !current && next?.id === s.id
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => go('route')}
+                  className="relative h-56 w-[72%] shrink-0 snap-start overflow-hidden rounded-[26px] text-left text-white shadow-[var(--shadow-md)] sm:w-72"
+                >
+                  {img ? (
+                    <img src={img} alt="" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,#ff9a6b,#e2522c_50%,#7a3cb0)]" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+                  <span className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-[13px] font-extrabold backdrop-blur-md">
+                    {i + 1}
+                  </span>
+                  {(isNow || isNext) && (
+                    <span className="absolute right-3 top-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#2a160d]">
+                      {isNow ? t('ov.today') : t('ov.next')}
+                    </span>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 p-4">
+                    <p className="text-[12px] font-semibold opacity-85">
+                      {s.country ? `${flagOf(s.country)} ` : ''}
+                      {shortDate(s.arrive_date, locale)}
+                      {s.leave_date ? ` → ${shortDate(s.leave_date, locale)}` : ''}
+                    </p>
+                    <p className="mt-0.5 text-[1.7rem] font-extrabold leading-tight">{s.name}</p>
+                    <p className="mt-1 truncate text-[12px] opacity-85">
+                      {nights !== null && `🌙 ${t('ov.nights', { n: nights })}`}
+                      {s.stay_name && ` · 🏨 ${s.stay_name}`}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* A decouvrir : carrousel de lieux en photo */}
+      {discover.length > 0 && (
+        <section>
+          <SectionHead title={t('ov.discover')} action={t('ov.seeMap')} onAction={() => navigate('/carte')} />
+          <div className="nav-scroll -mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8">
+            {discover.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => navigate(`/carte?lieu=${p.id}`)}
+                className="w-40 shrink-0 snap-start text-left sm:w-48"
+              >
+                <div className="aspect-[4/5] overflow-hidden rounded-[22px] bg-surface-2 shadow-[var(--shadow-sm)]">
+                  <img src={imageOf(p)!} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                </div>
+                <p className="mt-2 line-clamp-2 text-[14px] font-bold leading-snug">{p.name}</p>
+                {p.city && <p className="text-[12px] text-text-muted">{p.city}</p>}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Listes facon reglages iOS */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section>
+          <SectionHead title={t('hub.upcomingTodos')} action={t('hub.allTodos')} onAction={() => go('todo')} />
+          <ul className="overflow-hidden rounded-[22px] border border-line bg-surface shadow-[var(--shadow-sm)]">
+            {upcoming.length === 0 ? (
+              <li className="px-4 py-4 text-[14px] text-text-muted">{t('todo.empty')}</li>
+            ) : (
+              upcoming.map((todo) => {
                 const day = todo.due_at?.slice(0, 10)
                 const late = day && day < today
                 const inDays = day ? daysBetween(today, day) : null
                 return (
-                  <li key={todo.id} className="flex items-center gap-3 py-2.5">
-                    <span className="text-text-muted">
-                      <TodoKindIcon kind={todo.kind} size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[14px]">{todo.title}</span>
-                    {day && (
-                      <span className={`chip num ${late ? 'chip-bad' : day <= addDaysIso(today, 3) ? 'chip-warn' : ''}`}>
-                        {late ? t('hub.late') : inDays === 0 ? shortDate(day, locale) : t('hub.in', { n: inDays ?? 0 })}
+                  <li key={todo.id}>
+                    <button onClick={() => go('todo')} className="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-b-0 hover:bg-surface-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--halo)] text-accent">
+                        <TodoKindIcon kind={todo.kind} size={15} />
                       </span>
-                    )}
+                      <span className="min-w-0 flex-1 truncate text-[15px]">{todo.title}</span>
+                      {day && (
+                        <span className={`chip num ${late ? 'chip-bad' : day <= addDaysIso(today, 3) ? 'chip-warn' : ''}`}>
+                          {late ? t('hub.late') : inDays === 0 ? shortDate(day, locale) : t('hub.in', { n: inDays ?? 0 })}
+                        </span>
+                      )}
+                      <span className="text-text-muted">›</span>
+                    </button>
                   </li>
                 )
-              })}
-            </ul>
-          )}
+              })
+            )}
+          </ul>
         </section>
 
-        {/* Documents essentiels */}
-        <section className="card p-5">
-          <div className="flex items-center justify-between">
-            <p className="eyebrow">{t('hub.essentialDocs')}</p>
-            <button onClick={() => go('docs')} className="text-[12px] font-semibold text-accent">
-              {t('hub.allDocs')}
-            </button>
-          </div>
-          {essentials.length === 0 ? (
-            <button onClick={() => go('docs')} className="mt-4 text-[14px] text-text-muted hover:text-text">
-              {t('hub.startDocsHint')}
-            </button>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {essentials.map((doc) => (
-                <li key={doc.id} className="flex items-center gap-3">
-                  <span className="glyph h-8 w-8">
-                    <DocIcon kind={doc.kind} size={14} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[14px]">{doc.title}</span>
-                  {doc.reference && <span className="num font-mono text-[12px] text-text-muted">{doc.reference}</span>}
+        <section>
+          <SectionHead title={t('hub.essentialDocs')} action={t('hub.allDocs')} onAction={() => go('docs')} />
+          <ul className="overflow-hidden rounded-[22px] border border-line bg-surface shadow-[var(--shadow-sm)]">
+            {essentials.length === 0 ? (
+              <li className="px-4 py-4 text-[14px] text-text-muted">{t('hub.startDocsHint')}</li>
+            ) : (
+              essentials.map((doc) => (
+                <li key={doc.id}>
+                  <button onClick={() => go('docs')} className="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-b-0 hover:bg-surface-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--halo)] text-accent">
+                      <DocIcon kind={doc.kind} size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[15px]">{doc.title}</span>
+                    <span className="text-text-muted">›</span>
+                  </button>
                 </li>
-              ))}
-            </ul>
-          )}
+              ))
+            )}
+          </ul>
         </section>
-
-        {trip.start_date && trip.end_date && (
-          <p className="num px-1 text-[12px] text-text-muted">
-            {shortDate(trip.start_date, locale)} → {shortDate(trip.end_date, locale)}
-          </p>
-        )}
       </div>
     </div>
   )
 }
+
+function SectionHead({ title, action, onAction }: { title: string; action: string; onAction: () => void }) {
+  return (
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <h2 className="text-[1.35rem] font-extrabold tracking-tight">{title}</h2>
+      <button onClick={onAction} className="shrink-0 text-[14px] font-semibold text-accent">
+        {action}
+      </button>
+    </div>
+  )
+}
+
+const norm = (s: string | null | undefined) =>
+  (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
 
 function StartCard({
   icon,

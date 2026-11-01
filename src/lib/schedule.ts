@@ -134,3 +134,17 @@ export function conflictsFor(
 }
 
 export const fmtMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? String(m % 60).padStart(2, '0') : ''}` : `${m} min`)
+
+/**
+ * Note « belle photo » d'un lieu, pour choisir les images de couverture :
+ * paysages et monuments d'abord, affiches d'evenements et cliniques ensuite.
+ */
+export function photoScore(p: Place): number {
+  const text = `${p.name} ${p.details?.kind ?? ''}`.toLowerCase()
+  let score = 0
+  if (/temple|wat |wat$|pagode|plage|beach|vue|view|panorama|parc|park|[îi]le|island|baie|bay|march[ée]|market|montagne|mountain|cascade|waterfall|grotte|cave|pont|bridge|palais|palace|rooftop|lanterne/.test(text)) score += 3
+  if (p.details?.gps_exact) score += 1
+  if (/festival|edc|[ée]v[ée]nement|event|concert|clinic|clinique|hospital|h[ôo]pital|spa|soin|dental|dentaire|vente|sale|studio|tatou/.test(text)) score -= 4
+  if (isStay(p)) score -= 2
+  return score
+}

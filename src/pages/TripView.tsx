@@ -3,12 +3,12 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { useAuth } from '../context/AuthContext'
 import { fetchAllPhotos, signPhotoUrls } from '../lib/api'
-import { formatDate, formatRange, totalDistanceKm } from '../lib/stats'
+import { formatDate, totalDistanceKm } from '../lib/stats'
 import { formatDuration } from '../lib/geolocation'
-import { countdown, daysBetween } from '../lib/tripDates'
+import { daysBetween } from '../lib/tripDates'
 import { buildTripIcs, downloadIcs } from '../lib/ics'
 import { useTripHub } from '../lib/useTripHub'
-import AppShell, { Avatar } from '../components/AppShell'
+import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
 import Reveal from '../components/Reveal'
 import TripForm from '../components/TripForm'
@@ -26,11 +26,10 @@ import TripAssistant from '../components/hub/TripAssistant'
 import IdeasTab from '../components/hub/IdeasTab'
 import CountriesTab from '../components/hub/CountriesTab'
 import { MODES, modeKey } from '../components/hub/StopForm'
-import { CalendarIcon, ShareIcon, SparkIcon } from '../components/hub/icons'
 import { useI18n } from '../i18n/I18nContext'
+import TripHero from '../components/hub/TripHero'
 import type { Key } from '../i18n/fr'
 import type { TransportMode } from '../lib/types'
-import Countdown from '../components/Countdown'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -48,11 +47,12 @@ const TABS: { id: HubTab; label: Key }[] = [
  * venues des reseaux et les souvenirs (lieux, photos, parcours).
  */
 export default function TripView() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { trips, loading } = usePlaces()
+  const { trips, places: allPlaces, loading } = usePlaces()
+  const tripPlaces = useMemo(() => allPlaces.filter((p) => p.trip_id === id), [allPlaces, id])
   const hub = useTripHub(id)
   const [editing, setEditing] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -89,9 +89,7 @@ export default function TripView() {
     )
   }
 
-  const cd = countdown(trip.start_date, trip.end_date)
   const totalDays = trip.start_date && trip.end_date ? daysBetween(trip.start_date, trip.end_date) + 1 : null
-  const countries = [...new Set(hub.stops.map((s) => s.country).filter(Boolean))]
   const openTodos = hub.todos.filter((x) => !x.done).length
 
   function exportCalendar() {
@@ -108,115 +106,18 @@ export default function TripView() {
 
   return (
     <AppShell>
-      {/* En-tete : couverture plein cadre, titre en grand, compte a rebours */}
-      <section className="relative isolate overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          {cover ? (
-            <>
-              <img src={cover} alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#120d09] via-[#120d09]/55 to-[#120d09]/10" />
-            </>
-          ) : (
-            <div className="h-full w-full bg-[radial-gradient(70%_90%_at_90%_0%,color-mix(in_srgb,var(--accent)_25%,transparent),transparent_65%)]" />
-          )}
-        </div>
-
-        <div className={`mx-auto w-full max-w-6xl px-5 pb-10 pt-8 sm:px-8 sm:pb-14 ${cover ? 'text-[#fbf3e8]' : ''}`}>
-          <Link
-            to="/voyages"
-            className={`text-[13px] ${cover ? 'text-[#fbf3e8]/75 hover:text-[#fbf3e8]' : 'text-text-muted hover:text-text'}`}
-          >
-            ← {t('nav.trips')}
-          </Link>
-
-          <div className={`${cover ? 'pt-28 sm:pt-40' : 'pt-10 sm:pt-14'}`}>
-            <Reveal>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`chip ${cover ? 'border-white/25 bg-white/10 text-white' : 'chip-accent'}`}>
-                  {trip.status === 'planning' ? t('hub.status.planning') : t('hub.status.done')}
-                </span>
-                {hub.people.length > 1 && (
-                  <span className={`chip ${cover ? 'border-white/25 bg-white/10 text-white' : ''}`}>
-                    {t('share.sharedBadge')}
-                  </span>
-                )}
-              </div>
-              <h1 className="display mt-5 max-w-4xl text-[clamp(2.8rem,8vw,6.2rem)]">{trip.title}</h1>
-              <p className={`num mt-4 text-[15px] ${cover ? 'text-[#fbf3e8]/85' : 'text-text-soft'}`}>
-                {formatRange(trip.start_date, trip.end_date, t, locale)}
-              </p>
-            </Reveal>
-
-            {/* Compte a rebours en direct */}
-            <Reveal delay={60}>
-              <div className="mt-7">
-                <Countdown start={trip.start_date} end={trip.end_date} light={Boolean(cover)} />
-              </div>
-            </Reveal>
-
-            {/* Chiffres cles */}
-            <Reveal delay={80}>
-              <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4">
-                {cd.kind === 'after' && (
-                  <Stat
-                    light={Boolean(cover)}
-                    value={t('hub.countdown.after', { n: cd.days })}
-                    accent
-                  />
-                )}
-                {totalDays && <Stat light={Boolean(cover)} value={t('hub.days', { n: totalDays })} />}
-                {hub.stops.length > 0 && (
-                  <Stat
-                    light={Boolean(cover)}
-                    value={hub.stops.length === 1 ? t('hub.stop') : t('hub.stops', { n: hub.stops.length })}
-                  />
-                )}
-                {countries.length > 0 && (
-                  <Stat light={Boolean(cover)} value={countries.join(' · ')} />
-                )}
-              </dl>
-            </Reveal>
-
-            <Reveal delay={140}>
-              <div className="mt-9 flex flex-wrap items-center gap-2">
-                <button onClick={() => setAssistant(true)} className="btn btn-accent">
-                  <SparkIcon size={15} />
-                  {t('ai.open')}
-                </button>
-                <button
-                  onClick={exportCalendar}
-                  className={`btn ${cover ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
-                  title={t('hub.calendarHint')}
-                  disabled={hub.stops.length === 0 && hub.todos.length === 0}
-                >
-                  <CalendarIcon size={15} />
-                  {t('hub.calendar')}
-                </button>
-                <button
-                  onClick={() => setSharing((v) => !v)}
-                  className={`btn ${cover ? 'border-white/30 text-white hover:bg-white/10' : ''}`}
-                >
-                  <ShareIcon size={15} />
-                  {t('hub.share')}
-                </button>
-                <div className="ml-1 flex -space-x-2">
-                  {hub.people.map((p) => (
-                    <span key={p.user_id} className="rounded-full ring-2 ring-bg" title={p.display_name}>
-                      <Avatar url={p.avatar_url} name={p.display_name} size={30} />
-                    </span>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setEditing((v) => !v)}
-                  className={`btn btn-quiet btn-xs ml-auto ${cover ? 'text-white/80 hover:bg-white/10' : ''}`}
-                >
-                  {editing ? t('common.cancel') : t('hub.edit')}
-                </button>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      <TripHero
+        trip={trip}
+        hub={hub}
+        cover={cover}
+        places={tripPlaces}
+        totalDays={totalDays}
+        editing={editing}
+        onAssistant={() => setAssistant(true)}
+        onCalendar={exportCalendar}
+        onShare={() => setSharing((v) => !v)}
+        onEdit={() => setEditing((v) => !v)}
+      />
 
       <div className="mx-auto w-full max-w-6xl px-5 pb-28 sm:px-8">
         {hub.missingSchema && <p className="notice notice-bad mt-6">{t('error.missingTable')}</p>}
@@ -236,7 +137,18 @@ export default function TripView() {
         <div className="-mx-5 mt-8 px-5 py-3 sm:sticky sm:top-16 sm:z-[800] sm:-mx-8 sm:px-8">
           <nav className="tabbar w-fit max-w-full">
             {TABS.map((x) => (
-              <button key={x.id} onClick={() => go(x.id)} className={`tab ${tab === x.id ? 'tab-active' : ''}`}>
+              <button
+                key={x.id}
+                onClick={() => go(x.id)}
+                ref={(el) => {
+                  // L onglet actif se place au centre de la barre
+                  // (defilement horizontal seulement : la page ne doit pas sauter)
+                  const bar = el?.parentElement
+                  if (el && bar && tab === x.id)
+                    bar.scrollTo({ left: el.offsetLeft - bar.clientWidth / 2 + el.clientWidth / 2, behavior: 'smooth' })
+                }}
+                className={`tab ${tab === x.id ? 'tab-active' : ''}`}
+              >
                 {t(x.label)}
                 {x.id === 'todo' && openTodos > 0 && <span className="tab-count num">{openTodos}</span>}
                 {x.id === 'docs' && hub.docs.length > 0 && <span className="tab-count num">{hub.docs.length}</span>}
@@ -276,20 +188,6 @@ export default function TripView() {
         />
       )}
     </AppShell>
-  )
-}
-
-function Stat({ value, light, accent = false }: { value: string; light: boolean; accent?: boolean }) {
-  return (
-    <div>
-      <dd
-        className={`display-sm num text-[1.35rem] ${
-          accent ? (light ? 'text-[#f3b48c]' : 'text-accent') : light ? 'text-[#fbf3e8]' : ''
-        }`}
-      >
-        {value}
-      </dd>
-    </div>
   )
 }
 

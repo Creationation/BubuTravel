@@ -1030,17 +1030,17 @@ body {
   display: none;
 }
 
-/* Sur telephone, les onglets passent a la ligne : tout est visible sans
-   avoir a deviner qu'il faut faire defiler. */
+/* Sur telephone : une seule ligne qui defile, facon iOS, bords en fondu
+   pour montrer qu'il y a d'autres onglets ; l'onglet actif se centre seul. */
 @media (max-width: 639px) {
   .tabbar {
-    flex-wrap: wrap;
-    justify-content: center;
-    overflow: visible;
-    border-radius: 22px;
     width: 100% !important;
+    scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
   }
   .tabbar .tab {
-    padding: 0.5rem 0.8rem;
+    scroll-snap-align: center;
+    padding: 0.55rem 0.95rem;
   }
 }

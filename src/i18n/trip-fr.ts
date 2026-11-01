@@ -445,4 +445,11 @@ export const tripFr = {
   'plan.morning': "Matin",
   'plan.afternoon': "Après-midi",
   'plan.evening': "Soir",
+  'hero.calendar': "Agenda",
+  'ov.journey': "🧭 Votre parcours",
+  'ov.discover': "✨ À découvrir",
+  'ov.seeMap': "Voir sur la carte",
+  'ov.nights': "{n} nuits",
+  'ov.today': "Aujourd'hui",
+  'ov.next': "Prochaine",
 } as const
