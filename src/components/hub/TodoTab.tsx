@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { errorMessage } from '../../lib/errors'
+import { flagOf } from '../../lib/countries'
 import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import type { TodoKind, TripStop, TripTodo } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
@@ -44,10 +45,23 @@ function groupOf(todo: TripTodo, today: string): Group {
 export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAdd?: boolean }) {
   const { t } = useI18n()
   const [filter, setFilter] = useState<TodoKind | 'all'>('all')
+  // '*' = tous les pays, '' = check-list generale, sinon le nom du pays
+  const [place, setPlace] = useState<string>('*')
   const [error, setError] = useState<string | null>(null)
   const today = todayIso()
 
-  const visible = hub.todos.filter((todo) => filter === 'all' || todo.kind === filter)
+  const countries = useMemo(() => {
+    const list: string[] = []
+    for (const s of hub.stops) if (s.country && !list.includes(s.country)) list.push(s.country)
+    for (const x of hub.todos) if (x.country && !list.includes(x.country)) list.push(x.country)
+    return list
+  }, [hub.stops, hub.todos])
+
+  const visible = hub.todos.filter(
+    (todo) =>
+      (filter === 'all' || todo.kind === filter) &&
+      (place === '*' || (todo.country ?? '') === place),
+  )
   const grouped = useMemo(() => {
     const map: Record<Group, TripTodo[]> = { late: [], soon: [], later: [], undated: [], done: [] }
     for (const todo of visible) map[groupOf(todo, today)].push(todo)
@@ -61,8 +75,33 @@ export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
 
   return (
     <div className="space-y-8">
-      <AddTodo autoFocus={autoAdd} stops={hub.stops} onAdd={(input) => hub.addTodo(input)} onError={setError} />
+      <AddTodo
+        autoFocus={autoAdd}
+        stops={hub.stops}
+        countries={countries}
+        defaultCountry={place === '*' ? '' : place}
+        onAdd={(input) => hub.addTodo(input)}
+        onError={setError}
+      />
       {error && <p className="notice notice-bad">{error}</p>}
+
+      {countries.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { value: '*', label: t('todo.all') },
+            { value: '', label: t('todo.general') },
+            ...countries.map((c) => ({ value: c, label: `${flagOf(c)} ${c}` })),
+          ].map((opt) => (
+            <button
+              key={opt.value || 'general'}
+              onClick={() => setPlace(opt.value)}
+              className={`pill ${place === opt.value ? 'pill-active' : ''}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tabbar">
@@ -179,11 +218,15 @@ function TodoRow({
 function AddTodo({
   autoFocus = false,
   stops,
+  countries,
+  defaultCountry,
   onAdd,
   onError,
 }: {
   autoFocus?: boolean
   stops: TripStop[]
+  countries: string[]
+  defaultCountry: string
   onAdd: (input: Partial<TripTodo> & { title: string }) => Promise<unknown>
   onError: (e: string | null) => void
 }) {
@@ -195,8 +238,12 @@ function AddTodo({
   const [time, setTime] = useState('')
   const [remind, setRemind] = useState<number | null>(15 * 60)
   const [stopId, setStopId] = useState('')
+  const [country, setCountry] = useState(defaultCountry)
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Le filtre pays choisi en dessous devient le pays par defaut de l'ajout
+  useEffect(() => setCountry(defaultCountry), [defaultCountry])
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault()
@@ -213,6 +260,7 @@ function AddTodo({
         // une journee entiere ; avec une heure precise, ce sont des jours pleins.
         remind_minutes: !date || remind === null ? null : date && time ? timedReminder(remind) : remind,
         stop_id: stopId || null,
+        country: country || null,
         notes: notes.trim() || null,
       })
       setTitle('')
@@ -296,6 +344,19 @@ function AddTodo({
               ))}
             </select>
           </div>
+          {countries.length > 0 && (
+            <div>
+              <label className="label">{t('todo.country')}</label>
+              <select className="field" value={country} onChange={(e) => setCountry(e.target.value)}>
+                <option value="">{t('todo.general')}</option>
+                {countries.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="sm:col-span-3">
             <label className="label">{t('todo.notes')}</label>
             <input className="field" value={notes} onChange={(e) => setNotes(e.target.value)} />

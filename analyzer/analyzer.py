@@ -456,6 +456,57 @@ class Itinerary(BaseModel):
     admin: list[AdminNote]
 
 
+class Currency(BaseModel):
+    code: str = Field(description="Code ISO, ex. THB")
+    name: str
+    rate_hint: str = Field(description="Ordre de grandeur TRES court, 25 caracteres max, ex. « 1 EUR ≈ 37 THB »")
+
+
+class Payments(BaseModel):
+    summary: str = Field(description="En deux phrases : comment payer au quotidien dans ce pays")
+    cards: str = Field(description="Ou la carte passe ou non, Visa/Mastercard, frais, sans contact")
+    cash: str = Field(description="Place du liquide, petites coupures, ou changer")
+    mobile: str = Field(description="Paiement mobile utilisable par un touriste etranger (apps, QR), ou pas")
+    atm: str = Field(description="Distributeurs : frais fixes, banques conseillees, plafonds, astuces")
+    tipping: str
+    tips: list[str] = Field(description="3 a 6 bons reflexes argent (carte sans frais, refuser la conversion DCC...)")
+
+
+class GuideItem(BaseModel):
+    title: str = Field(description="Action courte et concrete")
+    kind: Literal["todo", "booking", "admin", "packing"]
+    when: Literal["before", "arrival", "during"]
+    notes: str
+
+
+class Guide(BaseModel):
+    country: str
+    currency: Currency
+    payments: Payments
+    entry: str = Field(description="Visa ou exemption pour CE passeport, duree, documents, e-visa, preuve de sortie")
+    plugs: str = Field(description="Types de prises et tension, adaptateur necessaire ou non")
+    sim: str = Field(description="eSIM / SIM locale, operateurs, prix, ou l'acheter")
+    emergency: str = Field(description="Numeros d'urgence et police touristique")
+    safety: list[str] = Field(description="Arnaques et precautions courantes, 3 a 6")
+    etiquette: list[str] = Field(description="Usages importants, 3 a 6")
+    checklist: list[GuideItem] = Field(description="8 a 15 choses a faire pour ce pays, du depart au sejour")
+
+
+COUNTRY_BRIEF = """Prepare une fiche pratique pour des voyageurs independants qui vont dans ce pays.
+Verifie sur le web (WebSearch, WebFetch) tout ce qui change souvent : regles d'entree et visa pour leur
+passeport, paiement mobile accessible aux etrangers, frais des distributeurs, taux de change.
+Le moyen de payer est la partie la plus importante : sois precis et concret.
+Sois factuel ; signale ce qui doit etre verifie au lieu de l'inventer.
+{lang}
+
+Pays : {country}
+Passeport des voyageurs : {passport}
+Voyage : du {start} au {end}
+Etapes dans ce pays : {stops}
+Date du jour : {today}
+"""
+
+
 def inline_schema(model: type[BaseModel]) -> dict:
     """Schema JSON sans $ref : plus sur pour --json-schema."""
     schema = model.model_json_schema()
@@ -679,9 +730,23 @@ def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
+        req = job.get("input") or {}
+        if job["kind"] == "country_guide":
+            prompt = COUNTRY_BRIEF.format(
+                lang=lang_line(req.get("lang", "fr")),
+                country=req.get("country", ""),
+                passport=req.get("passport") or "non precise (donne les cas UE, Suisse, Royaume-Uni)",
+                start=req.get("start_date") or "?",
+                end=req.get("end_date") or "?",
+                stops=", ".join(req.get("stops") or []) or "aucune pour l'instant",
+                today=req.get("today") or date.today().isoformat(),
+            )
+            data = claude_json(prompt, Guide, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  fiche pays prete : {data['country']}")
+            return
         if job["kind"] != "itinerary":
             raise RuntimeError(f"Type de demande inconnu : {job['kind']}")
-        req = job.get("input") or {}
         lines = [
             f"Date du jour : {req.get('today') or date.today().isoformat()}",
             f"Debut du voyage : {req.get('start_date') or 'non fixe'}",

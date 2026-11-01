@@ -43,3 +43,4 @@ keystore.properties
 analyzer/.venv/
 analyzer/.env
 analyzer/__pycache__/
+analyzer/analyzer.log

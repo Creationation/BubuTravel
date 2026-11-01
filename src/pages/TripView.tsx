@@ -24,6 +24,7 @@ import DocsTab from '../components/hub/DocsTab'
 import SharePanel from '../components/hub/SharePanel'
 import TripAssistant from '../components/hub/TripAssistant'
 import IdeasTab from '../components/hub/IdeasTab'
+import CountriesTab from '../components/hub/CountriesTab'
 import { MODES, modeKey } from '../components/hub/StopForm'
 import { CalendarIcon, ShareIcon, SparkIcon } from '../components/hub/icons'
 import { useI18n } from '../i18n/I18nContext'
@@ -35,6 +36,7 @@ const TABS: { id: HubTab; label: Key }[] = [
   { id: 'route', label: 'hub.tab.route' },
   { id: 'todo', label: 'hub.tab.todo' },
   { id: 'docs', label: 'hub.tab.docs' },
+  { id: 'countries', label: 'hub.tab.countries' },
   { id: 'ideas', label: 'hub.tab.ideas' },
   { id: 'memories', label: 'hub.tab.memories' },
 ]
@@ -258,6 +260,7 @@ export default function TripView() {
           {tab === 'route' && <RouteTab trip={trip} hub={hub} autoAdd={autoAdd} onOpenAssistant={() => setAssistant(true)} />}
           {tab === 'todo' && <TodoTab hub={hub} autoAdd={autoAdd} />}
           {tab === 'docs' && <DocsTab hub={hub} autoAdd={autoAdd} />}
+          {tab === 'countries' && <CountriesTab trip={trip} hub={hub} />}
           {tab === 'ideas' && <IdeasTab trip={trip} hub={hub} />}
           {tab === 'memories' && <Memories tripId={trip.id} planning={trip.status === 'planning'} />}
         </div>

@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import { modeKey } from './StopForm'
 import { DocIcon, PinIcon, RouteIcon, ShareIcon, ShieldIcon, SparkIcon, TodoKindIcon, TransportIcon } from './icons'
 
-export type HubTab = 'overview' | 'route' | 'todo' | 'docs' | 'ideas' | 'memories'
+export type HubTab = 'overview' | 'route' | 'todo' | 'docs' | 'countries' | 'ideas' | 'memories'
 
 /**
  * Le tableau de bord du voyage : ce qui arrive, ce qu'il ne faut pas oublier

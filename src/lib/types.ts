@@ -177,6 +177,8 @@ export type TripTodo = {
   due_at: string | null
   has_time: boolean
   remind_minutes: number | null
+  /** Pays de la check-list ; null = check-list generale du voyage. */
+  country: string | null
   done: boolean
   done_by: string | null
   position: number
@@ -272,7 +274,37 @@ export type LinkIdea = {
   updated_at: string
 }
 
-export type NewTripStop =Omit<TripStop, 'id' | 'created_at' | 'created_by'>
+/** Fiche pays preparee par l'IA : paiement, entree, pratique, check-list. */
+export type CountryGuide = {
+  country: string
+  currency: { code: string; name: string; rate_hint: string }
+  payments: {
+    summary: string
+    cards: string
+    cash: string
+    mobile: string
+    atm: string
+    tipping: string
+    tips: string[]
+  }
+  entry: string
+  plugs: string
+  sim: string
+  emergency: string
+  safety: string[]
+  etiquette: string[]
+  checklist: { title: string; kind: TodoKind; when: 'before' | 'arrival' | 'during'; notes: string }[]
+}
+
+export type CountryGuideRow = {
+  id: string
+  trip_id: string
+  country: string
+  guide: CountryGuide | null
+  updated_at: string
+}
+
+export type NewTripStop = Omit<TripStop, 'id' | 'created_at' | 'created_by'>
 export type NewTripTodo = Omit<TripTodo, 'id' | 'created_at' | 'created_by'>
 export type NewTripDocument = Omit<TripDocument, 'id' | 'created_at' | 'created_by'>
 
@@ -405,6 +437,12 @@ export type Database = {
         Row: LinkIdea
         Insert: { url: string; platform?: string | null; note?: string | null; trip_id?: string | null }
         Update: Partial<Pick<LinkIdea, 'trip_id' | 'status' | 'place_id' | 'note' | 'attempts' | 'error'>>
+        Relationships: []
+      }
+      country_guides: {
+        Row: CountryGuideRow
+        Insert: { trip_id: string; country: string; guide?: Json | null; updated_at?: string }
+        Update: { guide?: Json | null; updated_at?: string }
         Relationships: []
       }
       ai_jobs: {
