@@ -91,6 +91,8 @@ export type Place = {
   promo_code: string | null
   promo_note: string | null
   promo_until: string | null
+  /** Photo d illustration trouvee en ligne (Wikipedia). null = pas cherchee, vide = rien trouve. */
+  image_url?: string | null
   /** Note personnelle, de 1 a 5. */
   rating: number | null
   review: string | null

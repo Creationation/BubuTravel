@@ -85,7 +85,7 @@ export default function AppShell({
 
       </header>
 
-      <main className="flex-1 pb-24 sm:pb-0">{children}</main>
+      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">{children}</main>
       <MobileNav />
     </div>
   )

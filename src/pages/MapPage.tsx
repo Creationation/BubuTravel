@@ -183,10 +183,10 @@ export default function MapPage() {
 
   return (
     <AppShell wide>
-      <div className="flex h-[calc(100vh-4rem)] flex-col">
-        <div className="relative flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3 sm:px-8">
+      <div className="flex h-[calc(100dvh-8rem-env(safe-area-inset-bottom))] flex-col sm:h-[calc(100vh-4rem)]">
+        <div className="relative flex shrink-0 flex-col gap-2 border-b border-line px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-8 sm:py-3">
           <div className="min-w-0">
-            <p className="eyebrow mb-1.5">{t('map.eyebrow')}</p>
+            <p className="eyebrow mb-1.5 hidden sm:flex">{t('map.eyebrow')}</p>
             {loading ? (
               <p className="text-[13px] text-text-soft">{t('map.loadingJournal')}</p>
             ) : (
@@ -198,8 +198,8 @@ export default function MapPage() {
               />
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => void scanHere()} className="btn" disabled={scanning}>
+          <div className="nav-scroll -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+            <button onClick={() => void scanHere()} className="btn btn-xs shrink-0 sm:px-5 sm:py-2.5 sm:text-[13px]" disabled={scanning}>
               {scanning ? t('map.locating') : t('map.here')}
             </button>
             <button
@@ -209,11 +209,11 @@ export default function MapPage() {
                 setPanel({ kind: 'new' })
                 setPicking(true)
               }}
-              className="btn"
+              className="btn btn-xs shrink-0 sm:px-5 sm:py-2.5 sm:text-[13px]"
             >
               {t('map.addWish')}
             </button>
-            <button onClick={openNew} className="btn btn-accent">
+            <button onClick={openNew} className="btn btn-accent btn-xs shrink-0 sm:px-5 sm:py-2.5 sm:text-[13px]">
               {t('journal.addPlace')}
             </button>
           </div>
@@ -228,7 +228,7 @@ export default function MapPage() {
             <MapCanvas
               points={points}
               tracks={tripStops.line ? [...trackLines, tripStops.line] : trackLines}
-              fitTo={tripStops.points}
+              autoFit={false}
               liveTrack={recording?.points ?? null}
               onTrackSelect={(id) => {
                 setPicking(false)
