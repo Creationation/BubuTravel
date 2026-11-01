@@ -44,7 +44,7 @@ export default function AppShell({
           }`}
         >
           <Link to="/" className="flex shrink-0 items-center gap-2.5">
-            <span className="h-2 w-2 rounded-full bg-accent" />
+            <img src="/icons/logo-64.png" alt="" width={32} height={32} className="h-8 w-8 rounded-[9px] shadow-[var(--shadow-sm)]" />
             <span className="display-sm text-xl">{t('app.name')}</span>
           </Link>
 

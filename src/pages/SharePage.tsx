@@ -81,7 +81,7 @@ export default function SharePage() {
     <div className="min-h-full">
       <header className="sticky top-0 z-[900] border-b border-line bg-bg/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-5 sm:px-8">
-          <span className="h-2 w-2 rounded-full bg-accent" />
+          <img src="/icons/logo-64.png" alt="" width={32} height={32} className="h-8 w-8 rounded-[9px] shadow-[var(--shadow-sm)]" />
           <span className="display-sm text-xl">{t('app.name')}</span>
           <span className="pill ml-2 hidden sm:inline-flex">{t('share.readOnly')}</span>
           <div className="ml-auto">

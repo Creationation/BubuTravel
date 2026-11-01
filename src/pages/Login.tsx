@@ -56,9 +56,13 @@ export default function Login() {
 
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
-          <span className="mx-auto mb-7 flex h-16 w-12 items-end justify-center rounded-t-full border border-line bg-surface-2 pb-3">
-            <span className="h-2 w-2 rotate-45 border border-accent" />
-          </span>
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            width={96}
+            height={96}
+            className="mx-auto mb-7 h-24 w-24 rounded-[26px] shadow-[var(--shadow-md)]"
+          />
           <h1 className="display text-[clamp(2.6rem,10vw,3.6rem)]">{t('app.name')}</h1>
           <p className="lede mt-4">{t('app.tagline')}</p>
         </div>

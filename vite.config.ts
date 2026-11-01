@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'favicon.png', 'icons/apple-touch-icon.png', 'icons/logo-64.png'],
       manifest: {
         name: 'BuBuTravel, carnet de voyage',
         short_name: 'BuBuTravel',
