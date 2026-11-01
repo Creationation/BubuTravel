@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { usePlaces } from '../context/PlacesContext'
@@ -191,6 +192,17 @@ export default function ProfilePage() {
             <div className="mt-5">
               <LanguageSwitch />
             </div>
+          </section>
+        </Reveal>
+
+        {/* Code du coffre */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">{t('vault.settings')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('vault.settingsHint')}</p>
+            <Link to="/coffre?changer=1" className="btn mt-5">
+              {t('vault.pin.change')}
+            </Link>
           </section>
         </Reveal>
 

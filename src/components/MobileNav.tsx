@@ -160,6 +160,7 @@ function More({ go }: { go: (path: string) => void }) {
   const { theme, toggle } = useTheme()
   const { signOut } = useAuth()
   const links: { path: string; label: Key; icon: React.ReactNode; advancedOnly?: boolean }[] = [
+    { path: '/coffre', label: 'nav.vault', icon: <span className="text-[18px] leading-none">🔐</span> },
     { path: '/voyages', label: 'nav.trips', icon: <RouteIcon size={18} /> },
     { path: '/carte', label: 'nav.map', icon: <PinIcon size={18} /> },
     { path: '/bucketlist', label: 'nav.wishlist', icon: <SparkIcon size={18} /> },

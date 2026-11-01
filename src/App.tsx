@@ -21,6 +21,7 @@ import SharePage from './pages/SharePage'
 import PasswordPage from './pages/PasswordPage'
 import UpdatePrompt from './components/UpdatePrompt'
 import { useT } from './i18n/I18nContext'
+import VaultPage from './pages/VaultPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -128,6 +129,14 @@ export default function App() {
               element={
                 <Protected>
                   <IdeasPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/coffre"
+              element={
+                <Protected>
+                  <VaultPage />
                 </Protected>
               }
             />
