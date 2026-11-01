@@ -251,6 +251,7 @@ export default function MapPage() {
             >
               <CountriesLayer
                 places={places}
+                mode={filter.status}
                 extraCountries={tripStops.stops.map((s) => s.country ?? '').filter(Boolean)}
                 interactive={!picking}
                 onCountry={(props) => {
@@ -274,7 +275,7 @@ export default function MapPage() {
 
             {/* Legende : la couleur des marqueurs porte une information */}
             <div className="absolute right-4 top-4 z-[1000]">
-              <MapLegend />
+              <MapLegend value={filter.status} onChange={(status) => setFilter({ ...filter, status })} />
             </div>
 
             {/* Enregistreur de parcours, toujours accessible */}

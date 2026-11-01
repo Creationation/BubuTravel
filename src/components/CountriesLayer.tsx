@@ -6,19 +6,29 @@ import { loadCountries, sameCountry } from '../lib/worldCountries'
 import type { CountryFeature, CountryProps } from '../lib/worldCountries'
 import type { Place } from '../lib/types'
 
+export type CountryMode = 'all' | 'visited' | 'wishlist'
+
+type Stat = { visited: number; wish: number; planned: boolean }
+
 /**
- * Pays remplis selon l'activite : plus il y a de lieux (a visiter et deja
- * visites) dans un pays, plus sa couleur est dense. Un tap sur un pays le
- * cadre et ouvre sa liste (a faire / deja fait).
+ * Pays remplis selon l'activite, et selon le choix « Visité / À visiter » :
+ *  - les deux : plus il y a d'activites, plus c'est dense ; un pays dont
+ *    tout est fait passe en dore ;
+ *  - « Visité » : les pays ou l'on est alle s'illuminent (dore lumineux),
+ *    d'autant plus que la part deja faite est grande ;
+ *  - « À visiter » : seulement ce qu'il reste a faire, en corail.
+ * Un tap sur un pays le cadre et ouvre sa liste.
  */
 export default function CountriesLayer({
   places,
+  mode = 'all',
   extraCountries = [],
   interactive = true,
   onCountry,
 }: {
   places: Place[]
-  /** Pays du voyage sans lieu encore (etapes) : remplis legerement. */
+  mode?: CountryMode
+  /** Pays du voyage sans lieu encore (etapes) : teintes legerement. */
   extraCountries?: string[]
   interactive?: boolean
   onCountry: (props: CountryProps, bounds: L.LatLngBounds) => void
@@ -36,30 +46,38 @@ export default function CountriesLayer({
     }
   }, [])
 
-  // Nombre de lieux par pays (cle = code ISO du contour)
-  const counts = useMemo(() => {
-    const map = new Map<string, number>()
+  const stats = useMemo(() => {
+    const map = new Map<string, Stat>()
     if (!world) return map
     for (const f of world.features) {
-      const n = places.filter((p) => p.country && sameCountry(f.properties, p.country)).length
+      const mine = places.filter((p) => p.country && sameCountry(f.properties, p.country))
+      const visited = mine.filter((p) => p.status !== 'wishlist').length
+      const wish = mine.length - visited
       const planned = extraCountries.some((c) => sameCountry(f.properties, c))
-      if (n > 0 || planned) map.set(f.properties.code || f.properties.nameEn, n)
+      if (mine.length > 0 || planned) map.set(f.properties.code || f.properties.nameEn, { visited, wish, planned })
     }
     return map
   }, [world, places, extraCountries])
 
+  // Ce qui compte dans le mode choisi
+  const shown = (s: Stat) => (mode === 'visited' ? s.visited : mode === 'wishlist' ? s.wish : s.visited + s.wish)
+  const visible = (s: Stat) => shown(s) > 0 || (mode !== 'visited' && s.planned)
+
   const data = useMemo(() => {
     if (!world) return null
-    // On ne dessine que les pays concernes : la carte reste lisible
     return {
       ...world,
-      features: world.features.filter((f) => counts.has(f.properties.code || f.properties.nameEn)),
+      features: world.features.filter((f) => {
+        const s = stats.get(f.properties.code || f.properties.nameEn)
+        return s ? visible(s) : false
+      }),
     } as FeatureCollection<Geometry, CountryProps>
-  }, [world, counts])
+  }, [world, stats, mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data) return null
-  const max = Math.max(1, ...counts.values())
-  const signature = [...counts.entries()].map(([k, v]) => `${k}:${v}`).join(',') + (interactive ? 'i' : '')
+  const max = Math.max(1, ...[...stats.values()].map(shown))
+  const signature =
+    mode + [...stats.entries()].map(([k, v]) => `${k}:${v.visited}/${v.wish}`).join(',') + (interactive ? 'i' : '')
 
   return (
     <GeoJSON
@@ -67,30 +85,65 @@ export default function CountriesLayer({
       data={data}
       style={(f) => {
         const props = (f as CountryFeature).properties
-        const n = counts.get(props.code || props.nameEn) ?? 0
+        const s = stats.get(props.code || props.nameEn) ?? { visited: 0, wish: 0, planned: false }
+        const n = shown(s)
+        const total = s.visited + s.wish
+        const done = total > 0 ? s.visited / total : 0
+        const complete = total > 0 && s.visited === total
         // Echelle logarithmique : le 10e lieu compte moins que le 1er
         const level = n === 0 ? 0 : Math.log(1 + n) / Math.log(1 + max)
+
+        if (mode === 'visited') {
+          return {
+            className: complete ? 'country-glow country-complete' : 'country-glow',
+            color: '#ffb020',
+            weight: complete ? 2.6 : 1.8,
+            opacity: 1,
+            fillColor: complete ? '#ffcf4d' : '#ffb84d',
+            fillOpacity: 0.28 + 0.32 * level + 0.25 * done,
+          }
+        }
+        if (mode === 'wishlist') {
+          return {
+            className: 'country-wish',
+            color: '#e2522c',
+            weight: 1.3,
+            opacity: 0.9,
+            fillColor: '#ff7f57',
+            fillOpacity: n === 0 ? 0.08 : 0.14 + 0.46 * level,
+          }
+        }
+        // Les deux : densite = activite, et la part deja faite rechauffe vers le dore
         return {
-          color: '#e2522c',
-          weight: 1.2,
-          opacity: 0.85,
-          fillColor: '#ff7f57',
-          fillOpacity: n === 0 ? 0.08 : 0.14 + 0.46 * level,
+          className: complete ? 'country-glow country-complete' : '',
+          color: complete ? '#ffb020' : '#e2522c',
+          weight: complete ? 2.4 : 1.2,
+          opacity: 0.9,
+          fillColor: complete ? '#ffc23d' : done > 0 ? '#ff9a3c' : '#ff7f57',
+          fillOpacity: n === 0 ? 0.08 : Math.min(0.85, 0.14 + 0.42 * level + 0.25 * done),
         }
       }}
       interactive={interactive}
       onEachFeature={(f, layer) => {
         const props = (f as CountryFeature).properties
         const path = layer as L.Path & { getBounds: () => L.LatLngBounds }
+        let base = 1.2
+        path.on('add', () => {
+          base = (path.options.weight as number) ?? 1.2
+          // Leaflet n'applique pas className via setStyle : on pose les
+          // classes (lueur, respiration) directement sur l'element SVG.
+          const cls = (path.options as { className?: string }).className
+          const el = (path as unknown as { getElement?: () => Element | undefined }).getElement?.()
+          if (cls && el) for (const c of cls.split(' ').filter(Boolean)) el.classList.add(c)
+        })
         path.on('click', (e) => {
           // Le clic ne doit pas atteindre la carte (ajout de lieu, etc.)
           ;(e as L.LeafletMouseEvent).originalEvent?.stopPropagation()
-          // On se rapproche du pays, sans zoomer jusqu'a la rue
           map.fitBounds(path.getBounds(), { padding: [40, 40], maxZoom: 7 })
           onCountry(props, path.getBounds())
         })
-        path.on('mouseover', () => path.setStyle({ weight: 2.4 }))
-        path.on('mouseout', () => path.setStyle({ weight: 1.2 }))
+        path.on('mouseover', () => path.setStyle({ weight: base + 1.2 }))
+        path.on('mouseout', () => path.setStyle({ weight: base }))
       }}
     />
   )
