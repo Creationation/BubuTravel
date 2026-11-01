@@ -63,6 +63,8 @@ export default function DayPlanTab({ trip, hub }: { trip: Trip; hub: TripHub }) 
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [instruction, setInstruction] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('20:00')
   const [undoJob, setUndoJob] = useState<string | null>(null)
 
   const aiRunning = jobs.find((j) => j.kind === 'day_plan' && j.trip_id === trip.id && j.input?.day === day && (j.status === 'pending' || j.status === 'processing'))
@@ -136,6 +138,17 @@ export default function DayPlanTab({ trip, hub }: { trip: Trip; hub: TripHub }) 
       {/* L'IA refait la journee */}
       <div className="card-feature space-y-3 p-4">
         <p className="text-[15px] font-extrabold">🪄 {t('day.ai.title')}</p>
+        <p className="text-[13px] text-text-muted">{t('day.ai.hoursHint')}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="min-w-0">
+            <span className="label">{t('day.ai.from')}</span>
+            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="field num" />
+          </label>
+          <label className="min-w-0">
+            <span className="label">{t('day.ai.to')}</span>
+            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="field num" />
+          </label>
+        </div>
         <div className="nav-scroll -mx-1 flex gap-1.5 overflow-x-auto px-1">
           {QUICK.map((k) => (
             <button key={k} onClick={() => setInstruction(t(k))} className="pill shrink-0 text-[12px]">
@@ -154,7 +167,8 @@ export default function DayPlanTab({ trip, hub }: { trip: Trip; hub: TripHub }) 
           <AiGauge job={aiRunning} />
         ) : (
           <button
-            onClick={() => void queue('day_plan', { trip_id: trip.id, day, instruction: instruction.trim(), lang }, trip.id).then(() => setInstruction(''))}
+            disabled={toMinutes(endTime) <= toMinutes(startTime)}
+            onClick={() => void queue('day_plan', { trip_id: trip.id, day, instruction: instruction.trim(), start_time: startTime, end_time: endTime, lang }, trip.id).then(() => setInstruction(''))}
             className="btn btn-accent w-full"
           >
             ✨ {t('day.ai.go')}
@@ -168,6 +182,7 @@ export default function DayPlanTab({ trip, hub }: { trip: Trip; hub: TripHub }) 
             </button>
           </div>
         )}
+        {toMinutes(endTime) <= toMinutes(startTime) && <p className="text-[12px] font-semibold text-danger">{t('day.ai.invalidHours')}</p>}
       </div>
 
       {adding && (

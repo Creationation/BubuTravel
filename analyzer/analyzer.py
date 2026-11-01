@@ -58,6 +58,7 @@ CLAUDE_RETRY_SECONDS = max(60, int(os.environ.get("CLAUDE_RETRY_MINUTES", "15"))
 CLAUDE_PAUSED_UNTIL = 0.0
 CLAUDE_STATE_LOCK = threading.Lock()
 CLAUDE_CALL_LOCK = threading.Lock()
+CODEX_CALL_LOCK = threading.Lock()
 SB_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SB_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -70,6 +71,7 @@ UA = (
 MAX_FRAMES = 16
 POLL_SECONDS = 8
 STUCK_MINUTES = 20
+DAY_PLAN_GAP = 15
 
 
 def log(msg: str) -> None:
@@ -143,8 +145,13 @@ def requeue_provider_limits() -> tuple[int, int]:
         ) or []
         ids = [
             row["id"] for row in rows
-            if str(row.get("error") or "").lower().startswith("claude code")
-            and is_claude_usage_limit(RuntimeError(str(row.get("error") or "")))
+            if (
+                str(row.get("error") or "").lower().startswith("claude code")
+                and is_claude_usage_limit(RuntimeError(str(row.get("error") or "")))
+            ) or (
+                "chatgpt" in str(row.get("error") or "").lower()
+                and is_provider_busy(RuntimeError(str(row.get("error") or "")))
+            )
         ]
         if ids:
             body = {"status": "pending", "error": None, "updated_at": now_iso()}
@@ -171,6 +178,12 @@ def heartbeat_forever() -> None:
 
 
 def claim() -> dict | None:
+    # Evite de prendre une nouvelle analyse si Claude et ChatGPT sont deja
+    # occupes : elle resterait en erreur/en attente et serait reprise aussitot.
+    with CLAUDE_STATE_LOCK:
+        claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
+    if (claude_paused and CODEX_CALL_LOCK.locked()) or (CLAUDE_CALL_LOCK.locked() and CODEX_CALL_LOCK.locked()):
+        return None
     rows = sb(
         "GET",
         "link_ideas",
@@ -451,6 +464,9 @@ class Analysis(BaseModel):
     fit: Fit | None
     transcript_excerpt: str = Field(description="Passage utile de ce qui est dit dans la video, 600 caracteres max")
     sources: list[Source] = Field(description="Pages web consultees qui confirment les informations")
+    relevant_frame_indexes: list[int] = Field(
+        description="Indices 1-based des seules images de la video qui montrent clairement le lieu ou l'activite identifiee ; liste vide si aucune scene n'est reliee avec confiance",
+    )
 
 
 class Transport(BaseModel):
@@ -833,7 +849,16 @@ def claude_only_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: l
     return model.model_validate(result).model_dump()
 
 
-def codex_json(prompt: str, model: type[BaseModel], *, cwd: Path, timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
+def codex_json(
+    prompt: str,
+    model: type[BaseModel],
+    *,
+    cwd: Path,
+    timeout: int = 900,
+    span: tuple[int, int] = (5, 80),
+    images: list[Path] | None = None,
+    web_search: bool = False,
+) -> dict:
     """Secours structure via Codex CLI et l'abonnement ChatGPT du PC."""
     exe = shutil.which("codex.cmd") or shutil.which("codex")
     if not exe:
@@ -846,10 +871,18 @@ def codex_json(prompt: str, model: type[BaseModel], *, cwd: Path, timeout: int =
         exe, "exec", "--ephemeral", "--skip-git-repo-check",
         "--sandbox", "read-only", "--model", CODEX_MODEL,
         "-c", 'model_reasoning_effort="low"',
+    ]
+    if web_search:
+        # Le CLI garde sa connexion au compte ChatGPT; aucune cle API n'est lue.
+        cmd.extend(["--enable", "standalone_web_search"])
+    for image in (images or []):
+        if image.is_file():
+            cmd.extend(["--image", str(image)])
+    cmd.extend([
         "--output-schema", str(schema_path),
         "--output-last-message", str(output_path),
         "-",
-    ]
+    ])
     lo, hi = span
     progress(max(lo, getattr(CURRENT, "pct", lo)), "fallback:ChatGPT", force=True)
     completed = subprocess.run(
@@ -875,35 +908,107 @@ def is_claude_usage_limit(err: Exception) -> bool:
     ))
 
 
-def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900, span: tuple[int, int] = (5, 80)) -> dict:
+def is_provider_busy(err: Exception) -> bool:
+    text = str(err).lower()
+    return any(marker in text for marker in (
+        "busy", "already processing", "already occupied", "already in use", "occup", "concurrent", "overloaded", "temporarily unavailable",
+        "too many requests", "429", "502", "503", "529", "connection reset", "timed out",
+    ))
+
+
+def claude_json(
+    prompt: str,
+    model: type[BaseModel],
+    *,
+    cwd: Path,
+    tools: list[str],
+    timeout: int = 900,
+    span: tuple[int, int] = (5, 80),
+    codex_images: list[Path] | None = None,
+) -> dict:
     """
-    Claude Sonnet est prioritaire. Quand son quota est epuise, la demande est
-    terminee par Codex/ChatGPT. Apres la pause, la prochaine demande reteste
-    Claude automatiquement et le remet par defaut des qu'il repond.
+    Claude Sonnet est prioritaire. Si Claude est deja occupe, une autre demande
+    compatible passe sur Codex/ChatGPT; au prochain travail disponible, Claude
+    redevient prioritaire. En cas de quota Claude epuise, ChatGPT prend le relais
+    jusqu'au retest automatique.
     """
     global CLAUDE_PAUSED_UNTIL
-    with CLAUDE_CALL_LOCK:
-        with CLAUDE_STATE_LOCK:
-            use_codex = time.time() < CLAUDE_PAUSED_UNTIL
-        if not use_codex:
-            try:
-                result = claude_only_json(prompt, model, cwd=cwd, tools=tools, timeout=timeout, span=span)
-                with CLAUDE_STATE_LOCK:
-                    was_paused = CLAUDE_PAUSED_UNTIL > 0
-                    CLAUDE_PAUSED_UNTIL = 0.0
-                if was_paused:
-                    log("Quota Claude revenu : Sonnet redevient le modele prioritaire.")
-                return result
-            except Exception as err:
-                if not is_claude_usage_limit(err):
-                    raise
+    with CLAUDE_STATE_LOCK:
+        claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
+    claude_error: Exception | None = None
+
+    def try_claude() -> tuple[dict | None, bool]:
+        """Retourne (resultat, occupe). Le verrou non bloquant libere le relais."""
+        global CLAUDE_PAUSED_UNTIL
+        nonlocal claude_error
+        if not CLAUDE_CALL_LOCK.acquire(blocking=False):
+            return None, True
+        try:
+            result = claude_only_json(prompt, model, cwd=cwd, tools=tools, timeout=timeout, span=span)
+            with CLAUDE_STATE_LOCK:
+                was_paused = CLAUDE_PAUSED_UNTIL > 0
+                CLAUDE_PAUSED_UNTIL = 0.0
+            if was_paused:
+                log("Quota Claude revenu : Sonnet redevient le modele prioritaire.")
+            return result, False
+        except Exception as err:
+            claude_error = err
+            if is_claude_usage_limit(err):
                 with CLAUDE_STATE_LOCK:
                     CLAUDE_PAUSED_UNTIL = time.time() + CLAUDE_RETRY_SECONDS
                 log(f"Limite Claude atteinte : nouvel essai dans {CLAUDE_RETRY_SECONDS // 60} min.")
-        if not getattr(CURRENT, "codex_allowed", False):
-            raise ProviderPausedError("Quota Claude epuise : recherche de fond en pause jusqu'au prochain essai.")
-        log(f"Relais ChatGPT/{CODEX_MODEL} pour une demande immediate.")
-        return codex_json(prompt, model, cwd=cwd, timeout=timeout, span=span)
+            else:
+                log(f"Claude indisponible pour cette demande : {str(err)[:180]}")
+            return None, False
+        finally:
+            CLAUDE_CALL_LOCK.release()
+
+    if not claude_paused:
+        result, claude_busy = try_claude()
+        if result is not None:
+            return result
+        if claude_busy:
+            claude_error = RuntimeError("Claude Code est deja occupe par une autre demande.")
+            log("Claude occupe : tentative parallele via ChatGPT.")
+        with CLAUDE_STATE_LOCK:
+            claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
+
+    if not getattr(CURRENT, "codex_allowed", False):
+        raise ProviderPausedError("Claude est occupe ou en pause; cette recherche reprendra automatiquement.") from claude_error
+
+    def try_codex() -> dict | None:
+        if not CODEX_CALL_LOCK.acquire(blocking=False):
+            return None
+        try:
+            log(f"Relais ChatGPT/{CODEX_MODEL} pour une demande immediate.")
+            return codex_json(
+                prompt, model, cwd=cwd, timeout=timeout, span=span,
+                images=codex_images, web_search="WebSearch" in tools,
+            )
+        finally:
+            CODEX_CALL_LOCK.release()
+
+    try:
+        result = try_codex()
+        if result is not None:
+            return result
+        codex_error = RuntimeError("ChatGPT est deja occupe par une autre demande.")
+    except Exception as err:
+        codex_error = err
+        log(f"ChatGPT indisponible pour cette demande : {str(err)[:180]}")
+
+    # Si ChatGPT est occupe ou vient d'echouer, tenter Claude une fois de plus :
+    # son verrou a pu se liberer entre-temps. On ne retente pas un Claude en quota.
+    if not claude_paused:
+        result, claude_busy = try_claude()
+        if result is not None:
+            log("Claude a repris la demande apres indisponibilite de ChatGPT.")
+            return result
+        if claude_busy or is_provider_busy(claude_error or RuntimeError("busy")):
+            raise ProviderPausedError("Claude et ChatGPT sont occupes; la demande reste en file.") from codex_error
+    if is_provider_busy(codex_error):
+        raise ProviderPausedError("ChatGPT est temporairement occupe; la demande reste en file.") from codex_error
+    raise codex_error
 
 
 class ProviderPausedError(RuntimeError):
@@ -916,6 +1021,10 @@ Dans ce dossier se trouvent les images d'une courte video, dans l'ordre ({frames
 Regarde-les TOUTES avec l'outil Read : textes a l'ecran, panneaux, noms de bateaux, logos, paysages.
 
 1. Determine exactement ce qui est montre : l'activite, le lieu, l'operateur s'il est visible.
+   Les images sont numerotees dans l'ordre (1 = premiere image). La video peut contenir des scenes
+   d'autres lieux : dans relevant_frame_indexes, ne retiens QUE les indices qui montrent clairement
+   le lieu/activite finalement confirme, jamais une transition, une pub ou une scene sans rapport.
+   Si aucune image ne peut etre reliee avec confiance au lieu, renvoie une liste vide.
 2. Cherche sur le web (WebSearch, WebFetch) pour le confirmer et trouver les infos pratiques :
    vrai nom, emplacement, prix, duree, horaires ou departs, comment et ou reserver, combien de
    temps a l'avance, saison, et tout ce qui empecherait de le faire a leurs dates.
@@ -967,14 +1076,14 @@ def lang_line(lang: str) -> str:
 FRAMES_BUCKET = "idea-frames"
 
 
-def upload_frames(frames: list[Path], tmp: Path, key: str, count: int = 6) -> list[str]:
-    """Envoie quelques images de la video (bucket public) : la galerie du lieu."""
+def upload_frames(frames: list[Path], tmp: Path, key: str, count: int = 6) -> list[tuple[int, str]]:
+    """Envoie quelques images de la video et conserve leur indice d'origine."""
     if not frames or not SB_KEY:
         return []
     step = max(1, len(frames) // count)
-    picked = frames[::step][:count]
+    picked = list(enumerate(frames))[::step][:count]
     urls = []
-    for n, frame in enumerate(picked):
+    for n, (frame_index, frame) in enumerate(picked):
         out = tmp / f"up_{n}.jpg"
         try:
             run(["ffmpeg", "-y", "-i", str(frame), "-vf", "scale=720:-2", "-q:v", "5", str(out)])
@@ -986,7 +1095,7 @@ def upload_frames(frames: list[Path], tmp: Path, key: str, count: int = 6) -> li
                 timeout=60,
             )
             if res.status_code < 300:
-                urls.append(f"{SB_URL}/storage/v1/object/public/{FRAMES_BUCKET}/{path}")
+                urls.append((frame_index + 1, f"{SB_URL}/storage/v1/object/public/{FRAMES_BUCKET}/{path}"))
         except Exception:
             continue
     return urls
@@ -1002,6 +1111,7 @@ def analyse(url: str, note: str | None, context: str, lang: str, key: str | None
         transcript = ""
         subs = ""
         frames: list[Path] = []
+        uploaded_frames: list[tuple[int, str]] = []
         frame_urls: list[str] = []
         maps = ""
 
@@ -1015,9 +1125,6 @@ def analyse(url: str, note: str | None, context: str, lang: str, key: str | None
                 duration = info.get("duration") or video_duration(video)
                 frames = extract_frames(video, tmp, float(duration or 0))
                 log(f"  video {video.stat().st_size // 1024} Ko, {duration or '?'} s, {len(frames)} images")
-                if frames:
-                    frame_urls = upload_frames(frames, tmp, key or uuid.uuid4().hex)
-                    thumb = frame_urls[0] if frame_urls else thumbnail_data_url(frames[min(len(frames) - 1, 2)], tmp)
                 transcript = transcribe(video, tmp)
                 log(f"  transcription : {len(transcript)} caracteres")
                 video.unlink(missing_ok=True)
@@ -1050,7 +1157,21 @@ def analyse(url: str, note: str | None, context: str, lang: str, key: str | None
         if not thumb:
             thumb = info.get("thumbnail") or meta.get("og:image")
 
-        data = claude_json(prompt, Analysis, cwd=tmp, tools=["Read", "WebSearch", "WebFetch"])
+        data = claude_json(prompt, Analysis, cwd=tmp, tools=["Read", "WebSearch", "WebFetch"], codex_images=frames)
+        if frames:
+            relevant = {i for i in data.get("relevant_frame_indexes", []) if isinstance(i, int) and 1 <= i <= len(frames)}
+            selected_indexes = sorted(relevant)
+            selected_frames = [frames[i - 1] for i in selected_indexes]
+            uploaded_frames = upload_frames(selected_frames, tmp, key or uuid.uuid4().hex) if selected_frames else []
+            data["uploaded_frame_indexes"] = [selected_indexes[i - 1] for i, _ in uploaded_frames]
+            frame_urls = [url for _, url in uploaded_frames]
+            # La vignette du reseau social n'est pas une photo du lieu verifiee.
+            # Elle ne devient couverture que si l'image correspondante a ete retenue.
+            thumb = frame_urls[0] if frame_urls else None
+        else:
+            frame_urls = []
+            if not thumb:
+                thumb = info.get("thumbnail") or meta.get("og:image")
         log(f"  fiche prete, {len(data.get('sources') or [])} sources")
         if transcript and not data.get("transcript_excerpt"):
             data["transcript_excerpt"] = transcript[:600]
@@ -1061,7 +1182,7 @@ def analyse(url: str, note: str | None, context: str, lang: str, key: str | None
 
 def process(job: dict) -> None:
     log(f"Lien {job['id'][:8]} : {job['url']}")
-    CURRENT.kind, CURRENT.codex_allowed = "link_idea", False
+    CURRENT.kind, CURRENT.codex_allowed = "link_idea", True
     try:
         lang = user_lang(job["user_id"])
         context = trip_context(job)
@@ -1114,13 +1235,17 @@ def link_place(idea: dict) -> None:
     for place in places:
         patch: dict = {}
         frames = idea.get("frames") or []
+        if "relevant_frame_indexes" in a:
+            matched = {i for i in a.get("relevant_frame_indexes", []) if isinstance(i, int)}
+            uploaded_indexes = a.get("uploaded_frame_indexes") or list(range(1, len(frames) + 1))
+            frames = [url for i, url in zip(uploaded_indexes, frames) if i in matched]
         verified = ((place.get("details") or {}).get("images")) or []
         if frames or verified:
             # Les photos verifiees du lieu restent devant les images de la video
             gallery = verified + [u for u in frames if u not in verified]
             patch["gallery"] = gallery[:10]
             patch["image_url"] = gallery[0]
-        elif idea.get("thumbnail") and str(idea["thumbnail"]).startswith("http"):
+        elif not ("relevant_frame_indexes" in a) and idea.get("thumbnail") and str(idea["thumbnail"]).startswith("http"):
             patch["image_url"] = idea["thumbnail"]
         if not place.get("details"):
             patch["details"] = details_from_analysis(a)
@@ -1149,6 +1274,24 @@ def link_place(idea: dict) -> None:
         if patch:
             sb("PATCH", "places", params={"id": f"eq.{place['id']}"}, body=patch, prefer="return=minimal")
             log(f"  lieu mis a jour : {patch.get('name', place['name'])}")
+        # Une video sans image clairement confirmee ne doit pas remplir la fiche
+        # avec des scenes sans rapport : lancer plutot la recherche photo du lieu.
+        details = place.get("details") or {}
+        has_place_photo = bool(details.get("images") or place.get("gallery") or frames or (place.get("image_url") and not ("relevant_frame_indexes" in a)))
+        if not has_place_photo and idea.get("user_id"):
+            try:
+                active = sb("GET", "ai_jobs", params={
+                    "kind": "eq.place_info", "input->>place_id": f"eq.{place['id']}",
+                    "status": "in.(pending,processing)", "select": "id", "limit": "1",
+                }) or []
+                if not active:
+                    sb("POST", "ai_jobs", body={
+                        "user_id": idea["user_id"], "trip_id": idea["trip_id"],
+                        "kind": "place_info", "input": {"place_id": place["id"], "lang": user_lang(idea["user_id"])},
+                    }, prefer="return=minimal")
+                    log(f"  photos exactes a rechercher pour {place.get('name') or a.get('name')}")
+            except Exception as err:
+                log(f"  avertissement : recherche photo impossible pour {place.get('name') or a.get('name')} ({str(err)[:100]})")
 
 
 # --------------------------------------------------------------------------
@@ -1158,12 +1301,14 @@ def link_place(idea: dict) -> None:
 def claim_ai_job() -> dict | None:
     # Ce que quelqu'un attend a l'ecran passe avant les traitements de fond :
     # apercus « Remplir les informations », assistant d'itineraire, fiches pays.
-    immediate = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan)", "order": "created_at.asc", "limit": "1", "select": "*"})
-        or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
-    )
     with CLAUDE_STATE_LOCK:
         claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
+    if (claude_paused and CODEX_CALL_LOCK.locked()) or (CLAUDE_CALL_LOCK.locked() and CODEX_CALL_LOCK.locked()):
+        return None
+    immediate = (
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan,place_info,arrange_trip,stop_places)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
+    )
     rows = immediate if claude_paused else (
         immediate
         # Le reste : la demande la plus recente d'abord (ce qu'on vient de lancer
@@ -1204,7 +1349,10 @@ def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
     req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
-    CURRENT.codex_allowed = job["kind"] in ("chat", "schedule_place", "day_plan", "itinerary", "country_guide", "receipt_scan") or bool(req.get("preview"))
+    CURRENT.codex_allowed = job["kind"] in (
+        "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
+        "stop_places", "country_guide", "itinerary", "receipt_scan",
+    ) or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
         if job["kind"] == "place_info":
@@ -1480,12 +1628,12 @@ def job_receipt_scan(req: dict, tmp: Path) -> dict:
         raise RuntimeError("Image du recu trop volumineuse")
     path = tmp / "receipt.jpg"
     path.write_bytes(image)
-    prompt = f"""Lis attentivement l'image de recu suivante avec l'outil Read : {path}
+    prompt = f"""Examine attentivement l'image du recu jointe (fichier local : {path}). Si elle n'est pas jointe, lis le fichier avec Read.
 Extrais uniquement ce qui est visible. Le montant est le TOTAL effectivement paye, pas un sous-total.
 N'invente rien si une information est illisible. {lang_line(req.get('lang', 'fr'))}
 Pour category, utilise un mot court parmi restaurant, transport, logement, courses, activite, shopping, sante, autre.
 """
-    return claude_json(prompt, ReceiptScan, cwd=tmp, tools=["Read"], timeout=300, span=(10, 90))
+    return claude_json(prompt, ReceiptScan, cwd=tmp, tools=["Read"], timeout=300, span=(10, 90), codex_images=[path])
 
 
 class Assignment(BaseModel):
@@ -1523,7 +1671,7 @@ class DayPlan(BaseModel):
 
 
 class ChatAction(BaseModel):
-    type: Literal["add_place", "schedule", "add_todo"] = Field(
+    type: Literal["add_place", "schedule", "add_todo", "add_stay", "add_stop"] = Field(
         description="add_place : ajouter un lieu a visiter ; schedule : placer un lieu existant un jour ; add_todo : ajouter une chose a faire"
     )
     label: str = Field(description="Texte du bouton, court, ex. « Ajouter le marché flottant le 15/12 »")
@@ -1537,6 +1685,9 @@ class ChatAction(BaseModel):
     time: str = Field(description="HH:MM ou chaine vide")
     minutes: int | None
     notes: str
+    stay_address: str = Field(description="Pour add_stay : adresse de l'hebergement, sinon chaine vide")
+    stay_url: str = Field(description="Pour add_stay : URL source de l'hebergement, sinon chaine vide")
+    leave_date: str = Field(description="Pour add_stop : date de depart AAAA-MM-JJ, sinon chaine vide")
 
 
 class ChatReply(BaseModel):
@@ -1575,6 +1726,12 @@ DAY_BRIEF = """Refais proprement le plan de cette journee selon la demande des v
 Garde les lieux existants (meme id) sauf si la demande dit de les enlever ; tu peux en ajouter
 (place_id vide) si la demande le suggere ou si la journee a un vrai trou. Ordre logique dans
 l'espace (pas d'aller-retour), horaires realistes avec trajets, pauses et repas.
+Plage horaire autorisee : {start_time} a {end_time}. Chaque activite doit commencer a partir de
+{start_time} et se terminer au plus tard a {end_time}. Ne propose aucun horaire hors de cette plage.
+Les lieux enregistres ne sont pas un catalogue ferme : utilise-les en priorite, mais cherche aussi
+sur le web des activites interessantes dans cette ville qui ne sont pas encore dans les envies.
+Ajoute au plus 2 nouvelles activites pertinentes (place_id vide) quand le temps disponible le permet;
+ne force pas de remplissage inutile. Ne duplique ni une activite existante ni un lieu du voyage.
 {lang}
 
 Jour : {day} a {city}
@@ -1590,10 +1747,17 @@ CHAT_BRIEF = """Tu es l'assistant prive de voyage de {who}, pendant la preparati
 Reponds comme dans une vraie conversation, en tutoyant, avec chaleur et precision. Tu connais tout le
 voyage (ci-dessous). Si des photos sont jointes (fichiers image dans ce dossier : {images}), regarde-les
 TOUTES avec l'outil Read avant de repondre : elles montrent ce dont on parle (lieu, menu, billet, panneau...).
-Cherche sur le web (WebSearch, WebFetch) quand il faut des infos fiables et a jour.
+Cherche sur le web (WebSearch, WebFetch) quand il faut des infos fiables et a jour. Pour les dates du voyage,
+verifie jours feries, horaires et jours d'ouverture, fermetures saisonnieres et periodes de forte/faible affluence ;
+cite des sources et explicite les incertitudes. Les disponibilites d'hebergement ne sont jamais garanties.
 S'il manque une information pour bien repondre (quel jour, quelle ville, budget...), pose la question
 dans « questions ». Propose des actions concretes (ajouter un lieu, le placer un jour, une chose a faire)
-seulement quand c'est utile ; les id de lieux viennent de la liste ci-dessous.
+seulement quand c'est utile ; les id de lieux viennent de la liste ci-dessous. Tu peux aussi proposer add_stay
+pour renseigner un etablissement identifie sur le web sur une etape existante, ou add_stop pour ajouter une ville
+souhaitee au parcours avec des dates qui ne chevauchent aucune etape existante ; donne ville, pays, date d'arrivee
+et de depart. N'ajoute une ville que si les dates restent dans le voyage et sont coherentes avec les etapes.
+Pour add_stay, donne son adresse et URL,
+mais ne reserve et ne paie jamais : les dates, prix et disponibilites doivent etre verifies par le voyageur.
 {lang}
 
 {snapshot}
@@ -1646,26 +1810,54 @@ def job_arrange_trip(job: dict, req: dict, tmp: Path) -> dict:
 
 def job_day_plan(job: dict, req: dict, tmp: Path) -> dict:
     trip_id, day = job["trip_id"], req.get("day")
+    start_time = req.get("start_time") if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(req.get("start_time", ""))) else "09:00"
+    end_time = req.get("end_time") if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(req.get("end_time", ""))) else "20:00"
+    start_minute = int(start_time[:2]) * 60 + int(start_time[3:])
+    end_minute = int(end_time[:2]) * 60 + int(end_time[3:])
+    if end_minute <= start_minute:
+        raise RuntimeError("L'heure de fin doit etre apres l'heure de debut.")
     snapshot, _, stops, places = trip_snapshot(trip_id)
     today = [p for p in places if p.get("visit_date") == day and not is_stay_place(p)]
     today.sort(key=lambda p: p.get("plan_time") or "99")
     current = "\n".join(f"- {p.get('plan_time') or '?'} {p['name']} (id {p['id']}, {p.get('plan_minutes') or '?'} min)" for p in today) or "(vide)"
     stop = next((s for s in stops if s.get("arrive_date") and s["arrive_date"] <= day <= (s.get("leave_date") or s["arrive_date"])), None)
     prompt = DAY_BRIEF.format(lang=lang_line(req.get("lang", "fr")), day=day, city=(stop or {}).get("name", "?"),
+                              start_time=start_time, end_time=end_time,
                               instruction=req.get("instruction") or "Optimise la journee", current=current, snapshot=snapshot)
     data = claude_json(prompt, DayPlan, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
     by_id = {p["id"]: p for p in places}
-    undo = [{"id": p["id"], "visit_date": p.get("visit_date"), "plan_time": p.get("plan_time"), "plan_minutes": p.get("plan_minutes")} for p in today]
+    undo_by_id = {p["id"]: {"id": p["id"], "visit_date": p.get("visit_date"), "plan_time": p.get("plan_time"), "plan_minutes": p.get("plan_minutes")} for p in today}
     kept, created = set(), []
-    for it in data["items"]:
+    known_names = {str(p.get("name") or "").strip().casefold() for p in places}
+    selected_names = set()
+    planned = []
+    for it in sorted(data["items"], key=lambda item: item.get("time") or "99:99"):
         if not re.match(r"^\d{2}:\d{2}$", it["time"] or ""):
             continue
         minutes = max(15, min(720, int(it["minutes"] or 60)))
+        hour, minute = map(int, it["time"].split(":"))
+        start = hour * 60 + minute
+        if hour > 23 or minute > 59 or start < start_minute or start + minutes > end_minute:
+            continue
+        if planned and start < planned[-1][0] + planned[-1][1] + DAY_PLAN_GAP:
+            continue
         if it["place_id"] and it["place_id"] in by_id:
+            place = by_id[it["place_id"]]
+            normalized_name = str(place.get("name") or "").strip().casefold()
+            if (it["place_id"] in kept or normalized_name in selected_names
+                    or place.get("status") == "visited"
+                    or (place.get("visit_date") and place.get("visit_date") != day)):
+                continue
+            undo_by_id.setdefault(it["place_id"], {"id": it["place_id"], "visit_date": place.get("visit_date"), "plan_time": place.get("plan_time"), "plan_minutes": place.get("plan_minutes")})
             kept.add(it["place_id"])
+            selected_names.add(normalized_name)
+            planned.append((start, minutes))
             sb("PATCH", "places", params={"id": f"eq.{it['place_id']}"},
                body={"visit_date": day, "plan_time": it["time"], "plan_minutes": minutes}, prefer="return=minimal")
         elif it["name"]:
+            normalized_name = it["name"].strip().casefold()
+            if not normalized_name or normalized_name in known_names or normalized_name in selected_names:
+                continue
             lat, lng = it.get("lat"), it.get("lng")
             if lat is None or lng is None:
                 lat, lng = (stop or {}).get("lat"), (stop or {}).get("lng")
@@ -1678,10 +1870,12 @@ def job_day_plan(job: dict, req: dict, tmp: Path) -> dict:
             }, prefer="return=representation")
             if row:
                 created.append(row[0]["id"])
+                selected_names.add(normalized_name)
+                planned.append((start, minutes))
     for p in today:
         if p["id"] not in kept:
             sb("PATCH", "places", params={"id": f"eq.{p['id']}"}, body={"visit_date": None, "plan_time": None}, prefer="return=minimal")
-    return {"summary": data["summary"], "undo": undo, "created": created}
+    return {"summary": data["summary"], "undo": list(undo_by_id.values()), "created": created}
 
 
 ASSISTANT_BUCKET = "assistant"
@@ -1714,7 +1908,7 @@ def job_chat(job: dict, req: dict, tmp: Path) -> dict:
         message=msg.get("content") or "(photos sans texte)",
     )
     tools = ["WebSearch", "WebFetch"] + (["Read"] if names else [])
-    data = claude_json(prompt, ChatReply, cwd=tmp, tools=tools, timeout=1200)
+    data = claude_json(prompt, ChatReply, cwd=tmp, tools=tools, timeout=1200, codex_images=[tmp / name for name in names])
     text = data["reply"].strip()
     if data.get("questions"):
         text += "\n\n" + "\n".join(f"❓ {q}" for q in data["questions"])
@@ -1734,7 +1928,7 @@ def keep_alive(job_id: str, stop: threading.Event) -> None:
             pass
 
 
-AI_WORKERS = max(1, int(os.environ.get("AI_WORKERS", "1")))
+AI_WORKERS = max(2, int(os.environ.get("AI_WORKERS", "2")))
 
 
 def ai_worker(n: int) -> None:

@@ -6,6 +6,9 @@ import { searchPlaces } from '../../lib/geocode'
 import { compressImage } from '../../lib/images'
 import { supabase } from '../../lib/supabase'
 import { shortDate } from '../../lib/tripDates'
+import { addDaysIso } from '../../lib/tripDates'
+import { isStay, stopOnDay } from '../../lib/schedule'
+import { useMemo } from 'react'
 import type { Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
@@ -15,7 +18,7 @@ const MAX_PHOTOS = 20
 const BUCKET = 'assistant'
 
 type Action = {
-  type: 'add_place' | 'schedule' | 'add_todo'
+  type: 'add_place' | 'schedule' | 'add_todo' | 'add_stay' | 'add_stop'
   label: string
   place_id: string
   name: string
@@ -27,6 +30,9 @@ type Action = {
   time: string
   minutes: number | null
   notes: string
+  stay_address?: string
+  stay_url?: string
+  leave_date?: string
 }
 
 type Message = {
@@ -52,7 +58,7 @@ const db = () => supabase as unknown as { from: (t: string) => ReturnType<typeof
 export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub }) {
   const { t, lang, locale } = useI18n()
   const { user } = useAuth()
-  const { add, edit } = usePlaces()
+  const { add, edit, places } = usePlaces()
   const { queue, jobs } = useAiJobs()
   const [messages, setMessages] = useState<Message[]>([])
   const [urls, setUrls] = useState<Record<string, string>>({})
@@ -62,6 +68,23 @@ export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub 
   const [error, setError] = useState<string | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const planningPrompts = useMemo(() => {
+    if (!trip.start_date || !trip.end_date || trip.end_date < trip.start_date) return []
+    const gaps: { date: string; activity: boolean; stay: boolean; city: boolean }[] = []
+    for (let date = trip.start_date; date <= trip.end_date; date = addDaysIso(date, 1)) {
+      const stop = stopOnDay(date, hub.stops)
+      const activities = places.some((p) => p.trip_id === trip.id && p.visit_date === date && p.status === 'wishlist' && !isStay(p))
+      const needsStay = hub.stops.some((s) => s.arrive_date && s.arrive_date <= date && (s.leave_date ? date < s.leave_date : date === s.arrive_date) && !s.stay_name && !s.stay_address)
+      if (!stop || !activities || needsStay) gaps.push({ date, activity: !activities, stay: needsStay, city: !stop })
+    }
+    return gaps.slice(0, 6)
+  }, [trip.id, trip.start_date, trip.end_date, hub.stops, places])
+
+  function askAboutGap(gap: { date: string; activity: boolean; stay: boolean; city: boolean }) {
+    const needs = [gap.city && 'propose une ville/étape qui s’insère dans l’itinéraire', gap.stay && 'cherche des hébergements réellement ouverts et disponibles à vérifier (ne réserve rien)', gap.activity && 'propose des activités adaptées à nos envies, y compris des idées nouvelles'].filter(Boolean).join(' ; ')
+    setText(`Aide-nous à compléter le ${shortDate(gap.date, locale, true)} : ${needs}. Vérifie les jours fériés locaux, les jours et horaires d’ouverture, les fermetures saisonnières et les périodes de forte/faible affluence autour de cette date. Cite tes sources et propose des boutons pour ajouter les choix retenus.`)
+    document.querySelector<HTMLTextAreaElement>('textarea[placeholder]')?.focus()
+  }
 
   const load = useCallback(async () => {
     if (!user) return
@@ -149,6 +172,54 @@ export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub 
         await edit(a.place_id, { visit_date: a.date || null, plan_time: a.time || null, ...(a.minutes ? { plan_minutes: a.minutes } : {}) })
       } else if (a.type === 'add_todo') {
         await hub.addTodo({ title: a.name || a.label, notes: a.notes || null, kind: 'todo', due_at: a.date ? `${a.date}T09:00` : null })
+      } else if (a.type === 'add_stay') {
+        const stop = hub.stops.find((s) => a.date && s.arrive_date && s.leave_date && s.arrive_date <= a.date && a.date < s.leave_date)
+          ?? hub.stops.find((s) => s.name.toLocaleLowerCase() === a.city.toLocaleLowerCase())
+        if (!stop) throw new Error(lang === 'fr' ? 'Aucune étape correspondante. Demande d’abord à l’assistant de proposer une étape.' : 'No matching stop. Ask the assistant to suggest a stop first.')
+        await hub.editStop(stop.id, {
+          stay_name: a.name.slice(0, 120),
+          stay_address: a.stay_address || null,
+          stay_url: a.stay_url || null,
+          notes: [stop.notes, a.notes].filter(Boolean).join('\n\n').slice(0, 3000) || null,
+        })
+      } else if (a.type === 'add_stop') {
+        const leave = a.leave_date || ''
+        if (!a.date || !leave || leave <= a.date) throw new Error(lang === 'fr' ? 'Les dates de cette étape sont invalides.' : 'The stop dates are invalid.')
+        if ((trip.start_date && a.date < trip.start_date) || (trip.end_date && leave > trip.end_date)) throw new Error(lang === 'fr' ? 'Cette étape sort des dates du voyage.' : 'This stop falls outside the trip dates.')
+        const overlaps = hub.stops.some((s) => s.arrive_date && s.leave_date && a.date < s.leave_date && s.arrive_date < leave)
+        if (overlaps) throw new Error(lang === 'fr' ? 'Ces dates chevauchent une autre étape. Demande une proposition qui respecte les dates déjà prévues.' : 'These dates overlap another stop. Ask for dates that fit the current itinerary.')
+        let { lat, lng } = a
+        if (lat == null || lng == null) {
+          const hit = (await searchPlaces(`${a.city || a.name} ${a.country}`).catch(() => []))[0]
+          ;[lat, lng] = hit ? [hit.lat, hit.lng] : [null, null]
+        }
+        const orderedStops = [...hub.stops].sort((x, y) => x.position - y.position)
+        const position = Math.max(0, orderedStops.findIndex((s) => s.arrive_date && s.arrive_date > a.date) < 0
+          ? orderedStops.length
+          : orderedStops.findIndex((s) => s.arrive_date && s.arrive_date > a.date))
+        for (const existing of orderedStops.slice(position).reverse()) {
+          await hub.editStop(existing.id, { position: existing.position + 1 })
+        }
+        await hub.addStop({
+          position,
+          name: a.city || a.name,
+          country: a.country || null,
+          lat,
+          lng,
+          arrive_date: a.date,
+          leave_date: leave,
+          stay_name: null,
+          stay_address: null,
+          stay_ref: null,
+          stay_url: null,
+          hosts: [],
+          transport_mode: null,
+          transport_details: null,
+          transport_departs: null,
+          transport_arrives: null,
+          transport_ref: null,
+          notes: a.notes || null,
+        })
       } else if (a.type === 'add_place') {
         let { lat, lng } = a
         if (lat == null || lng == null) {
@@ -186,6 +257,25 @@ export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub 
           <p className="text-[13px] text-text-muted">{t('chat.subtitle')}</p>
         </div>
       </div>
+
+      {planningPrompts.length > 0 && (
+        <section className="mb-4 rounded-[22px] border border-accent/25 bg-[var(--halo)] p-4" aria-label={lang === 'fr' ? 'Points à compléter' : 'Planning gaps'}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">{lang === 'fr' ? 'À compléter dans le voyage' : 'Complete your trip'}</p>
+              <p className="mt-1 text-xs text-text-muted">{lang === 'fr' ? 'Journées sans activité, nuits sans logement ou dates sans étape.' : 'Days without activities, nights without a stay, or dates without a stop.'}</p>
+            </div>
+            <span className="num rounded-full bg-surface px-2.5 py-1 text-xs font-bold">{planningPrompts.length}{planningPrompts.length === 6 ? '+' : ''}</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {planningPrompts.map((gap) => (
+              <button key={gap.date} onClick={() => askAboutGap(gap)} className="rounded-full border border-line bg-surface px-3 py-2 text-left text-xs font-semibold transition hover:border-accent active:scale-[0.98]">
+                {shortDate(gap.date, locale, true)} · {[gap.city && (lang === 'fr' ? 'étape' : 'stop'), gap.stay && (lang === 'fr' ? 'logement' : 'stay'), gap.activity && (lang === 'fr' ? 'activité' : 'activity')].filter(Boolean).join(' + ')}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="space-y-3 pb-4">
         {messages.length === 0 && (
@@ -234,10 +324,10 @@ export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub 
                           done ? 'border-[var(--color-olive)] bg-[rgba(124,135,103,0.12)]' : 'border-accent/40 bg-[var(--halo)]'
                         }`}
                       >
-                        <span>{done ? '✅' : a.type === 'add_todo' ? '📝' : a.type === 'schedule' ? '📅' : '📍'}</span>
+                        <span>{done ? '✅' : a.type === 'add_todo' ? '📝' : a.type === 'add_stay' ? '🛏️' : a.type === 'schedule' ? '📅' : '📍'}</span>
                         <span className="min-w-0 flex-1">
                           {a.label}
-                          {a.date && <span className="block text-[11px] font-normal text-text-muted">{shortDate(a.date, locale, true)}{a.time && ` · ${a.time}`}</span>}
+                          {a.date && <span className="block text-[11px] font-normal text-text-muted">{shortDate(a.date, locale, true)}{a.leave_date ? ` – ${shortDate(a.leave_date, locale, true)}` : ''}{a.time && ` · ${a.time}`}</span>}
                         </span>
                       </button>
                     )
