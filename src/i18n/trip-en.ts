@@ -706,4 +706,6 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'ai.stale': "Paused: the PC will pick it up again",
   'ai.queued': "Queued: #{n}",
   'ai.next': "Starting in a moment",
+  'ai.claudeQuotaTitle': "Claude limit reached — switching automatically",
+  'ai.claudeQuotaBody': "Supported requests are using {model}. Claude will be retried automatically in about {minutes} min; queued searches resume when its quota returns.",
 }

@@ -721,4 +721,6 @@ export const tripFr = {
   'ai.stale': "En pause : le PC va reprendre la demande",
   'ai.queued': "En file : {n}e",
   'ai.next': "Démarre dans un instant",
+  'ai.claudeQuotaTitle': "Limite Claude atteinte — bascule automatique en cours",
+  'ai.claudeQuotaBody': "Les demandes compatibles utilisent {model}. Claude sera retesté automatiquement dans environ {minutes} min; les recherches en attente reprendront dès que son quota revient.",
 } as const

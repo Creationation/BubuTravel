@@ -8,6 +8,7 @@ import { useMode } from '../context/ModeContext'
 import { useT } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
 import { ReviewHost } from './ReviewSheet'
+import AnalyzerQuotaNotice from './AnalyzerQuotaNotice'
 
 const NAV: { to: string; label: Key; end?: boolean; advanced?: boolean }[] = [
   { to: '/', label: 'nav.journal', end: true },
@@ -88,7 +89,10 @@ export default function AppShell({
 
       </header>
 
-      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">{children}</main>
+      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+        <AnalyzerQuotaNotice />
+        {children}
+      </main>
       <MobileNav />
       <ReviewHost />
     </div>

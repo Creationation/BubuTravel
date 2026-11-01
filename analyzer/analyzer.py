@@ -101,11 +101,15 @@ def now_iso() -> str:
 
 
 def heartbeat() -> None:
+    # Le champ version est deja lu par l'app et accepte une valeur libre. On y
+    # expose l'etat du quota sans ajouter de migration Supabase.
+    with CLAUDE_STATE_LOCK:
+        paused_until = int(CLAUDE_PAUSED_UNTIL)
     sb(
         "POST",
         "analyzer_status",
         params={"on_conflict": "id"},
-        body={"id": NAME, "last_seen": now_iso(), "version": VERSION},
+        body={"id": NAME, "last_seen": now_iso(), "version": f"{VERSION};claude_paused_until={paused_until}"},
         prefer="resolution=merge-duplicates,return=minimal",
     )
 
