@@ -6,6 +6,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { useI18n } from '../i18n/I18nContext'
 import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
 import ClampText from './ClampText'
+import PlanBox from './PlanBox'
 
 /** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
 export function isExact(place: Place): boolean {
@@ -169,7 +170,7 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap gap-2">
-        <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-accent flex-1">
+        <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-accent min-w-[14rem] flex-1">
           <PinIcon size={15} />
           {t('pd.maps')}
         </a>
@@ -180,6 +181,8 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
           </a>
         )}
       </div>
+
+      <PlanBox place={place} />
 
       {/* Adresse et GPS */}
       <div className="rounded-2xl border border-line bg-surface p-3.5">

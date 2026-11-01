@@ -114,6 +114,10 @@ export type Place = {
   image_url?: string | null
   /** Images du lieu (video analysee, sites trouves en ligne). */
   gallery?: string[]
+  /** Heure de debut prevue (HH:MM) dans le programme du voyage. */
+  plan_time?: string | null
+  /** Duree prevue, en minutes. */
+  plan_minutes?: number | null
   /** Fiche pratique trouvee par l analyseur. */
   details?: PlaceDetails | null
   /** Note personnelle, de 1 a 5. */

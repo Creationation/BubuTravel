@@ -17,6 +17,7 @@ import type { Trip, TripStop } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import ClampText from '../ClampText'
+import StopProgramme from './StopProgramme'
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -343,6 +344,12 @@ export default function RouteTab({
               ))}
           </div>
         )}
+        <StopProgramme
+          stop={stop}
+          stops={stops}
+          places={places.filter((p) => p.trip_id === trip.id)}
+          onOpen={(id) => navigate(`/carte?lieu=${id}`)}
+        />
         {stop.notes && (
           <ClampText text={stop.notes} lines={4} className="mt-4 text-[14px] leading-relaxed text-text-soft" />
         )}
