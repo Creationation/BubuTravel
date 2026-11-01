@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GeoJSON, useMap } from 'react-leaflet'
+import { GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import type L from 'leaflet'
 import type { FeatureCollection, Geometry } from 'geojson'
 import { loadCountries, sameCountry } from '../lib/worldCountries'
@@ -34,6 +34,11 @@ export default function CountriesLayer({
   onCountry: (props: CountryProps, bounds: L.LatLngBounds) => void
 }) {
   const map = useMap()
+  // En zoom rapproche (ville), le pays colore recouvrirait les rues : on
+  // efface le remplissage et on garde un contour discret.
+  const [zoom, setZoom] = useState(() => map.getZoom())
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) })
+  const fade = zoom >= 9 ? 0.12 : zoom >= 7 ? 0.45 : 1
   const [world, setWorld] = useState<FeatureCollection<Geometry, CountryProps> | null>(null)
 
   useEffect(() => {
@@ -77,7 +82,7 @@ export default function CountriesLayer({
   if (!data) return null
   const max = Math.max(1, ...[...stats.values()].map(shown))
   const signature =
-    mode + [...stats.entries()].map(([k, v]) => `${k}:${v.visited}/${v.wish}`).join(',') + (interactive ? 'i' : '')
+    `z${fade}` + mode + [...stats.entries()].map(([k, v]) => `${k}:${v.visited}/${v.wish}`).join(',') + (interactive ? 'i' : '')
 
   return (
     <GeoJSON
@@ -100,7 +105,7 @@ export default function CountriesLayer({
             weight: complete ? 2.6 : 1.8,
             opacity: 1,
             fillColor: complete ? '#ffcf4d' : '#ffb84d',
-            fillOpacity: 0.28 + 0.32 * level + 0.25 * done,
+            fillOpacity: (0.28 + 0.32 * level + 0.25 * done) * fade,
           }
         }
         if (mode === 'wishlist') {
@@ -110,7 +115,7 @@ export default function CountriesLayer({
             weight: 1.3,
             opacity: 0.9,
             fillColor: '#ff7f57',
-            fillOpacity: n === 0 ? 0.08 : 0.14 + 0.46 * level,
+            fillOpacity: (n === 0 ? 0.08 : 0.14 + 0.46 * level) * fade,
           }
         }
         // Les deux : densite = activite, et la part deja faite rechauffe vers le dore
@@ -120,7 +125,7 @@ export default function CountriesLayer({
           weight: complete ? 2.4 : 1.2,
           opacity: 0.9,
           fillColor: complete ? '#ffc23d' : done > 0 ? '#ff9a3c' : '#ff7f57',
-          fillOpacity: n === 0 ? 0.08 : Math.min(0.85, 0.14 + 0.42 * level + 0.25 * done),
+          fillOpacity: (n === 0 ? 0.08 : Math.min(0.85, 0.14 + 0.42 * level + 0.25 * done)) * fade,
         }
       }}
       interactive={interactive}

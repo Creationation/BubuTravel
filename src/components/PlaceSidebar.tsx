@@ -174,7 +174,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
   const gallery = photos.map((p) => urls[p.url]).filter(Boolean)
 
   return (
-    <aside className="panel-enter flex max-h-[58vh] w-full shrink-0 flex-col border-t border-line bg-bg md:max-h-none md:w-[25rem] md:border-l md:border-t-0">
+    <aside className="panel-enter fixed inset-0 z-[1150] flex flex-col bg-bg md:static md:z-auto md:w-[25rem] md:shrink-0 md:border-l md:border-line">
       <div className="min-h-0 flex-1 overflow-y-auto">
       <PlaceHero place={place} onZoom={(urls, index) => setHeroZoom({ urls, index })} />
       <header className="border-b border-line px-6 pb-5 pt-6">
@@ -184,8 +184,6 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               {place.country}
               {categoryOf(place) && ` · ${categoryOf(place)!.name}`}
             </p>
-            <h2 className="display mt-2 text-[2rem] leading-[1.05]">{place.name}</h2>
-            {place.city && <p className="mt-1 text-[13px] text-text-muted">{place.city}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
@@ -201,12 +199,18 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
+        <h2
+          className={`display mt-2 line-clamp-3 break-words leading-[1.08] ${
+            place.name.length <= 18 ? 'text-[2rem]' : place.name.length <= 32 ? 'text-[1.6rem]' : 'text-[1.3rem]'
+          }`}
+          title={place.name}
+        >
+          {place.name}
+        </h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
+          {place.city && <span className="font-semibold text-text-soft">{place.city}</span>}
+          {place.city && <span className="h-1 w-1 rounded-full bg-line-strong" />}
           <span>{place.visit_date ? formatDate(place.visit_date) : t('place.dateUnset')}</span>
-          <span className="h-1 w-1 rounded-full bg-line-strong" />
-          <span className="font-mono text-[11px]">
-            {place.lat.toFixed(3)}, {place.lng.toFixed(3)}
-          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">

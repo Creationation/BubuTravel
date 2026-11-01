@@ -6,6 +6,8 @@ import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import TripCover from '../components/TripCover'
 import TripForm from '../components/TripForm'
+import Countdown from '../components/Countdown'
+import { flagOf } from '../lib/countries'
 import { useI18n } from '../i18n/I18nContext'
 
 export default function TripsPage() {
@@ -54,8 +56,18 @@ export default function TripsPage() {
               return (
                 <Reveal key={trip.id} delay={i * 60}>
                   <Link to={`/voyages/${trip.id}`} className="panel lift block overflow-hidden">
-                    <div className="arch aspect-[16/11] bg-surface-2">
-                      <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
+                    <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_srgb,var(--accent)_35%,transparent),transparent_60%),radial-gradient(120%_120%_at_0%_100%,color-mix(in_srgb,var(--accent-2)_30%,transparent),transparent_60%)]">
+                      {trip.cover_url ? (
+                        <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
+                      ) : (
+                        // Sans photo de couverture : les drapeaux des pays du voyage
+                        <div className="flex h-full w-full items-center justify-center gap-3 text-6xl drop-shadow-lg">
+                          {[...countries].slice(0, 4).map((c) => (
+                            <span key={c}>{flagOf(c)}</span>
+                          ))}
+                          {countries.size === 0 && <span>🧳</span>}
+                        </div>
+                      )}
                     </div>
                     <div className="p-5">
                       <h2 className="display-sm text-xl">{trip.title}</h2>
@@ -66,9 +78,12 @@ export default function TripsPage() {
                         {formatRange(trip.start_date, trip.end_date, t, locale)}
                       </p>
                       <p className="mt-3 text-[13px] text-text-soft">
-                        {plural(count, t('unit.place'), t('unit.places'))}
+                        📍 {plural(count, t('unit.place'), t('unit.places'))}
                         {countries.size > 0 && ` · ${[...countries].join(', ')}`}
                       </p>
+                      <div className="mt-4">
+                        <Countdown start={trip.start_date} end={trip.end_date} size="sm" />
+                      </div>
                     </div>
                   </Link>
                 </Reveal>

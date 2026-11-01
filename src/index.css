@@ -1009,3 +1009,38 @@ body {
 .btn { font-size: 0.875rem; font-weight: 700; }
 .btn-xs { font-size: 0.78rem; }
 .label { font-size: 0.75rem; }
+
+/* --------------------------------------------------------------------------
+   Telephone : rien ne doit deborder.
+   Un element de grille garde par defaut la largeur de son contenu le plus
+   long (min-width: auto) : un texte « truncate » faisait alors elargir toute
+   la page. min-width: 0 le laisse se reduire, comme attendu.
+   -------------------------------------------------------------------------- */
+:where(.grid) > *,
+:where(.flex) > :where(.min-w-0, .flex-1) {
+  min-width: 0;
+}
+
+/* Onglets : jamais de barre de defilement visible (la regle globale des
+   barres fines passait devant celle du composant) */
+.tabbar {
+  scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sur telephone, les onglets passent a la ligne : tout est visible sans
+   avoir a deviner qu'il faut faire defiler. */
+@media (max-width: 639px) {
+  .tabbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+    border-radius: 22px;
+    width: 100% !important;
+  }
+  .tabbar .tab {
+    padding: 0.5rem 0.8rem;
+  }
+}

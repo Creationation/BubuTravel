@@ -275,7 +275,7 @@ export default function RouteTab({
               {isNow && <span className="chip chip-ok">{t('hub.currentStop')}</span>}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:shrink-0">
             <button
               onClick={() => onMove(-1)}
               disabled={index === 0}
@@ -303,20 +303,20 @@ export default function RouteTab({
         </div>
 
         {(stop.stay_name || stop.stay_address) && (
-          <div className="mt-5 flex items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
+          <div className="mt-5 flex flex-wrap items-start gap-3 rounded-2xl bg-surface-2 p-3.5">
             <span className="glyph h-9 w-9">
               <BedIcon size={16} />
             </span>
             <div className="min-w-0 flex-1 text-[13px]">
               {stop.stay_name && <p className="font-semibold">{stop.stay_name}</p>}
-              {stop.stay_address && <p className="truncate text-text-muted">{stop.stay_address}</p>}
+              {stop.stay_address && <p className="text-text-muted">{stop.stay_address}</p>}
               {stop.stay_ref && (
                 <p className="mt-0.5 text-text-muted">
                   {t('stop.booking')} <span className="num font-medium text-text-soft">{stop.stay_ref}</span>
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex w-full flex-wrap gap-1 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
               <a href={mapsLink(stop)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-xs">
                 {t('stop.openMap')}
               </a>

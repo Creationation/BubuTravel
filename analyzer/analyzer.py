@@ -399,7 +399,7 @@ class Source(BaseModel):
 
 
 class Analysis(BaseModel):
-    name: str = Field(description="Nom court de l'activite ou du lieu")
+    name: str = Field(description="Nom COURT du lieu (40 caracteres max) : son vrai nom propre, ex. « Eagle Nest Bar », « Wat Pho ». Pas de description, pas de parentheses")
     kind: str = Field(description="Type : excursion en bateau, temple, restaurant, randonnee, marche...")
     summary: str = Field(description="Ce que c'est et pourquoi c'est bien, 2 a 3 phrases")
     place: Place
@@ -499,20 +499,20 @@ class MenuItem(BaseModel):
 
 
 class PlaceDetails(BaseModel):
-    name: str = Field(description="Nom exact et usuel du lieu")
+    name: str = Field(description="Nom COURT du lieu (40 caracteres max) : son vrai nom propre, ex. « Eagle Nest Bar », « Wat Pho ». Pas de description, pas de parentheses")
     kind: str = Field(description="restaurant, bar, cafe, temple, plage, atelier, spa, marche...")
-    summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 a 3 phrases vivantes")
+    summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 phrases maximum")
     address: str = Field(description="Adresse complete : numero, rue, quartier, ville")
     lat: float | None = Field(description="Latitude precise du lieu (5 decimales)")
     lng: float | None = Field(description="Longitude precise du lieu (5 decimales)")
-    price: str = Field(description="Fourchette ou prix par personne avec devise")
-    hours: str = Field(description="Horaires d'ouverture, jours de fermeture")
+    price: str = Field(description="COURT, 60 caracteres max : ex. « 250-400 THB / pers. » ou « 78 € les 2 nuits »")
+    hours: str = Field(description="COURT, 60 caracteres max : ex. « 10 h-22 h, fermé lundi »")
     menu: list[MenuItem] = Field(description="Pour un lieu ou l'on mange/boit : 3 a 8 plats ou boissons phares avec prix ; sinon les formules / billets")
-    booking: str = Field(description="Faut-il reserver, comment, combien de temps avant")
+    booking: str = Field(description="Une phrase : faut-il reserver, ou, combien de temps avant")
     booking_url: str = Field(description="Lien de reservation ou site officiel, chaine vide sinon")
-    best_time: str
-    duration: str = Field(description="Temps a prevoir")
-    tips: list[str] = Field(description="3 a 5 conseils concrets (quoi commander, ou s'asseoir, dress code, cash...)")
+    best_time: str = Field(description="COURT, 70 caracteres max")
+    duration: str = Field(description="COURT, 30 caracteres max : ex. « 2 h »")
+    tips: list[str] = Field(description="3 a 5 conseils concrets, une phrase courte chacun")
     images: list[str] = Field(description="2 a 6 URL DIRECTES d'images (.jpg/.png/.webp) montrant CE lieu : site officiel, Wikimedia, Tripadvisor, Google... jamais une image d'un autre lieu")
     sources: list[Source]
 
@@ -569,7 +569,7 @@ def details_from_analysis(a: dict) -> dict:
 
 
 class Sight(BaseModel):
-    name: str = Field(description="Nom usuel du lieu ou de l'activite")
+    name: str = Field(description="Nom COURT du lieu (40 caracteres max) : son vrai nom propre, ex. « Eagle Nest Bar », « Wat Pho ». Pas de description, pas de parentheses")
     kind: str = Field(description="temple, plage, marche, point de vue, restaurant, excursion...")
     why: str = Field(description="Pourquoi y aller, une ou deux phrases")
     city: str
@@ -957,7 +957,13 @@ def link_place(idea: dict) -> None:
 # --------------------------------------------------------------------------
 
 def claim_ai_job() -> dict | None:
-    rows = sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.asc", "limit": "1", "select": "*"})
+    # Ce que quelqu'un attend a l'ecran passe avant les traitements de fond :
+    # apercus « Remplir les informations », assistant d'itineraire, fiches pays.
+    rows = (
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
+        or sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(itinerary,country_guide)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        or sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.asc", "limit": "1", "select": "*"})
+    )
     if not rows:
         return None
     job = rows[0]
@@ -1010,6 +1016,11 @@ def process_ai_job(job: dict) -> None:
                 if hit:
                     lat, lng = hit
                     data["lat"], data["lng"] = lat, lng
+            if req.get("preview"):
+                data["gps_exact"] = lat is not None and lng is not None
+                update_ai_job(job["id"], status="ready", result=data, error=None)
+                log(f"  apercu pret : {data['name']} ({len(images)} images)")
+                return
             if lat is not None and lng is not None:
                 patch.update({"lat": lat, "lng": lng})
                 patch["details"] = {**data, "gps_exact": True}

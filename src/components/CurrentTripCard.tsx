@@ -6,6 +6,7 @@ import { formatRange } from '../lib/stats'
 import { useI18n } from '../i18n/I18nContext'
 import { useCoverUrl } from './TripCover'
 import { RouteIcon } from './hub/icons'
+import Countdown from './Countdown'
 
 /**
  * En haut de l'accueil : le voyage du moment, en un tap. C'est le chemin le
@@ -62,7 +63,11 @@ export default function CurrentTripCard() {
         <h2 className="display mt-4 text-[clamp(2.2rem,6vw,3.6rem)]">{trip.title}</h2>
         <p className="num mt-2 text-[14px] opacity-80">{formatRange(trip.start_date, trip.end_date, t, locale)}</p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {label && <span className="display-sm num text-[1.35rem] text-accent">{label}</span>}
+          {cd.kind === 'before' ? (
+            <Countdown start={trip.start_date} end={trip.end_date} size="sm" light={Boolean(cover)} />
+          ) : (
+            label && <span className="display-sm num text-[1.35rem] text-accent">{label}</span>
+          )}
           <span className="btn btn-accent ml-auto">{t('home.openTrip')} →</span>
         </div>
       </div>

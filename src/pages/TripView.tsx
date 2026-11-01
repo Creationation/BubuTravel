@@ -30,6 +30,7 @@ import { CalendarIcon, ShareIcon, SparkIcon } from '../components/hub/icons'
 import { useI18n } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
 import type { TransportMode } from '../lib/types'
+import Countdown from '../components/Countdown'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -146,23 +147,20 @@ export default function TripView() {
               </p>
             </Reveal>
 
+            {/* Compte a rebours en direct */}
+            <Reveal delay={60}>
+              <div className="mt-7">
+                <Countdown start={trip.start_date} end={trip.end_date} light={Boolean(cover)} />
+              </div>
+            </Reveal>
+
             {/* Chiffres cles */}
             <Reveal delay={80}>
               <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4">
-                {cd.kind !== 'none' && (
+                {cd.kind === 'after' && (
                   <Stat
                     light={Boolean(cover)}
-                    value={
-                      cd.kind === 'before'
-                        ? cd.days === 0
-                          ? t('hub.countdown.today')
-                          : cd.days === 1
-                            ? t('hub.countdown.tomorrow')
-                            : t('hub.countdown.before', { n: cd.days })
-                        : cd.kind === 'during'
-                          ? t('hub.countdown.during', { day: cd.day, total: cd.total })
-                          : t('hub.countdown.after', { n: cd.days })
-                    }
+                    value={t('hub.countdown.after', { n: cd.days })}
                     accent
                   />
                 )}
@@ -235,7 +233,7 @@ export default function TripView() {
         )}
 
         {/* Onglets, colles en haut au defilement */}
-        <div className="sticky top-16 z-[800] -mx-5 mt-8 px-5 py-3 sm:-mx-8 sm:px-8">
+        <div className="-mx-5 mt-8 px-5 py-3 sm:sticky sm:top-16 sm:z-[800] sm:-mx-8 sm:px-8">
           <nav className="tabbar w-fit max-w-full">
             {TABS.map((x) => (
               <button key={x.id} onClick={() => go(x.id)} className={`tab ${tab === x.id ? 'tab-active' : ''}`}>
