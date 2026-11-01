@@ -6,12 +6,49 @@ import { usePlaces } from '../context/PlacesContext'
 import { useI18n } from '../i18n/I18nContext'
 import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
 
-/** Lien Google Maps : adresse trouvee, sinon nom + ville, sinon coordonnees. */
+/** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
+export function isExact(place: Place): boolean {
+  if (place.details?.gps_exact) return true
+  return !(place.notes ?? '').includes('Position approximative')
+}
+
+/**
+ * Lien Google Maps : le point GPS exact quand on l'a (le pin tombe pile sur
+ * le lieu), sinon une recherche par nom et adresse.
+ */
 export function googleMapsUrl(place: Place): string {
+  if (isExact(place)) {
+    return `https://www.google.com/maps/search/?api=1&query=${place.lat.toFixed(6)},${place.lng.toFixed(6)}`
+  }
   const q = place.details?.address
     ? `${place.details.name || place.name}, ${place.details.address}`
     : `${place.name}, ${place.city ?? ''} ${place.country}`
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.trim())}`
+}
+
+export function directionsUrl(place: Place): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${place.lat.toFixed(6)},${place.lng.toFixed(6)}`
+}
+
+function Copy({ text }: { text: string }) {
+  const { t } = useI18n()
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text)
+          setDone(true)
+          window.setTimeout(() => setDone(false), 1500)
+        } catch {
+          // presse-papiers indisponible
+        }
+      }}
+      className="shrink-0 text-[11px] font-semibold text-accent"
+    >
+      {done ? t('pd.copied') : t('pd.copy')}
+    </button>
+  )
 }
 
 /** Premier lien de video dans les notes (Instagram, TikTok, YouTube). */
@@ -90,7 +127,7 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
 
   // Ouverture d'un lieu sans infos : on les demande une fois, automatiquement
   useEffect(() => {
-    if (d || asked.current === place.id || online === false) return
+    if (d?.gps_exact || asked.current === place.id || online === false) return
     if (online === null) return
     asked.current = place.id
     void find()
@@ -122,6 +159,40 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
         )}
       </div>
 
+      <div className="rounded-2xl border border-line bg-surface p-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">{t('pd.where')}</p>
+          <span className={`chip py-0 ${d?.gps_exact ? 'chip-ok' : 'chip-warn'}`}>
+            {d?.gps_exact ? t('pd.exact') : t('pd.approx')}
+          </span>
+        </div>
+        <div className="mt-2 flex items-start gap-2">
+          <p className={`min-w-0 flex-1 text-[14px] leading-snug ${d?.address ? '' : 'text-text-muted'}`}>
+            {d?.address || t('pd.noAddress')}
+          </p>
+          {d?.address && <Copy text={d.address} />}
+        </div>
+        <div className="mt-2 flex items-center gap-2 border-t border-dashed border-line pt-2">
+          <span className="text-[11px] font-semibold text-text-muted">{t('pd.gps')}</span>
+          <span className="num min-w-0 flex-1 truncate font-mono text-[13px]">
+            {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
+          </span>
+          <Copy text={`${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}`} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={directionsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-xs">
+            <PinIcon size={12} />
+            {t('pd.route')}
+          </a>
+          {!d?.gps_exact && !busy && (
+            <button onClick={() => void find()} className="btn btn-xs btn-quiet">
+              <SparkIcon size={12} />
+              {t('pd.locate')}
+            </button>
+          )}
+        </div>
+      </div>
+
       {busy && (
         <div className="card-feature flex items-center gap-3 p-4">
           <span className="glyph animate-pulse">
@@ -137,12 +208,6 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
         <>
           {d.kind && <p className="eyebrow eyebrow-dot">{d.kind}</p>}
           {d.summary && <p className="text-[15px] leading-relaxed text-text-soft">{d.summary}</p>}
-          {d.address && (
-            <p className="flex items-start gap-2 text-[13px] text-text-muted">
-              <PinIcon size={14} className="mt-0.5 shrink-0" />
-              {d.address}
-            </p>
-          )}
 
           {facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-2">

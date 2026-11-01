@@ -82,6 +82,8 @@ export type PlaceDetails = {
   duration: string
   tips: string[]
   images?: string[]
+  /** Position verifiee par l analyseur. */
+  gps_exact?: boolean
   sources: { title: string; url: string }[]
 }
 

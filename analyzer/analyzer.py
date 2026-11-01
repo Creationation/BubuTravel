@@ -502,9 +502,9 @@ class PlaceDetails(BaseModel):
     name: str = Field(description="Nom exact et usuel du lieu")
     kind: str = Field(description="restaurant, bar, cafe, temple, plage, atelier, spa, marche...")
     summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 a 3 phrases vivantes")
-    address: str = Field(description="Adresse complete, chaine vide si inconnue")
-    lat: float | None
-    lng: float | None
+    address: str = Field(description="Adresse complete : numero, rue, quartier, ville")
+    lat: float | None = Field(description="Latitude precise du lieu (5 decimales)")
+    lng: float | None = Field(description="Longitude precise du lieu (5 decimales)")
     price: str = Field(description="Fourchette ou prix par personne avec devise")
     hours: str = Field(description="Horaires d'ouverture, jours de fermeture")
     menu: list[MenuItem] = Field(description="Pour un lieu ou l'on mange/boit : 3 a 8 plats ou boissons phares avec prix ; sinon les formules / billets")
@@ -519,7 +519,9 @@ class PlaceDetails(BaseModel):
 
 DETAILS_BRIEF = """Fais la fiche pratique complete de ce lieu pour deux voyageurs, en cherchant sur le web
 (WebSearch, WebFetch : site officiel, Google Maps, Tripadvisor, Instagram, articles recents).
-Identifie le lieu exact. Donne de VRAIES infos : prix, horaires, plats ou billets phares avec prix,
+Identifie le lieu exact. L'ADRESSE COMPLETE (numero, rue, quartier, ville) et les coordonnees GPS
+PRECISES du lieu lui-meme sont obligatoires : verifie-les sur Google Maps ou le site officiel.
+Donne de VRAIES infos : prix, horaires, plats ou billets phares avec prix,
 reservation, conseils. Ajoute des URL directes d'images de CE lieu (ouvre les pages pour trouver
 les fichiers images). N'invente rien : laisse vide ce que tu ne trouves pas.
 {lang}
@@ -982,8 +984,17 @@ def process_ai_job(job: dict) -> None:
             patch["gallery"] = gallery[:10]
             if not place.get("image_url") and gallery:
                 patch["image_url"] = gallery[0]
-            if "Position approximative" in (place.get("notes") or "") and data.get("lat") is not None:
-                patch.update({"lat": data["lat"], "lng": data["lng"], "name": data["name"][:120] or place["name"]})
+            lat, lng = data.get("lat"), data.get("lng")
+            if (lat is None or lng is None) and data.get("address"):
+                hit = geocode_osm(f"{data['address']}, {place.get('country') or ''}")
+                if hit:
+                    lat, lng = hit
+                    data["lat"], data["lng"] = lat, lng
+            if lat is not None and lng is not None:
+                patch.update({"lat": lat, "lng": lng})
+                patch["details"] = {**data, "gps_exact": True}
+            if "Position approximative" in (place.get("notes") or "") and lat is not None:
+                patch["name"] = data["name"][:120] or place["name"]
                 patch["notes"] = place["notes"].replace(
                     "Position approximative (centre de la ville) : à préciser.",
                     f"Position corrigée : {data.get('address') or data['name']}.",

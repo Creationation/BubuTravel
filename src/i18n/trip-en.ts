@@ -375,4 +375,13 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'map.otherCity': "Other",
   'map.cities': "{n} cities",
   'map.city': "1 city",
+  'pd.where': "Address and GPS",
+  'pd.noAddress': "Exact address not found yet",
+  'pd.gps': "GPS",
+  'pd.exact': "Verified position",
+  'pd.approx': "Approximate position",
+  'pd.copy': "Copy",
+  'pd.copied': "Copied",
+  'pd.route': "Directions",
+  'pd.locate': "Find the exact address",
 }

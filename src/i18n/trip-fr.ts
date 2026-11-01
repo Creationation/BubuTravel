@@ -390,4 +390,13 @@ export const tripFr = {
   'map.otherCity': "Autres",
   'map.cities': "{n} villes",
   'map.city': "1 ville",
+  'pd.where': "Adresse et GPS",
+  'pd.noAddress': "Adresse exacte pas encore trouvée",
+  'pd.gps': "GPS",
+  'pd.exact': "Position vérifiée",
+  'pd.approx': "Position approximative",
+  'pd.copy': "Copier",
+  'pd.copied': "Copié",
+  'pd.route': "Itinéraire",
+  'pd.locate': "Trouver l'adresse exacte",
 } as const
