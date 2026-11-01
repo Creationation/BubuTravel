@@ -47,6 +47,8 @@ type Props = {
   liveTrack?: TrackPoint[] | null
   onTrackSelect?: (id: string) => void
   children?: ReactNode
+  /** Cadrage initial prioritaire (ex. les etapes du voyage en cours). */
+  fitTo?: { lat: number; lng: number }[]
 }
 
 const WORLD_CENTER: [number, number] = [28, 8]
@@ -94,6 +96,7 @@ function MapCanvasInner({
   liveTrack = null,
   onTrackSelect,
   children,
+  fitTo,
 }: Props) {
   const { theme } = useTheme()
   // CARTO exige une cle API depuis l'automne 2026 (tuiles « API KEY
@@ -234,7 +237,12 @@ function MapCanvasInner({
       <MapHandle onReady={(map) => (mapRef.current = map)} />
 
       {onMapClick && <ClickCatcher enabled={picking} onClick={onMapClick} />}
-      {autoFit && <FitOnce points={points} />}
+      {autoFit && (
+        <FitOnce
+          key={fitTo && fitTo.length > 0 ? `zone-${fitTo.length}` : 'tout'}
+          points={fitTo && fitTo.length > 0 ? fitTo : points}
+        />
+      )}
       <FlyTo target={focus ?? null} />
 
       {/* Halo du lieu selectionne, pose hors grappe pour ne jamais toucher
@@ -338,11 +346,13 @@ function FitOnce({ points }: { points: { lat: number; lng: number }[] }) {
   const [done, setDone] = useState(false)
   useEffect(() => {
     if (done || points.length === 0) return
-    if (points.length === 1) map.setView([points[0].lat, points[0].lng], 6)
+    // Sans animation : un second cadrage (zone du voyage) arrive souvent
+    // pendant celui-ci, et Leaflet ignore un zoom lance en pleine animation.
+    if (points.length === 1) map.setView([points[0].lat, points[0].lng], 6, { animate: false })
     else {
       map.fitBounds(
         points.map((p) => [p.lat, p.lng] as [number, number]),
-        { padding: [70, 70], maxZoom: 8 },
+        { padding: [70, 70], maxZoom: 12, animate: false },
       )
     }
     setDone(true)

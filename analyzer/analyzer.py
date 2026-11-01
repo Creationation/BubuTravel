@@ -492,6 +492,75 @@ class Guide(BaseModel):
     checklist: list[GuideItem] = Field(description="8 a 15 choses a faire pour ce pays, du depart au sejour")
 
 
+class Sight(BaseModel):
+    name: str = Field(description="Nom usuel du lieu ou de l'activite")
+    kind: str = Field(description="temple, plage, marche, point de vue, restaurant, excursion...")
+    why: str = Field(description="Pourquoi y aller, une ou deux phrases")
+    city: str
+    lat: float = Field(description="Latitude precise du lieu lui-meme (pas du centre-ville)")
+    lng: float
+    price_level: int | None = Field(description="1 (gratuit ou presque) a 4 (cher), null si inconnu")
+    duration: str = Field(description="Temps a prevoir")
+    best_time: str = Field(description="Meilleur moment de la journee ou de la semaine")
+
+
+class Sights(BaseModel):
+    places: list[Sight]
+
+
+SIGHTS_BRIEF = """Propose les incontournables a voir et a faire pendant une etape de voyage.
+Choisis 6 a 10 lieux reels, varies (culture, nature, marches, points de vue, une ou deux bonnes
+tables, une excursion si elle vaut le coup), adaptes a la duree du sejour et a la saison.
+Coordonnees PRECISES de chaque lieu (verifie sur le web si besoin) : elles servent a les placer
+sur une carte. Evite les doublons avec ce qui est deja prevu.
+{lang}
+
+Etape : {stop} ({country})
+Sejour : du {arrive} au {leave}
+Deja prevu sur place : {existing}
+Preferences : {prefs}
+"""
+
+
+def insert_sights(job: dict, req: dict, sights: list[dict]) -> int:
+    """Place les incontournables dans le voyage, en « a visiter », sans doublon."""
+    trip_id = job.get("trip_id")
+    existing = sb("GET", "places", params={"trip_id": f"eq.{trip_id}", "select": "name"}) or []
+    known = {e["name"].strip().lower() for e in existing}
+    rows = []
+    for s in sights:
+        if s["name"].strip().lower() in known:
+            continue
+        known.add(s["name"].strip().lower())
+        notes = "\n".join(
+            x
+            for x in [
+                s.get("why", ""),
+                f"Temps a prevoir : {s['duration']}" if s.get("duration") else "",
+                f"Meilleur moment : {s['best_time']}" if s.get("best_time") else "",
+                f"Etape : {req.get('stop', '')}",
+            ]
+            if x
+        )
+        rows.append(
+            {
+                "user_id": job["user_id"],
+                "trip_id": trip_id,
+                "name": s["name"],
+                "country": req.get("country") or "",
+                "city": s.get("city") or req.get("stop"),
+                "lat": s["lat"],
+                "lng": s["lng"],
+                "notes": notes,
+                "status": "wishlist",
+                "price_level": s.get("price_level") if s.get("price_level") in (1, 2, 3, 4) else None,
+            }
+        )
+    if rows:
+        sb("POST", "places", body=rows, prefer="return=minimal")
+    return len(rows)
+
+
 COUNTRY_BRIEF = """Prepare une fiche pratique pour des voyageurs independants qui vont dans ce pays.
 Verifie sur le web (WebSearch, WebFetch) tout ce qui change souvent : regles d'entree et visa pour leur
 passeport, paiement mobile accessible aux etrangers, frais des distributeurs, taux de change.
@@ -731,6 +800,21 @@ def process_ai_job(job: dict) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
         req = job.get("input") or {}
+        if job["kind"] == "stop_places":
+            prompt = SIGHTS_BRIEF.format(
+                lang=lang_line(req.get("lang", "fr")),
+                stop=req.get("stop", ""),
+                country=req.get("country", ""),
+                arrive=req.get("arrive_date") or "?",
+                leave=req.get("leave_date") or "?",
+                existing=", ".join(req.get("existing") or []) or "rien",
+                prefs=req.get("prefs") or "aucune en particulier",
+            )
+            data = claude_json(prompt, Sights, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
+            added = insert_sights(job, req, data["places"])
+            update_ai_job(job["id"], status="ready", result={**data, "added": added}, error=None)
+            log(f"  {added} choses a voir ajoutees pour {req.get('stop')}")
+            return
         if job["kind"] == "country_guide":
             prompt = COUNTRY_BRIEF.format(
                 lang=lang_line(req.get("lang", "fr")),

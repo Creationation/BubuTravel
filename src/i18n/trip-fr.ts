@@ -357,4 +357,12 @@ export const tripFr = {
   'country.verify': "Règles d'entrée et taux changent : vérifiez sur les sites officiels avant de partir.",
   'todo.country': "Pays",
   'todo.general': "Général",
+  'stop.sights': "Choses à voir",
+  'stop.sightsBusy': "Votre PC cherche les incontournables...",
+  'stop.sightsDone': "{n} lieux ajoutés sur la carte",
+  'stop.sightsCount': "{n} à voir",
+  'stop.sightsAll': "Choses à voir pour toutes les étapes",
+  'stop.sightsQueued': "C'est lancé : les lieux arrivent sur la carte au fil des minutes.",
+  'stop.seeOnMap': "Voir sur la carte",
+  'map.tripLayer': "Votre voyage",
 } as const

@@ -754,6 +754,24 @@ body::before {
   filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) sepia(0.35) saturate(0.6);
 }
 
+/* Nom des etapes du voyage sur la carte principale */
+.leaflet-tooltip.stop-label {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+.leaflet-tooltip.stop-label::before {
+  display: none;
+}
+
 .leaflet-control-attribution {
   background: color-mix(in srgb, var(--bg) 84%, transparent) !important;
   color: var(--text-muted) !important;

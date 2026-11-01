@@ -7,6 +7,7 @@ import { GeoError, currentPosition } from '../lib/geolocation'
 import type { Place } from '../lib/types'
 import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
+import TripStopsLayer, { useCurrentTripStops } from '../components/TripStopsLayer'
 import PlaceSidebar from '../components/PlaceSidebar'
 import PlaceForm, { emptyDraft } from '../components/PlaceForm'
 import type { Draft, GpsInfo } from '../components/PlaceForm'
@@ -40,6 +41,7 @@ export default function MapPage() {
   /** Lieux superposes sous le dernier clic, a departager. */
   const [choices, setChoices] = useState<string[] | null>(null)
   const t = useT()
+  const tripStops = useCurrentTripStops()
 
   const selected = useMemo(
     () => (panel.kind === 'place' ? (places.find((p) => p.id === panel.id) ?? null) : null),
@@ -221,7 +223,8 @@ export default function MapPage() {
           <div className={`relative min-h-0 flex-1 ${picking ? 'cursor-crosshair' : ''}`}>
             <MapCanvas
               points={points}
-              tracks={trackLines}
+              tracks={tripStops.line ? [...trackLines, tripStops.line] : trackLines}
+              fitTo={tripStops.points}
               liveTrack={recording?.points ?? null}
               onTrackSelect={(id) => {
                 setPicking(false)
@@ -241,7 +244,9 @@ export default function MapPage() {
               picking={picking}
               onMapClick={picking ? onMapClick : undefined}
               focus={focus}
-            />
+            >
+              <TripStopsLayer stops={tripStops.stops} />
+            </MapCanvas>
 
             {/* Legende : la couleur des marqueurs porte une information */}
             <div className="absolute right-4 top-4 z-[1000]">

@@ -342,4 +342,12 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'country.verify': "Entry rules and rates change: check official websites before leaving.",
   'todo.country': "Country",
   'todo.general': "General",
+  'stop.sights': "Things to see",
+  'stop.sightsBusy': "Your computer is finding the highlights...",
+  'stop.sightsDone': "{n} places added to the map",
+  'stop.sightsCount': "{n} to see",
+  'stop.sightsAll': "Things to see for every stop",
+  'stop.sightsQueued': "Started: places will appear on the map over the next minutes.",
+  'stop.seeOnMap': "See on the map",
+  'map.tripLayer': "Your trip",
 }

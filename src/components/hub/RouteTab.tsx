@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { usePlaces } from '../../context/PlacesContext'
+import { errorMessage } from '../../lib/errors'
+import { findSights, queueSights, sightsOf } from '../../lib/sights'
 import MapCanvas from '../MapCanvas'
 import StopForm, { modeKey } from './StopForm'
 import {
@@ -37,7 +41,11 @@ export default function RouteTab({
   autoAdd?: boolean
   onOpenAssistant: () => void
 }) {
-  const { t, locale } = useI18n()
+  const { t, locale, lang } = useI18n()
+  const navigate = useNavigate()
+  const { places, reload: reloadPlaces } = usePlaces()
+  const [sightBusy, setSightBusy] = useState<string | null>(null)
+  const [sightMsg, setSightMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [editing, setEditing] = useState<string | 'new' | null>(autoAdd ? 'new' : null)
   const { stops } = hub
   const issues = useMemo(() => routeIssues(stops), [stops])
@@ -47,6 +55,32 @@ export default function RouteTab({
   const routeLine = located.length > 1
     ? [{ id: 'route', name: trip.title, points: located.map((s, i) => ({ t: i, lat: s.lat!, lng: s.lng! })) }]
     : []
+
+  const tripSights = places.filter((p) => p.trip_id === trip.id)
+
+  async function sights(stop: TripStop) {
+    setSightBusy(stop.id)
+    setSightMsg(null)
+    try {
+      const res = await findSights(stop, places, lang)
+      await reloadPlaces()
+      setSightMsg({ ok: true, text: t('stop.sightsDone', { n: res.added ?? 0 }) })
+    } catch (err) {
+      setSightMsg({ ok: false, text: errorMessage(err) })
+    } finally {
+      setSightBusy(null)
+    }
+  }
+
+  async function sightsForAll() {
+    setSightMsg(null)
+    try {
+      await queueSights(stops.filter((s) => sightsOf(s, places).length === 0), places, lang)
+      setSightMsg({ ok: true, text: t('stop.sightsQueued') })
+    } catch (err) {
+      setSightMsg({ ok: false, text: errorMessage(err) })
+    }
+  }
 
   const last = stops[stops.length - 1]
   const defaultArrive = last?.leave_date ?? trip.start_date ?? null
@@ -62,10 +96,13 @@ export default function RouteTab({
               lng: s.lng!,
               name: s.name,
               country: s.country ?? '',
-            }))}
+            })).concat(
+              tripSights.map((p) => ({ id: `p:${p.id}`, lat: p.lat, lng: p.lng, name: p.name, country: p.country, wish: true })),
+            )}
             tracks={routeLine}
             cluster={false}
             onSelect={(id) => {
+              if (id.startsWith('p:')) return navigate(`/carte?lieu=${id.slice(2)}`)
               setEditing(null)
               document.getElementById(`stop-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
             }}
@@ -87,6 +124,8 @@ export default function RouteTab({
           ))}
         </div>
       )}
+
+      {sightMsg && <p className={`notice ${sightMsg.ok ? '' : 'notice-bad'}`}>{sightMsg.text}</p>}
 
       {stops.length === 0 && editing !== 'new' && (
         <div className="card-feature px-6 py-12 text-center sm:px-12">
@@ -181,6 +220,10 @@ export default function RouteTab({
               <PlusIcon size={16} />
               {t('stop.add')}
             </button>
+            <button onClick={() => void sightsForAll()} className="btn btn-quiet">
+              <SparkIcon size={16} />
+              {t('stop.sightsAll')}
+            </button>
             <button onClick={onOpenAssistant} className="btn btn-quiet">
               <SparkIcon size={16} />
               {t('ai.open')}
@@ -248,6 +291,10 @@ export default function RouteTab({
             >
               <ArrowDownIcon size={15} />
             </button>
+            <button onClick={() => void sights(stop)} className="btn btn-xs" disabled={sightBusy !== null}>
+              <SparkIcon size={13} />
+              {sightBusy === stop.id ? t('common.wait') : t('stop.sights')}
+            </button>
             <button onClick={onEdit} className="btn btn-xs">
               {t('common.edit')}
             </button>
@@ -282,6 +329,19 @@ export default function RouteTab({
           </div>
         )}
 
+        {sightBusy === stop.id && <p className="mt-4 text-[13px] text-text-muted">{t('stop.sightsBusy')}</p>}
+        {sightsOf(stop, places).length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            <span className="chip chip-accent num">{t('stop.sightsCount', { n: sightsOf(stop, places).length })}</span>
+            {sightsOf(stop, places)
+              .slice(0, 6)
+              .map((p) => (
+                <button key={p.id} onClick={() => navigate(`/carte?lieu=${p.id}`)} className="chip hover:border-accent">
+                  {p.name}
+                </button>
+              ))}
+          </div>
+        )}
         {stop.notes && (
           <p className="mt-4 whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">{stop.notes}</p>
         )}

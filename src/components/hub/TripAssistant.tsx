@@ -6,6 +6,9 @@ import { addDaysIso, nightsOf, shortDate, todayIso } from '../../lib/tripDates'
 import type { Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useDraft } from '../../lib/drafts'
+import { queueSights } from '../../lib/sights'
+import { usePlaces } from '../../context/PlacesContext'
+import type { TripStop } from '../../lib/types'
 import { useAnalyzerOnline } from '../../lib/ideas'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
@@ -57,6 +60,7 @@ export default function TripAssistant({
   })
   const form = draft.value
   const online = useAnalyzerOnline()
+  const { places } = usePlaces()
   const [plan, setPlan] = useState<AiItinerary | null>(null)
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -105,9 +109,10 @@ export default function TripAssistant({
     setError(null)
     try {
       const base = hub.stops.length ? Math.max(...hub.stops.map((s) => s.position)) + 1 : 0
+      const created: TripStop[] = []
       for (const [i, s] of plan.stops.entries()) {
         const tr = s.transport_to_next
-        await hub.addStop({
+        const stop = await hub.addStop({
           position: base + i,
           name: s.name,
           country: s.country || null,
@@ -134,6 +139,7 @@ export default function TripAssistant({
             .filter(Boolean)
             .join('\n\n'),
         })
+        created.push(stop)
         // Un trajet a reserver a l'avance devient un rappel date
         if (tr && tr.book_ahead_days > 0 && s.leave_date) {
           const due = addDaysIso(s.leave_date, -tr.book_ahead_days)
@@ -157,6 +163,9 @@ export default function TripAssistant({
           notes: todo.notes || null,
         })
       }
+      // Les incontournables de chaque etape arrivent ensuite sur la carte,
+      // traites un par un par l'analyseur, sans bloquer l'ecran.
+      await queueSights(created, places, lang).catch(() => undefined)
       draft.clear()
       onImported()
     } catch (err) {
