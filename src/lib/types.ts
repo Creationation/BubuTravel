@@ -68,6 +68,23 @@ export type Category = {
 /** 'visited' alimente le carnet, 'wishlist' alimente la bucketlist. */
 export type PlaceStatus = 'visited' | 'wishlist'
 
+export type PlaceDetails = {
+  name: string
+  kind: string
+  summary: string
+  address: string
+  price: string
+  hours: string
+  menu: { name: string; price: string }[]
+  booking: string
+  booking_url: string
+  best_time: string
+  duration: string
+  tips: string[]
+  images?: string[]
+  sources: { title: string; url: string }[]
+}
+
 export type Place = {
   id: string
   user_id: string
@@ -93,6 +110,10 @@ export type Place = {
   promo_until: string | null
   /** Photo d illustration trouvee en ligne (Wikipedia). null = pas cherchee, vide = rien trouve. */
   image_url?: string | null
+  /** Images du lieu (video analysee, sites trouves en ligne). */
+  gallery?: string[]
+  /** Fiche pratique trouvee par l analyseur. */
+  details?: PlaceDetails | null
   /** Note personnelle, de 1 a 5. */
   rating: number | null
   review: string | null

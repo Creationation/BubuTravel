@@ -31,6 +31,7 @@ import tempfile
 import threading
 import time
 import traceback
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -492,6 +493,64 @@ class Guide(BaseModel):
     checklist: list[GuideItem] = Field(description="8 a 15 choses a faire pour ce pays, du depart au sejour")
 
 
+class MenuItem(BaseModel):
+    name: str
+    price: str = Field(description="Prix avec devise, chaine vide si inconnu")
+
+
+class PlaceDetails(BaseModel):
+    name: str = Field(description="Nom exact et usuel du lieu")
+    kind: str = Field(description="restaurant, bar, cafe, temple, plage, atelier, spa, marche...")
+    summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 a 3 phrases vivantes")
+    address: str = Field(description="Adresse complete, chaine vide si inconnue")
+    lat: float | None
+    lng: float | None
+    price: str = Field(description="Fourchette ou prix par personne avec devise")
+    hours: str = Field(description="Horaires d'ouverture, jours de fermeture")
+    menu: list[MenuItem] = Field(description="Pour un lieu ou l'on mange/boit : 3 a 8 plats ou boissons phares avec prix ; sinon les formules / billets")
+    booking: str = Field(description="Faut-il reserver, comment, combien de temps avant")
+    booking_url: str = Field(description="Lien de reservation ou site officiel, chaine vide sinon")
+    best_time: str
+    duration: str = Field(description="Temps a prevoir")
+    tips: list[str] = Field(description="3 a 5 conseils concrets (quoi commander, ou s'asseoir, dress code, cash...)")
+    images: list[str] = Field(description="2 a 6 URL DIRECTES d'images (.jpg/.png/.webp) montrant CE lieu : site officiel, Wikimedia, Tripadvisor, Google... jamais une image d'un autre lieu")
+    sources: list[Source]
+
+
+DETAILS_BRIEF = """Fais la fiche pratique complete de ce lieu pour deux voyageurs, en cherchant sur le web
+(WebSearch, WebFetch : site officiel, Google Maps, Tripadvisor, Instagram, articles recents).
+Identifie le lieu exact. Donne de VRAIES infos : prix, horaires, plats ou billets phares avec prix,
+reservation, conseils. Ajoute des URL directes d'images de CE lieu (ouvre les pages pour trouver
+les fichiers images). N'invente rien : laisse vide ce que tu ne trouves pas.
+{lang}
+
+Lieu : {name}
+Ville : {city}, {country}
+Ce que les voyageurs en ont note : {notes}
+"""
+
+
+def details_from_analysis(a: dict) -> dict:
+    """Une video analysee donne deja l'essentiel de la fiche."""
+    pl = a.get("place") or {}
+    return {
+        "name": a.get("name", ""),
+        "kind": a.get("kind", ""),
+        "summary": a.get("summary", ""),
+        "address": pl.get("address", ""),
+        "price": a.get("price", ""),
+        "hours": a.get("schedule", ""),
+        "menu": [],
+        "booking": a.get("booking", ""),
+        "booking_url": a.get("booking_url", ""),
+        "best_time": a.get("best_time", ""),
+        "duration": a.get("duration", ""),
+        "tips": a.get("tips", []),
+        "images": [],
+        "sources": a.get("sources", []),
+    }
+
+
 class Sight(BaseModel):
     name: str = Field(description="Nom usuel du lieu ou de l'activite")
     kind: str = Field(description="temple, plage, marche, point de vue, restaurant, excursion...")
@@ -693,7 +752,35 @@ def lang_line(lang: str) -> str:
 # Traitement d'un lien
 # --------------------------------------------------------------------------
 
-def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, str | None, str | None]:
+FRAMES_BUCKET = "idea-frames"
+
+
+def upload_frames(frames: list[Path], tmp: Path, key: str, count: int = 6) -> list[str]:
+    """Envoie quelques images de la video (bucket public) : la galerie du lieu."""
+    if not frames or not SB_KEY:
+        return []
+    step = max(1, len(frames) // count)
+    picked = frames[::step][:count]
+    urls = []
+    for n, frame in enumerate(picked):
+        out = tmp / f"up_{n}.jpg"
+        try:
+            run(["ffmpeg", "-y", "-i", str(frame), "-vf", "scale=720:-2", "-q:v", "5", str(out)])
+            path = f"{key}/{n}.jpg"
+            res = requests.post(
+                f"{SB_URL}/storage/v1/object/{FRAMES_BUCKET}/{path}",
+                headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "image/jpeg", "x-upsert": "true"},
+                data=out.read_bytes(),
+                timeout=60,
+            )
+            if res.status_code < 300:
+                urls.append(f"{SB_URL}/storage/v1/object/public/{FRAMES_BUCKET}/{path}")
+        except Exception:
+            continue
+    return urls
+
+
+def analyse(url: str, note: str | None, context: str, lang: str, key: str | None = None) -> tuple[dict, str | None, str | None, list[str]]:
     final_url = resolve_url(url)
     tmp = Path(tempfile.mkdtemp(prefix="bubu-"))
     try:
@@ -703,6 +790,7 @@ def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, 
         transcript = ""
         subs = ""
         frames: list[Path] = []
+        frame_urls: list[str] = []
         maps = ""
 
         is_maps = ("google." in final_url and "/maps" in final_url) or "goo.gl/maps" in url or "maps.app.goo.gl" in url
@@ -716,7 +804,8 @@ def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, 
                 frames = extract_frames(video, tmp, float(duration or 0))
                 log(f"  video {video.stat().st_size // 1024} Ko, {duration or '?'} s, {len(frames)} images")
                 if frames:
-                    thumb = thumbnail_data_url(frames[min(len(frames) - 1, 2)], tmp)
+                    frame_urls = upload_frames(frames, tmp, key or uuid.uuid4().hex)
+                    thumb = frame_urls[0] if frame_urls else thumbnail_data_url(frames[min(len(frames) - 1, 2)], tmp)
                 transcript = transcribe(video, tmp)
                 log(f"  transcription : {len(transcript)} caracteres")
                 video.unlink(missing_ok=True)
@@ -753,7 +842,7 @@ def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, 
         log(f"  fiche prete, {len(data.get('sources') or [])} sources")
         if transcript and not data.get("transcript_excerpt"):
             data["transcript_excerpt"] = transcript[:600]
-        return data, (title or data.get("name")), thumb
+        return data, (title or data.get("name")), thumb, frame_urls
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -763,12 +852,84 @@ def process(job: dict) -> None:
     try:
         lang = user_lang(job["user_id"])
         context = trip_context(job)
-        data, title, thumb = analyse(job["url"], job.get("note"), context, lang)
-        update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, error=None)
+        data, title, thumb, frames = analyse(job["url"], job.get("note"), context, lang, key=job["id"])
+        update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, frames=frames, error=None)
         log(f"  pret : {data.get('name')}")
+        link_place({**job, "analysis": data, "thumbnail": thumb, "frames": frames})
     except Exception as err:
         traceback.print_exc()
         update_idea(job["id"], status="error", error=str(err)[:300])
+
+
+def shortcode(url: str) -> str:
+    """Identifiant stable d'un lien (code Instagram, ou l'URL sans parametres)."""
+    m = re.search(r"instagram\.com/(?:reel|p)/([^/?]+)", url)
+    if m:
+        return m.group(1)
+    return url.split("?")[0].rstrip("/")
+
+
+def geocode_osm(query: str) -> tuple[float, float] | None:
+    try:
+        time.sleep(1.1)
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": query, "format": "jsonv2", "limit": 1},
+            headers={"User-Agent": "BuBuTravel/1.0"},
+            timeout=20,
+        )
+        d = r.json()
+        return (float(d[0]["lat"]), float(d[0]["lon"])) if d else None
+    except Exception:
+        return None
+
+
+def link_place(idea: dict) -> None:
+    """
+    Le lieu du voyage cree a partir de ce lien (meme URL dans ses notes)
+    recoit les images de la video ; s'il etait place approximativement, il
+    prend aussi le vrai nom et la vraie position trouves par l'analyse.
+    """
+    a = idea.get("analysis") or {}
+    if not idea.get("trip_id") or not a:
+        return
+    code = shortcode(idea["url"])
+    places = sb("GET", "places", params={"trip_id": f"eq.{idea['trip_id']}", "notes": f"ilike.*{code}*", "select": "*"}) or []
+    for place in places:
+        patch: dict = {}
+        frames = idea.get("frames") or []
+        if frames:
+            patch["gallery"] = frames
+            patch["image_url"] = frames[0]
+        elif idea.get("thumbnail") and str(idea["thumbnail"]).startswith("http"):
+            patch["image_url"] = idea["thumbnail"]
+        if not place.get("details"):
+            patch["details"] = details_from_analysis(a)
+        notes = place.get("notes") or ""
+        if "Position approximative" in notes:
+            pl = a.get("place") or {}
+            lat, lng = pl.get("lat"), pl.get("lng")
+            if lat is None or lng is None:
+                for q in [pl.get("address"), f"{pl.get('name', '')}, {pl.get('city', '')}", a.get("name")]:
+                    if q and q.strip(", "):
+                        hit = geocode_osm(f"{q}, {pl.get('country', '')}".strip(", "))
+                        if hit:
+                            lat, lng = hit
+                            break
+            if lat is not None and lng is not None:
+                patch.update({"lat": lat, "lng": lng})
+                if pl.get("city"):
+                    patch["city"] = pl["city"]
+                if a.get("name"):
+                    patch["name"] = a["name"][:120]
+                where = pl.get("address") or ", ".join(x for x in [pl.get("name"), pl.get("city")] if x)
+                patch["notes"] = notes.replace(
+                    "Position approximative (centre de la ville) : à préciser.",
+                    f"Position corrigée d'après la vidéo : {where}.",
+                )
+        if patch:
+            sb("PATCH", "places", params={"id": f"eq.{place['id']}"}, body=patch, prefer="return=minimal")
+            log(f"  lieu mis a jour : {patch.get('name', place['name'])}")
 
 
 # --------------------------------------------------------------------------
@@ -800,6 +961,37 @@ def process_ai_job(job: dict) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
         req = job.get("input") or {}
+        if job["kind"] == "place_info":
+            place = (sb("GET", "places", params={"id": f"eq.{req.get('place_id')}", "select": "*"}) or [None])[0]
+            if not place:
+                raise RuntimeError("Lieu introuvable")
+            prompt = DETAILS_BRIEF.format(
+                lang=lang_line(req.get("lang", "fr")),
+                name=place["name"],
+                city=place.get("city") or "",
+                country=place.get("country") or "",
+                notes=(place.get("notes") or "")[:1500],
+            )
+            data = claude_json(prompt, PlaceDetails, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
+            images = [u for u in data.get("images", []) if isinstance(u, str) and u.startswith("http")]
+            patch = {"details": data}
+            gallery = list(place.get("gallery") or [])
+            for u in images:
+                if u not in gallery:
+                    gallery.append(u)
+            patch["gallery"] = gallery[:10]
+            if not place.get("image_url") and gallery:
+                patch["image_url"] = gallery[0]
+            if "Position approximative" in (place.get("notes") or "") and data.get("lat") is not None:
+                patch.update({"lat": data["lat"], "lng": data["lng"], "name": data["name"][:120] or place["name"]})
+                patch["notes"] = place["notes"].replace(
+                    "Position approximative (centre de la ville) : à préciser.",
+                    f"Position corrigée : {data.get('address') or data['name']}.",
+                )
+            sb("PATCH", "places", params={"id": f"eq.{place['id']}"}, body=patch, prefer="return=minimal")
+            update_ai_job(job["id"], status="ready", result={"ok": True}, error=None)
+            log(f"  fiche du lieu prete : {data['name']} ({len(images)} images)")
+            return
         if job["kind"] == "stop_places":
             prompt = SIGHTS_BRIEF.format(
                 lang=lang_line(req.get("lang", "fr")),
@@ -876,7 +1068,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.test:
-        data, title, _ = analyse(args.test, None, "Aucun voyage communique (test).", "fr")
+        data, title, _, _ = analyse(args.test, None, "Aucun voyage communique (test).", "fr")
         print(json.dumps({"title": title, **data}, ensure_ascii=False, indent=2))
         return
 

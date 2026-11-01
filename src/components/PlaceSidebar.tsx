@@ -6,6 +6,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../lib/stats'
 import Lightbox from './Lightbox'
+import PlaceDetailsView, { PlaceHero } from './PlaceDetailsView'
 import PlaceExtras, { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
@@ -25,6 +26,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState<number | null>(null)
+  const [heroZoom, setHeroZoom] = useState<{ urls: string[]; index: number } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
@@ -172,6 +174,8 @@ export default function PlaceSidebar({ place, onClose }: Props) {
 
   return (
     <aside className="panel-enter flex max-h-[58vh] w-full shrink-0 flex-col border-t border-line bg-bg md:max-h-none md:w-[25rem] md:border-l md:border-t-0">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <PlaceHero place={place} onZoom={(urls, index) => setHeroZoom({ urls, index })} />
       <header className="border-b border-line px-6 pb-5 pt-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -179,7 +183,8 @@ export default function PlaceSidebar({ place, onClose }: Props) {
               {place.country}
               {categoryOf(place) && ` · ${categoryOf(place)!.name}`}
             </p>
-            <h2 className="display-sm mt-2 text-3xl leading-tight">{place.name}</h2>
+            <h2 className="display mt-2 text-[2rem] leading-[1.05]">{place.name}</h2>
+            {place.city && <p className="mt-1 text-[13px] text-text-muted">{place.city}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
@@ -221,7 +226,8 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         </div>
       </header>
 
-      <div className="flex-1 space-y-7 overflow-y-auto px-6 py-6">
+      <div className="space-y-7 px-6 py-6">
+        {!editing && <PlaceDetailsView place={place} />}
         {/* Edition du lieu */}
         {editing && (
           <section className="space-y-3 rounded-xl border border-line bg-surface-2 p-4">
@@ -490,6 +496,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         {error && <p className="notice notice-bad">{error}</p>}
       </div>
 
+      </div>
       <footer className="border-t border-line px-6 py-4">
         <button
           onClick={() => void onDeletePlace()}
@@ -499,6 +506,16 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           {confirmDelete ? t('place.deleteConfirm') : t('place.deleteAction')}
         </button>
       </footer>
+
+      {heroZoom && (
+        <Lightbox
+          urls={heroZoom.urls}
+          index={heroZoom.index}
+          onIndexChange={(index) => setHeroZoom({ ...heroZoom, index })}
+          onClose={() => setHeroZoom(null)}
+          caption={place.name}
+        />
+      )}
 
       {zoom !== null && gallery.length > 0 && (
         <Lightbox
