@@ -11,6 +11,7 @@ import PlaceExtras, { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
 import ClampText from './ClampText'
+import { askReview } from './ReviewSheet'
 
 type Props = {
   place: Place
@@ -216,7 +217,9 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             onClick={() =>
-              void edit(place.id, { status: 'visited' }).catch((err) => setError(errorMessage(err)))
+              void edit(place.id, { status: 'visited' })
+                .then(() => askReview(place.id))
+                .catch((err) => setError(errorMessage(err)))
             }
             className={`pill justify-center ${place.status !== 'wishlist' ? 'pill-active' : ''}`}
             disabled={busy}

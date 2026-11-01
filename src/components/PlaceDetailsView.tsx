@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
 import ClampText from './ClampText'
 import PlanBox from './PlanBox'
+import { ReviewSummary, askReview } from './ReviewSheet'
 
 /** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
 export function isExact(place: Place): boolean {
@@ -182,7 +183,11 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
         )}
       </div>
 
-      <PlanBox place={place} />
+      {place.status === 'wishlist' ? (
+        <PlanBox place={place} />
+      ) : (
+        <ReviewSummary place={place} onEdit={() => askReview(place.id)} />
+      )}
 
       {/* Adresse et GPS */}
       <div className="rounded-2xl border border-line bg-surface p-3.5">

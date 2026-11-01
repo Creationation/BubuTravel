@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { addCompanion, fetchCompanions } from '../lib/companions'
+import type { Companion } from '../lib/companions'
+import { Avatar } from './AppShell'
 import { usePlaces } from '../context/PlacesContext'
 import CoverPicker from './CoverPicker'
 import type { Trip, TripStatus } from '../lib/types'
@@ -22,6 +25,18 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
   const [notes, setNotes] = useState(trip?.notes ?? '')
   const [status, setStatus] = useState<TripStatus>(trip?.status ?? 'planning')
   const [busy, setBusy] = useState(false)
+  // Creation : les compagnons de voyage habituels, a cocher en un tap
+  const [companions, setCompanions] = useState<Companion[]>([])
+  const [withIds, setWithIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (trip) return
+    void fetchCompanions()
+      .then((list) => {
+        setCompanions(list)
+        setWithIds(new Set(list.map((c) => c.user_id)))
+      })
+      .catch(() => undefined)
+  }, [trip])
   const [error, setError] = useState<string | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
@@ -43,6 +58,9 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
         checklist: trip?.checklist ?? [],
       }
       const result = trip ? await editTrip(trip.id, payload) : await addTrip(payload)
+      if (!trip) {
+        for (const id of withIds) await addCompanion(result.id, id).catch(() => undefined)
+      }
       onDone(result)
     } catch (err) {
       setError(errorMessage(err))
@@ -122,6 +140,35 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
           placeholder={t('trips.notesPlaceholder')}
         />
       </div>
+
+      {!trip && companions.length > 0 && (
+        <div>
+          <label className="label">{t('sh.travelWith')}</label>
+          <div className="flex flex-wrap gap-2">
+            {companions.map((c) => {
+              const on = withIds.has(c.user_id)
+              return (
+                <button
+                  type="button"
+                  key={c.user_id}
+                  onClick={() =>
+                    setWithIds((prev) => {
+                      const next = new Set(prev)
+                      if (on) next.delete(c.user_id)
+                      else next.add(c.user_id)
+                      return next
+                    })
+                  }
+                  className={`flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 ${on ? 'border-accent bg-[var(--halo)]' : 'border-line bg-surface'}`}
+                >
+                  <Avatar url={c.avatar_url} name={c.display_name} size={28} />
+                  <span className="text-[14px] font-bold">{on ? '✓ ' : ''}{c.display_name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {error && <p className="notice notice-bad">{error}</p>}
 

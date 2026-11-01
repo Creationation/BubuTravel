@@ -7,6 +7,7 @@ import { sameCountry } from '../lib/worldCountries'
 import type { Place } from '../lib/types'
 import { useI18n } from '../i18n/I18nContext'
 import { CheckIcon, PinIcon } from './hub/icons'
+import { askReview } from './ReviewSheet'
 
 type Show = 'todo' | 'done' | 'all'
 
@@ -57,11 +58,9 @@ export default function CountryPanel({
   }, [inCountry, show, t])
 
   function toggle(p: Place) {
-    void edit(
-      p.id,
-      p.status === 'wishlist'
-        ? { status: 'visited', visit_date: p.visit_date ?? todayIso() }
-        : { status: 'wishlist' },
+    const visiting = p.status === 'wishlist'
+    void edit(p.id, visiting ? { status: 'visited', visit_date: p.visit_date ?? todayIso() } : { status: 'wishlist' }).then(
+      () => visiting && askReview(p.id),
     )
   }
 

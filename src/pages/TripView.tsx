@@ -128,9 +128,7 @@ export default function TripView() {
           </div>
         )}
         {sharing && (
-          <div className="mt-8">
-            <SharePanel trip={trip} hub={hub} onLeft={() => navigate('/voyages')} />
-          </div>
+          <SharePanel trip={trip} hub={hub} onLeft={() => navigate('/voyages')} onClose={() => setSharing(false)} />
         )}
 
         {/* Onglets, colles en haut au defilement */}
