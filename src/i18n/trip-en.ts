@@ -301,4 +301,6 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'home.openTrip': "Open the trip",
   'home.noTrip': "No trip yet",
   'home.createTrip': "Create a trip",
+  'ai.viaPc': "Processed on your computer, with your Claude subscription",
+  'ai.pcOffline': "Your computer is off: the request will wait until it is back.",
 }

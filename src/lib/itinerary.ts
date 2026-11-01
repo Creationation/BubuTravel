@@ -1,7 +1,12 @@
 import { supabase } from './supabase'
-import type { TodoKind, TransportMode } from './types'
+import type { Json, TodoKind, TransportMode } from './types'
 
-/** Miroir du schema de api/itinerary.ts. */
+/**
+ * Assistant d'itineraire. La demande n'appelle pas d'API depuis Vercel : elle
+ * est deposee dans ai_jobs et traitee par l'analyseur du PC, via Claude Code
+ * et l'abonnement Claude. On attend le resultat en temps reel.
+ */
+
 export type AiTransport = {
   mode: TransportMode
   details: string
@@ -45,25 +50,56 @@ export type ItineraryRequest = {
   existing: { name: string; arrive_date: string | null; leave_date: string | null }[]
 }
 
-export async function requestItinerary(payload: ItineraryRequest): Promise<AiItinerary> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) throw new Error('Connexion requise')
+type JobRow = { id: string; status: string; result: Json | null; error: string | null }
 
-  const res = await fetch('/api/itinerary', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) {
-    let message = `L'assistant a repondu ${res.status}`
-    try {
-      const body = (await res.json()) as { error?: string }
-      if (body.error) message = body.error
-    } catch {
-      // Reponse non JSON (page d'erreur Vercel) : on garde le code
+const TIMEOUT_MS = 15 * 60 * 1000
+
+export async function requestItinerary(payload: ItineraryRequest, tripId: string): Promise<AiItinerary> {
+  const { data, error } = await supabase
+    .from('ai_jobs')
+    .insert({ kind: 'itinerary', trip_id: tripId, input: payload as unknown as Json })
+    .select('id, status, result, error')
+    .single()
+  if (error) throw error
+  const job = data as JobRow
+
+  return new Promise<AiItinerary>((resolve, reject) => {
+    let done = false
+    const finish = (row: JobRow) => {
+      if (done) return
+      if (row.status === 'ready' && row.result) {
+        done = true
+        cleanup()
+        resolve(row.result as unknown as AiItinerary)
+      } else if (row.status === 'error') {
+        done = true
+        cleanup()
+        reject(new Error(row.error || "L'assistant n'a pas pu repondre."))
+      }
     }
-    throw new Error(message)
-  }
-  return (await res.json()) as AiItinerary
+    const channel = supabase
+      .channel(`ai-job-${job.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ai_jobs', filter: `id=eq.${job.id}` },
+        (msg) => finish(msg.new as JobRow),
+      )
+      .subscribe()
+    // Filet de securite si le temps reel ne passe pas
+    const poll = window.setInterval(async () => {
+      const { data: row } = await supabase.from('ai_jobs').select('id, status, result, error').eq('id', job.id).single()
+      if (row) finish(row as JobRow)
+    }, 5000)
+    const timeout = window.setTimeout(() => {
+      if (done) return
+      done = true
+      cleanup()
+      reject(new Error("Pas de reponse de l'analyseur. Le PC est-il allume ?"))
+    }, TIMEOUT_MS)
+    function cleanup() {
+      window.clearInterval(poll)
+      window.clearTimeout(timeout)
+      void supabase.removeChannel(channel)
+    }
+  })
 }

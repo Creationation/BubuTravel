@@ -407,6 +407,12 @@ export type Database = {
         Update: Partial<Pick<LinkIdea, 'trip_id' | 'status' | 'place_id' | 'note' | 'attempts' | 'error'>>
         Relationships: []
       }
+      ai_jobs: {
+        Row: { id: string; user_id: string; trip_id: string | null; kind: string; input: Json; status: string; result: Json | null; error: string | null; attempts: number; created_at: string; updated_at: string }
+        Insert: { kind: string; trip_id?: string | null; input: Json }
+        Update: { status?: string }
+        Relationships: []
+      }
       analyzer_status: {
         Row: { id: string; last_seen: string; version: string | null }
         Insert: { id: string; last_seen?: string; version?: string | null }

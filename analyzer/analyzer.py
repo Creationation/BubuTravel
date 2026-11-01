@@ -7,7 +7,7 @@ colles dans l'app (table link_ideas, status = pending) :
   1. telecharge la video en 480p maximum (TikTok, Instagram, YouTube...),
   2. extrait une quinzaine d'images reparties sur toute la video,
   3. transcrit la voix avec Groq Whisper, recupere les sous-titres s'il y en a,
-  4. demande a Claude de regarder les images, lire la legende et la
+  4. demande a Claude (Claude Code, abonnement Claude, pas de cle API) de regarder les images, lire la legende et la
      transcription, puis de chercher sur le web (prix, horaires, reservation),
   5. ecrit une fiche structuree dans link_ideas.analysis (status = ready),
      avec l'etape du voyage ou l'activite s'integre et des dates possibles.
@@ -28,12 +28,13 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
-import anthropic
 import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -46,8 +47,9 @@ try:
 except Exception:
     pass
 
-VERSION = "1.0"
-MODEL = "claude-opus-5-5"
+VERSION = "2.0"
+# Modele utilise par Claude Code (alias : opus, sonnet...). Compte sur l'abonnement Claude.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "opus")
 SB_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SB_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -110,6 +112,23 @@ def requeue_stuck() -> None:
         body={"status": "pending", "updated_at": now_iso()},
         prefer="return=minimal",
     )
+    sb(
+        "PATCH",
+        "ai_jobs",
+        params={"status": "eq.processing", "updated_at": f"lt.{limit}", "attempts": "lt.3"},
+        body={"status": "pending", "updated_at": now_iso()},
+        prefer="return=minimal",
+    )
+
+
+def heartbeat_forever() -> None:
+    """Signe de vie toutes les 30 s, meme pendant une analyse de plusieurs minutes."""
+    while True:
+        try:
+            heartbeat()
+        except Exception:
+            pass
+        time.sleep(30)
 
 
 def claim() -> dict | None:
@@ -355,7 +374,7 @@ def subtitles_text(tmp: Path) -> str:
 
 
 # --------------------------------------------------------------------------
-# Claude : regarder, rechercher, structurer
+# Claude, via Claude Code et l'abonnement Claude (pas de cle API)
 # --------------------------------------------------------------------------
 
 class Place(BaseModel):
@@ -392,83 +411,162 @@ class Analysis(BaseModel):
     tips: list[str] = Field(description="2 a 5 conseils pratiques")
     fit: Fit | None
     transcript_excerpt: str = Field(description="Passage utile de ce qui est dit dans la video, 600 caracteres max")
-    sources: list[Source]
+    sources: list[Source] = Field(description="Pages web consultees qui confirment les informations")
 
 
-SYSTEM = """You help two travellers turn social media posts into concrete travel plans.
-You receive frames from a short video (in order), its caption, a transcript of the speech,
-subtitles, and the travellers' current trips with their stops and dates.
-
-1. Work out exactly what is shown: the activity, the place, the operator if visible
-   (boat names, signs, logos, on-screen text, what the speaker says).
-2. Search the web to confirm it and find practical facts: real name, location, price,
-   duration, schedule or departure times, how and where to book, how far ahead, seasonality,
-   and anything that would stop it from happening on their dates (weather, closures, festivals).
-3. Decide where it fits in their trips: which stop it belongs to and which dates work. If it is
-   not near any planned stop, say what would need to change.
-Be factual. When something cannot be confirmed, say so instead of inventing it."""
+class Transport(BaseModel):
+    mode: Literal["plane", "train", "bus", "boat", "car", "taxi", "motorbike", "other"]
+    details: str = Field(description="Ligne, compagnie ou trajet concret")
+    duration_hours: float
+    price_estimate: float = Field(description="Prix indicatif par personne")
+    currency: str
+    how_to_book: str
+    book_ahead_days: int = Field(description="Combien de jours a l'avance reserver, 0 si sur place")
 
 
-def research(client: anthropic.Anthropic, content: list, lang: str) -> tuple[str, list[dict]]:
-    messages = [{"role": "user", "content": content}]
-    tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6}]
-    sources: list[dict] = []
-    text_parts: list[str] = []
-    for _ in range(4):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
-            system=SYSTEM + ("\n\nWrite your notes in French." if lang == "fr" else ""),
-            tools=tools,
-            messages=messages,
-        )
-        for block in response.content:
-            if block.type == "text":
-                text_parts.append(block.text)
-            elif block.type == "web_search_tool_result" and isinstance(block.content, list):
-                for r in block.content:
-                    url = getattr(r, "url", None)
-                    if url and all(s["url"] != url for s in sources):
-                        sources.append({"title": getattr(r, "title", "") or "", "url": url})
-        if response.stop_reason == "pause_turn":
-            messages.append({"role": "assistant", "content": response.content})
-            continue
-        if response.stop_reason == "refusal":
-            raise RuntimeError("Claude a refuse d'analyser ce contenu.")
-        break
-    return "\n".join(text_parts).strip(), sources
+class Stop(BaseModel):
+    name: str = Field(description="Ville ou region ou l'on dort")
+    country: str
+    lat: float
+    lng: float
+    arrive_date: str = Field(description="AAAA-MM-JJ")
+    leave_date: str = Field(description="AAAA-MM-JJ")
+    why: str = Field(description="Pourquoi cette etape et cette duree, deux phrases maximum")
+    highlights: list[str] = Field(description="3 a 6 choses a ne pas manquer, nommees")
+    stay_tip: str = Field(description="Quartier ou type d'hebergement conseille")
+    transport_to_next: Transport | None
 
 
-def structure(client: anthropic.Anthropic, notes: str, context: str, sources: list[dict], lang: str) -> Analysis:
-    instruction = (
-        "Ecris tous les textes en francais avec les accents. Dates au format AAAA-MM-JJ."
+class Todo(BaseModel):
+    title: str
+    kind: Literal["todo", "booking", "admin", "packing"]
+    due_date: str = Field(description="AAAA-MM-JJ")
+    notes: str
+
+
+class AdminNote(BaseModel):
+    title: str
+    detail: str
+
+
+class Itinerary(BaseModel):
+    summary: str = Field(description="Vue d'ensemble, trois phrases maximum")
+    stops: list[Stop]
+    todos: list[Todo]
+    admin: list[AdminNote]
+
+
+def inline_schema(model: type[BaseModel]) -> dict:
+    """Schema JSON sans $ref : plus sur pour --json-schema."""
+    schema = model.model_json_schema()
+    defs = schema.pop("$defs", {})
+
+    def resolve(node):
+        if isinstance(node, dict):
+            if "$ref" in node:
+                return resolve(defs[node["$ref"].split("/")[-1]])
+            return {k: resolve(v) for k, v in node.items() if k not in ("title", "default")}
+        if isinstance(node, list):
+            return [resolve(v) for v in node]
+        return node
+
+    return resolve(schema)
+
+
+def claude_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: list[str], timeout: int = 900) -> dict:
+    """
+    Appelle Claude Code en mode non interactif avec une sortie structuree.
+    ANTHROPIC_API_KEY est retiree de l'environnement : sans ca, Claude Code
+    facturerait la cle API au lieu d'utiliser l'abonnement Claude.
+    """
+    exe = shutil.which("claude")
+    if not exe:
+        raise RuntimeError("Claude Code introuvable sur cette machine (commande « claude »).")
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    cmd = [
+        exe, "-p",
+        "--output-format", "json",
+        "--model", CLAUDE_MODEL,
+        "--json-schema", json.dumps(inline_schema(model), ensure_ascii=False),
+        "--max-turns", "40",
+        "--allowedTools", *tools,
+    ]
+    proc = subprocess.run(
+        cmd,
+        input=prompt,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=str(cwd),
+        env=env,
+        timeout=timeout,
+    )
+    out = proc.stdout
+    start = out.find("{")
+    if start < 0:
+        raise RuntimeError(f"Claude Code n'a rien renvoye : {(proc.stderr or out)[:300]}")
+    data = json.loads(out[start:])
+    if data.get("is_error"):
+        raise RuntimeError(f"Claude Code : {str(data.get('result'))[:300]}")
+    result = data.get("structured_output")
+    if result is None:
+        raw = data.get("result") or ""
+        i = raw.find("{")
+        result = json.loads(raw[i:]) if i >= 0 else None
+    if result is None:
+        raise RuntimeError("Reponse de Claude sans fiche structuree.")
+    return model.model_validate(result).model_dump()
+
+
+VIDEO_BRIEF = """Tu aides deux voyageurs a transformer une publication des reseaux sociaux en plan de voyage concret.
+
+Dans ce dossier se trouvent les images d'une courte video, dans l'ordre ({frames}).
+Regarde-les TOUTES avec l'outil Read : textes a l'ecran, panneaux, noms de bateaux, logos, paysages.
+
+1. Determine exactement ce qui est montre : l'activite, le lieu, l'operateur s'il est visible.
+2. Cherche sur le web (WebSearch, WebFetch) pour le confirmer et trouver les infos pratiques :
+   vrai nom, emplacement, prix, duree, horaires ou departs, comment et ou reserver, combien de
+   temps a l'avance, saison, et tout ce qui empecherait de le faire a leurs dates.
+3. Dis ou cela s'integre dans leurs voyages : quelle etape, quelles dates conviennent. Si ce
+   n'est pres d'aucune etape prevue, dis ce qu'il faudrait changer.
+Sois factuel : si quelque chose ne peut pas etre confirme, dis-le au lieu de l'inventer.
+{lang}
+
+--- Informations sur la publication ---
+{header}
+"""
+
+
+ITINERARY_BRIEF = """Tu es un organisateur de voyages experimente, specialiste des longs voyages independants
+(Asie du Sud-Est notamment). Transforme les notes brutes des voyageurs en itineraire realiste et date.
+
+Regles :
+- Respecte tout ce qu'ils donnent comme fixe (arrivee, vols, dates, lieux). Comble les trous autour.
+  Ne supprime jamais un lieu qu'ils ont cite ; s'il ne rentre pas, dis-le dans le resume.
+- Les dates s'enchainent : le depart d'une etape est l'arrivee de la suivante (ou la veille pour un
+  trajet de nuit). Couvre tout le voyage du debut a la fin, sans trou inexplique.
+- Pas d'etape d'une seule nuit sauf transit. Trajets realistes (vol interieur, train de nuit, bus,
+  ferry, passage de frontiere) avec duree et prix honnetes.
+- Tiens compte de la saison et des evenements a ces dates (meteo de chaque cote, fetes, periodes
+  qui affichent complet) et adapte l'itineraire si c'est important. Verifie sur le web ce qui
+  change souvent (visas, e-visa Vietnam, regles d'entree, meteo).
+- A faire : actions concretes avec une echeance sensee, au plus tot aujourd'hui.
+- Formalites : visas et entree dans chaque pays, sante, argent, securite ; signale ce qui est a verifier.
+- Vrais noms de lieux, coordonnees approximatives du centre-ville.
+{lang}
+
+--- Demande ---
+{request}
+"""
+
+
+def lang_line(lang: str) -> str:
+    return (
+        "Ecris tous les textes de la fiche en francais, avec les accents. Dates au format AAAA-MM-JJ."
         if lang == "fr"
-        else "Write every text in English. Dates as YYYY-MM-DD."
+        else "Write every text field in English. Dates as YYYY-MM-DD."
     )
-    response = client.messages.parse(
-        model=MODEL,
-        max_tokens=8000,
-        thinking={"type": "adaptive"},
-        output_config={"effort": "medium"},
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Turn these research notes into the structured card for the app.\n"
-                    f"{instruction}\n\n"
-                    f"Trips and stops:\n{context}\n\n"
-                    f"Web sources found:\n{json.dumps(sources[:12], ensure_ascii=False)}\n\n"
-                    f"Research notes:\n{notes}"
-                ),
-            }
-        ],
-        output_format=Analysis,
-    )
-    if not response.parsed_output:
-        raise RuntimeError("Fiche structuree introuvable dans la reponse.")
-    return response.parsed_output
 
 
 # --------------------------------------------------------------------------
@@ -476,20 +574,20 @@ def structure(client: anthropic.Anthropic, notes: str, context: str, sources: li
 # --------------------------------------------------------------------------
 
 def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, str | None, str | None]:
-    client = anthropic.Anthropic()
     final_url = resolve_url(url)
     tmp = Path(tempfile.mkdtemp(prefix="bubu-"))
     try:
-        content: list = []
         title = None
         thumb = None
         info: dict = {}
         transcript = ""
         subs = ""
+        frames: list[Path] = []
+        maps = ""
 
-        is_maps = "google." in final_url and "/maps" in final_url or "goo.gl/maps" in url or "maps.app.goo.gl" in url
+        is_maps = ("google." in final_url and "/maps" in final_url) or "goo.gl/maps" in url or "maps.app.goo.gl" in url
         if is_maps:
-            content.append({"type": "text", "text": f"Lien Google Maps.\n{maps_info(final_url)}"})
+            maps = maps_info(final_url)
         else:
             info, video = download(final_url, tmp)
             title = info.get("title") or None
@@ -499,46 +597,40 @@ def analyse(url: str, note: str | None, context: str, lang: str) -> tuple[dict, 
                 log(f"  video {video.stat().st_size // 1024} Ko, {duration or '?'} s, {len(frames)} images")
                 if frames:
                     thumb = thumbnail_data_url(frames[min(len(frames) - 1, 2)], tmp)
-                for i, frame in enumerate(frames):
-                    content.append({"type": "text", "text": f"Image {i + 1}/{len(frames)}"})
-                    content.append(
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": base64.b64encode(frame.read_bytes()).decode(),
-                            },
-                        }
-                    )
                 transcript = transcribe(video, tmp)
                 log(f"  transcription : {len(transcript)} caracteres")
+                video.unlink(missing_ok=True)
             subs = subtitles_text(tmp)
 
         meta = page_meta(final_url) if not info else {}
-        header = [
-            f"Lien : {url}",
-            f"Lien resolu : {final_url}" if final_url != url else "",
-            f"Plateforme : {info.get('extractor_key') or ''}",
-            f"Titre : {info.get('title') or meta.get('og:title') or meta.get('title') or ''}",
-            f"Auteur : {info.get('uploader') or info.get('channel') or ''}",
-            f"Legende / description : {(info.get('description') or meta.get('og:description') or meta.get('description') or '')[:4000]}",
-            f"Lieu indique par la plateforme : {info.get('location') or ''}",
-            f"Precision des voyageurs : {note}" if note else "",
-            f"Transcription de la voix :\n{transcript[:12000]}" if transcript else "Pas de transcription.",
-            f"Sous-titres :\n{subs}" if subs else "",
-            "",
-            f"Date du jour : {date.today().isoformat()}",
-            f"Voyages des voyageurs :\n{context}",
-        ]
-        content.insert(0, {"type": "text", "text": "\n".join(h for h in header if h)})
+        header = "\n".join(
+            h
+            for h in [
+                f"Lien : {url}",
+                f"Lien resolu : {final_url}" if final_url != url else "",
+                f"Google Maps :\n{maps}" if maps else "",
+                f"Plateforme : {info.get('extractor_key') or ''}",
+                f"Titre : {info.get('title') or meta.get('og:title') or meta.get('title') or ''}",
+                f"Auteur : {info.get('uploader') or info.get('channel') or ''}",
+                "Legende / description : "
+                + (info.get("description") or meta.get("og:description") or meta.get("description") or "")[:4000],
+                f"Lieu indique par la plateforme : {info.get('location') or ''}",
+                f"Precision des voyageurs : {note}" if note else "",
+                f"Transcription de la voix :\n{transcript[:12000]}" if transcript else "Pas de transcription.",
+                f"Sous-titres :\n{subs}" if subs else "",
+                "",
+                f"Date du jour : {date.today().isoformat()}",
+                f"Voyages des voyageurs :\n{context}",
+            ]
+            if h
+        )
+        frame_list = ", ".join(f.name for f in frames) if frames else "aucune image : la video n'a pas pu etre telechargee"
+        prompt = VIDEO_BRIEF.format(frames=frame_list, lang=lang_line(lang), header=header)
         if not thumb:
             thumb = info.get("thumbnail") or meta.get("og:image")
 
-        notes, sources = research(client, content, lang)
-        log(f"  recherche terminee, {len(sources)} sources")
-        result = structure(client, notes, context, sources, lang)
-        data = result.model_dump()
+        data = claude_json(prompt, Analysis, cwd=tmp, tools=["Read", "WebSearch", "WebFetch"])
+        log(f"  fiche prete, {len(data.get('sources') or [])} sources")
         if transcript and not data.get("transcript_excerpt"):
             data["transcript_excerpt"] = transcript[:600]
         return data, (title or data.get("name")), thumb
@@ -554,18 +646,73 @@ def process(job: dict) -> None:
         data, title, thumb = analyse(job["url"], job.get("note"), context, lang)
         update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, error=None)
         log(f"  pret : {data.get('name')}")
-    except anthropic.AuthenticationError:
-        update_idea(job["id"], status="error", error="Cle Anthropic invalide sur l'analyseur.")
-        log("  cle Anthropic invalide")
     except Exception as err:
         traceback.print_exc()
         update_idea(job["id"], status="error", error=str(err)[:300])
 
 
+# --------------------------------------------------------------------------
+# Demandes a l'IA (assistant d'itineraire)
+# --------------------------------------------------------------------------
+
+def claim_ai_job() -> dict | None:
+    rows = sb("GET", "ai_jobs", params={"status": "eq.pending", "order": "created_at.asc", "limit": "1", "select": "*"})
+    if not rows:
+        return None
+    job = rows[0]
+    taken = sb(
+        "PATCH",
+        "ai_jobs",
+        params={"id": f"eq.{job['id']}", "status": "eq.pending"},
+        body={"status": "processing", "attempts": (job.get("attempts") or 0) + 1, "updated_at": now_iso()},
+        prefer="return=representation",
+    )
+    return taken[0] if taken else None
+
+
+def update_ai_job(job_id: str, **fields) -> None:
+    fields["updated_at"] = now_iso()
+    sb("PATCH", "ai_jobs", params={"id": f"eq.{job_id}"}, body=fields, prefer="return=minimal")
+
+
+def process_ai_job(job: dict) -> None:
+    log(f"Demande IA {job['id'][:8]} : {job['kind']}")
+    tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
+    try:
+        if job["kind"] != "itinerary":
+            raise RuntimeError(f"Type de demande inconnu : {job['kind']}")
+        req = job.get("input") or {}
+        lines = [
+            f"Date du jour : {req.get('today') or date.today().isoformat()}",
+            f"Debut du voyage : {req.get('start_date') or 'non fixe'}",
+            f"Fin du voyage : {req.get('end_date') or 'non fixee'}",
+            f"Voyageurs : {req.get('travellers', 2)}",
+            f"Budget : {req.get('budget', 'moyen')}",
+            f"Rythme : {req.get('pace', 'equilibre')}",
+        ]
+        existing = req.get("existing") or []
+        if existing:
+            lines.append("Etapes deja enregistrees (a respecter, propose seulement ce qui manque autour) :")
+            lines += [f"- {s['name']} : {s.get('arrive_date') or '?'} -> {s.get('leave_date') or '?'}" for s in existing]
+        lines += ["", "Ce que les voyageurs ont ecrit :", '"""', req.get("raw", ""), '"""']
+        prompt = ITINERARY_BRIEF.format(lang=lang_line(req.get("lang", "fr")), request="\n".join(lines))
+        data = claude_json(prompt, Itinerary, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
+        update_ai_job(job["id"], status="ready", result=data, error=None)
+        log(f"  itineraire pret : {len(data['stops'])} etapes, {len(data['todos'])} a faire")
+    except Exception as err:
+        traceback.print_exc()
+        update_ai_job(job["id"], status="error", error=str(err)[:300])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def check_env() -> None:
-    missing = [k for k in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_API_KEY") if not os.environ.get(k)]
+    missing = [k for k in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY") if not os.environ.get(k)]
     if missing:
         log("Variables manquantes dans analyzer/.env : " + ", ".join(missing))
+        sys.exit(1)
+    if not shutil.which("claude"):
+        log("Claude Code introuvable : installez-le et connectez-vous avec votre compte Claude.")
         sys.exit(1)
     if not GROQ_KEY:
         log("Attention : GROQ_API_KEY absente, pas de transcription de la voix.")
@@ -576,19 +723,17 @@ def check_env() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", help="Analyse une URL et affiche la fiche, sans toucher a la base")
-    parser.add_argument("--once", action="store_true", help="Traite un seul lien puis s'arrete")
+    parser.add_argument("--once", action="store_true", help="Traite une seule demande puis s'arrete")
     args = parser.parse_args()
 
     if args.test:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            log("ANTHROPIC_API_KEY manquante")
-            sys.exit(1)
         data, title, _ = analyse(args.test, None, "Aucun voyage communique (test).", "fr")
         print(json.dumps({"title": title, **data}, ensure_ascii=False, indent=2))
         return
 
     check_env()
-    log(f"Analyseur BuBuTravel {VERSION} en ligne sous le nom « {NAME} ». Ctrl+C pour arreter.")
+    threading.Thread(target=heartbeat_forever, daemon=True).start()
+    log(f"Analyseur BuBuTravel {VERSION} en ligne sous le nom « {NAME} » (Claude via l'abonnement). Ctrl+C pour arreter.")
     last_beat = 0.0
     while True:
         try:
@@ -596,6 +741,14 @@ def main() -> None:
                 heartbeat()
                 requeue_stuck()
                 last_beat = time.time()
+            # L'assistant d'itineraire passe avant : quelqu'un attend a l'ecran
+            ai_job = claim_ai_job()
+            if ai_job:
+                process_ai_job(ai_job)
+                heartbeat()
+                if args.once:
+                    return
+                continue
             job = claim()
             if job:
                 process(job)

@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/itinerary.ts": { "maxDuration": 300 },
     "api/plan.ts": { "maxDuration": 300 }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]

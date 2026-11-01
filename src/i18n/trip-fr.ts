@@ -316,4 +316,6 @@ export const tripFr = {
   'home.openTrip': "Ouvrir le voyage",
   'home.noTrip': "Pas encore de voyage",
   'home.createTrip': "Créer un voyage",
+  'ai.viaPc': "Traité sur votre PC, avec votre abonnement Claude",
+  'ai.pcOffline': "Votre PC est éteint : la demande attendra son retour.",
 } as const

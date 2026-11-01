@@ -6,6 +6,7 @@ import { addDaysIso, nightsOf, shortDate, todayIso } from '../../lib/tripDates'
 import type { Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useDraft } from '../../lib/drafts'
+import { useAnalyzerOnline } from '../../lib/ideas'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { modeKey } from './StopForm'
@@ -55,6 +56,7 @@ export default function TripAssistant({
     isEmpty: (v) => !v.raw.trim(),
   })
   const form = draft.value
+  const online = useAnalyzerOnline()
   const [plan, setPlan] = useState<AiItinerary | null>(null)
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -88,7 +90,7 @@ export default function TripAssistant({
         lang,
         today: todayIso(),
         existing: hub.stops.map((s) => ({ name: s.name, arrive_date: s.arrive_date, leave_date: s.leave_date })),
-      })
+      }, trip.id)
       setPlan(result)
     } catch (err) {
       setError(errorMessage(err))
@@ -235,6 +237,9 @@ export default function TripAssistant({
                 </div>
               </div>
 
+              {online !== null && (
+                <p className={'chip ' + (online ? 'chip-ok' : 'chip-warn')}>{online ? t('ai.viaPc') : t('ai.pcOffline')}</p>
+              )}
               {hub.stops.length > 0 && (
                 <p className="notice">{t('ai.replaceWarning', { n: hub.stops.length })}</p>
               )}
