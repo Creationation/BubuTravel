@@ -26,11 +26,11 @@ const SIGNED_URL_TTL = 60 * 60 // 1 h
 /* Lieux                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchPlaces(userId: string): Promise<Place[]> {
+export async function fetchPlaces(_userId: string): Promise<Place[]> {
   const { data, error } = await supabase
     .from('places')
     .select('*')
-    .eq('user_id', userId)
+    // Pas de filtre user_id : la RLS renvoie les siens ET ceux des voyages partages
     .order('visit_date', { ascending: false, nullsFirst: false })
   if (error) throw error
   return data ?? []
@@ -71,11 +71,11 @@ export async function deletePlace(place: Place): Promise<void> {
 /* Voyages                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchTrips(userId: string): Promise<Trip[]> {
+export async function fetchTrips(_userId: string): Promise<Trip[]> {
   const { data, error } = await supabase
     .from('trips')
     .select('*')
-    .eq('user_id', userId)
+    // Pas de filtre user_id : la RLS renvoie les siens ET ceux des voyages partages
     .order('start_date', { ascending: false, nullsFirst: false })
   if (error) throw error
   return data ?? []
@@ -118,11 +118,11 @@ export async function fetchPhotos(placeId: string): Promise<Photo[]> {
 }
 
 /** Toutes les photos du compte, pour la galerie globale. */
-export async function fetchAllPhotos(userId: string): Promise<Photo[]> {
+export async function fetchAllPhotos(_userId: string): Promise<Photo[]> {
   const { data, error } = await supabase
     .from('photos')
     .select('*')
-    .eq('user_id', userId)
+    // Pas de filtre user_id : la RLS renvoie les siens ET ceux des voyages partages
     .order('uploaded_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -329,11 +329,11 @@ export async function fetchSharedData(token: string): Promise<SharedData> {
 /* Traces GPS                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchTracks(userId: string): Promise<Track[]> {
+export async function fetchTracks(_userId: string): Promise<Track[]> {
   const { data, error } = await supabase
     .from('tracks')
     .select('*')
-    .eq('user_id', userId)
+    // Pas de filtre user_id : la RLS renvoie les siens ET ceux des voyages partages
     .order('started_at', { ascending: false, nullsFirst: false })
   if (error) throw error
   return data ?? []
@@ -422,11 +422,11 @@ export async function seedCategories(userId: string): Promise<Category[]> {
 /* Evenements                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchEvents(userId: string): Promise<TravelEvent[]> {
+export async function fetchEvents(_userId: string): Promise<TravelEvent[]> {
   const { data, error } = await supabase
     .from('events')
     .select('*')
-    .eq('user_id', userId)
+    // Pas de filtre user_id : la RLS renvoie les siens ET ceux des voyages partages
     .order('starts_at', { ascending: true })
   if (error) throw error
   return data ?? []

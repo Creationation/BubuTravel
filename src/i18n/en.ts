@@ -1,4 +1,5 @@
 import type { Dict } from './fr'
+import { tripEn } from './trip-en'
 
 /**
  * Dictionnaire anglais. Il est type `Dict`, donc toute cle presente en
@@ -516,4 +517,5 @@ export const en: Dict = {
   'geo.unavailable': 'Position unavailable. The GPS signal may not reach here.',
   'geo.timeout': 'The position is taking too long. Try outside or near a window.',
   'geo.noWatch': 'This browser cannot track your position.',
+  ...tripEn,
 }

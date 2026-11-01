@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
 import { formatDate, plural, totalDistanceKm } from '../lib/stats'
-import type { ChecklistItem, Place, Trip } from '../lib/types'
+import type { Place, Trip } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
 
 /**
@@ -16,7 +16,6 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
   const { places, edit, editTrip, categoryOf } = usePlaces()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [newItem, setNewItem] = useState('')
   const [confirmDone, setConfirmDone] = useState(false)
 
   const steps = useMemo(() => {
@@ -32,8 +31,6 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
     })
   }, [places, trip.id])
 
-  const checklist: ChecklistItem[] = Array.isArray(trip.checklist) ? trip.checklist : []
-  const doneCount = checklist.filter((i) => i.done).length
   const km = totalDistanceKm(steps.filter((s) => s.visit_date))
 
   async function run(action: () => Promise<unknown>) {
@@ -62,10 +59,6 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
         if (next[i].planned_order !== i) await edit(next[i].id, { planned_order: i })
       }
     })
-  }
-
-  function setChecklist(items: ChecklistItem[]) {
-    void run(() => editTrip(trip.id, { checklist: items }))
   }
 
   /** Le voyage passe en fait : ses envies deviennent des lieux visites. */
@@ -139,86 +132,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
         )}
       </section>
 
-      {/* Pense-bete */}
-      <section>
-        <div className="mb-4 flex items-end justify-between gap-3">
-          <div>
-            <p className="eyebrow">{t('planner.checklist')}</p>
-            <h2 className="display-sm mt-2 text-2xl">
-              {checklist.length > 0 ? `${doneCount} sur ${checklist.length}` : t('planner.checklistEmpty')}
-            </h2>
-          </div>
-        </div>
-
-        <div className="panel p-5">
-          <div className="flex gap-2">
-            <input
-              className="field"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newItem.trim()) {
-                  setChecklist([
-                    ...checklist,
-                    { id: crypto.randomUUID(), text: newItem.trim(), done: false },
-                  ])
-                  setNewItem('')
-                }
-              }}
-              placeholder={t('planner.checklistPlaceholder')}
-            />
-            <button
-              className="btn"
-              disabled={!newItem.trim() || busy}
-              onClick={() => {
-                setChecklist([
-                  ...checklist,
-                  { id: crypto.randomUUID(), text: newItem.trim(), done: false },
-                ])
-                setNewItem('')
-              }}
-            >{t('common.add')}</button>
-          </div>
-
-          {checklist.length > 0 && (
-            <ul className="mt-4 space-y-1.5">
-              {checklist.map((item) => (
-                <li key={item.id} className="flex items-center gap-3">
-                  <button
-                    onClick={() =>
-                      setChecklist(
-                        checklist.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)),
-                      )
-                    }
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[10px] transition-colors ${
-                      item.done
-                        ? 'border-accent bg-accent text-accent-ink'
-                        : 'border-line-strong text-transparent'
-                    }`}
-                    aria-label={item.done ? t('planner.uncheck') : t('planner.check')}
-                  >
-                    ✓
-                  </button>
-                  <span
-                    className={`min-w-0 flex-1 text-[14px] ${
-                      item.done ? 'text-text-muted line-through' : ''
-                    }`}
-                  >
-                    {item.text}
-                  </span>
-                  <button
-                    onClick={() => setChecklist(checklist.filter((i) => i.id !== item.id))}
-                    className="btn btn-xs btn-quiet"
-                    aria-label={t('common.remove')}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      {/* Le pense-bete est devenu l onglet A faire du voyage (trip_todos) */}
     </div>
   )
 }

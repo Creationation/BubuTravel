@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Karla:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..500,0..100;1,9..144,300..400,0..100&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'leaflet/dist/leaflet.css';
 @import 'leaflet.markercluster/dist/MarkerCluster.css';
@@ -13,7 +13,7 @@
 
 @theme {
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-sans: 'Karla', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 
   /* Constantes de marque, identiques dans les deux themes */
   --color-clay: #c0653f;
@@ -27,44 +27,76 @@
   --radius-arch: 999px 999px 28px 28px;
 }
 
-/* Nuit terre brulee, par defaut */
+/*
+ * Deux ambiances « heure doree », ni trop claires ni trop sombres :
+ * un fond en degrade maille (corail, mangue, lagon, orchidee) comme un
+ * coucher de soleil sur la mer d'Andaman, et des panneaux en verre depoli
+ * par-dessus. --bg reste une couleur pleine pour les fenetres modales ;
+ * --surface est le verre, translucide.
+ */
+
+/* Soir tropical : indigo chaud, lueurs corail et lagon */
 :root,
 :root[data-theme='dark'] {
-  --bg: #17120e;
-  --bg-deep: #100c09;
-  --surface: #201914;
-  --surface-2: #2a211a;
-  --line: #3a2e25;
-  --line-strong: #4d3d31;
-  --text: #f5ece0;
-  --text-soft: #d5c5b2;
-  --text-muted: #9d8b78;
-  --accent: #d9895c;
-  --accent-ink: #1a120c;
-  --halo: rgba(217, 137, 92, 0.18);
-  --grain: 0.05;
-  --shadow-lg: 0 34px 70px -34px rgba(0, 0, 0, 0.85);
-  --shadow-md: 0 18px 36px -22px rgba(0, 0, 0, 0.75);
+  --bg: #1d1422;
+  --bg-deep: #150e19;
+  --app-bg:
+    radial-gradient(at 8% 6%, rgba(255, 112, 77, 0.42) 0px, transparent 46%),
+    radial-gradient(at 92% 10%, rgba(255, 176, 72, 0.3) 0px, transparent 44%),
+    radial-gradient(at 85% 88%, rgba(28, 178, 168, 0.36) 0px, transparent 48%),
+    radial-gradient(at 12% 92%, rgba(150, 92, 220, 0.34) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(232, 84, 120, 0.14) 0px, transparent 60%),
+    linear-gradient(160deg, #2a1630 0%, #1b1a2e 52%, #10262c 100%);
+  --surface: rgba(255, 240, 232, 0.075);
+  --surface-solid: #2a1f2c;
+  --surface-2: rgba(255, 240, 232, 0.06);
+  --line: rgba(255, 236, 224, 0.13);
+  --line-strong: rgba(255, 236, 224, 0.24);
+  --text: #fff4ec;
+  --text-soft: #ecd9cd;
+  --text-muted: #bba5a0;
+  --accent: #ff7f57;
+  --accent-2: #3fd0c2;
+  --accent-ink: #20110b;
+  --halo: rgba(255, 127, 87, 0.2);
+  --grain: 0.06;
+  --glass-blur: blur(22px) saturate(170%);
+  --shadow-lg: 0 34px 70px -30px rgba(5, 0, 12, 0.75);
+  --shadow-md: 0 18px 40px -22px rgba(5, 0, 12, 0.65);
+  --shadow-sm: 0 1px 2px rgba(5, 0, 12, 0.3), 0 10px 26px -14px rgba(5, 0, 12, 0.55);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.04);
   color-scheme: dark;
 }
 
-/* Jour sable */
+/* Jour tropical : peche doree, corail et lagon, encre brun profond */
 :root[data-theme='light'] {
-  --bg: #f6efe3;
-  --bg-deep: #ece1cf;
-  --surface: #fdf9f2;
-  --surface-2: #f2e8d8;
-  --line: #e0d2ba;
-  --line-strong: #cbb794;
-  --text: #2c221a;
-  --text-soft: #5b4c3d;
-  --text-muted: #8d7a64;
-  --accent: #b0562f;
-  --accent-ink: #fdf9f2;
-  --halo: rgba(176, 86, 47, 0.14);
-  --grain: 0.045;
-  --shadow-lg: 0 34px 70px -38px rgba(90, 62, 36, 0.4);
-  --shadow-md: 0 18px 36px -24px rgba(90, 62, 36, 0.32);
+  --bg: #f6e6d8;
+  --bg-deep: #efd9c7;
+  --app-bg:
+    radial-gradient(at 6% 4%, rgba(255, 120, 86, 0.55) 0px, transparent 45%),
+    radial-gradient(at 94% 6%, rgba(255, 196, 92, 0.6) 0px, transparent 45%),
+    radial-gradient(at 88% 92%, rgba(38, 186, 176, 0.42) 0px, transparent 48%),
+    radial-gradient(at 10% 94%, rgba(182, 128, 232, 0.36) 0px, transparent 50%),
+    radial-gradient(at 52% 48%, rgba(255, 150, 140, 0.22) 0px, transparent 55%),
+    linear-gradient(150deg, #fbe3cf 0%, #f6dccf 45%, #dcefe9 100%);
+  --surface: rgba(255, 251, 246, 0.58);
+  --surface-solid: #fff8f1;
+  --surface-2: rgba(255, 246, 238, 0.55);
+  --line: rgba(255, 255, 255, 0.72);
+  --line-strong: rgba(110, 64, 36, 0.2);
+  --text: #2a160d;
+  --text-soft: #5c3d2c;
+  --text-muted: #8a6754;
+  --accent: #e2522c;
+  --accent-2: #0f8f88;
+  --accent-ink: #fffaf5;
+  --halo: rgba(226, 82, 44, 0.14);
+  --grain: 0.05;
+  --glass-blur: blur(20px) saturate(165%);
+  --shadow-lg: 0 40px 80px -36px rgba(120, 52, 20, 0.35), 0 2px 6px -2px rgba(120, 52, 20, 0.08);
+  --shadow-md: 0 22px 46px -24px rgba(120, 52, 20, 0.3), 0 1px 3px rgba(120, 52, 20, 0.06);
+  --shadow-sm: 0 1px 2px rgba(120, 52, 20, 0.06), 0 10px 24px -14px rgba(120, 52, 20, 0.25);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 1px 0 0 rgba(255, 255, 255, 0.5);
   color-scheme: light;
 }
 
@@ -80,6 +112,8 @@
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-2: var(--accent-2);
+  --color-surface-solid: var(--surface-solid);
 }
 
 html,
@@ -109,6 +143,35 @@ body {
   transition:
     background-color 0.4s ease,
     color 0.4s ease;
+}
+
+/*
+ * Le fond maille, fixe derriere tout. Il derive tres lentement, comme la
+ * lumiere qui tourne en fin de journee ; immobile si l'utilisateur le demande.
+ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--app-bg);
+  animation: sky-drift 38s ease-in-out infinite alternate;
+}
+
+@keyframes sky-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-3%, 2%, 0) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after {
+    animation: none;
+  }
 }
 
 /*
@@ -166,35 +229,66 @@ body::before {
   /* ------------------------------------------------------------------------
      Typographie
      ------------------------------------------------------------------------ */
+  /*
+   * Titres : Fraunces en graisse legere et grande taille optique, comme une
+   * couverture de magazine de voyage. SOFT arrondit les empattements (le
+   * cote boho), l'italique sert de ponctuation : un mot par titre, en accent.
+   */
   .display {
     font-family: var(--font-display);
-    font-weight: 400;
-    /* SOFT adoucit les angles de Fraunces : c'est ce qui donne le cote boho */
-    font-variation-settings: 'opsz' 120, 'SOFT' 40, 'WONK' 0;
-    letter-spacing: -0.015em;
-    line-height: 1.04;
+    font-weight: 300;
+    font-variation-settings: 'opsz' 144, 'SOFT' 50, 'WONK' 0;
+    letter-spacing: -0.028em;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+
+  .display em,
+  .display-sm em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--accent);
+    font-variation-settings: 'opsz' 144, 'SOFT' 100, 'WONK' 1;
   }
 
   .display-sm {
     font-family: var(--font-display);
     font-weight: 400;
-    font-variation-settings: 'opsz' 28, 'SOFT' 40, 'WONK' 0;
-    letter-spacing: -0.005em;
-    line-height: 1.18;
+    font-variation-settings: 'opsz' 36, 'SOFT' 50, 'WONK' 0;
+    letter-spacing: -0.012em;
+    line-height: 1.15;
   }
 
   .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
     font-size: 0.6875rem;
     font-weight: 600;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
 
+  .eyebrow-dot::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 99px;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--halo);
+  }
+
   .lede {
     font-size: 1.0625rem;
-    line-height: 1.75;
+    line-height: 1.7;
     color: var(--text-soft);
+    text-wrap: pretty;
+  }
+
+  /* Chiffres alignes, pour les dates, les compteurs et les heures */
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   /* ------------------------------------------------------------------------
@@ -203,7 +297,162 @@ body::before {
   .panel {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 26px;
+    border-radius: 24px;
+    box-shadow: var(--shadow-sm), var(--highlight);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+
+  /* Carte d'information : plus legere qu'un panel, pour les listes */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--highlight);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.3s ease,
+      transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .card-hover:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-md), var(--highlight);
+    transform: translateY(-2px);
+  }
+
+  /* Carte mise en avant : degrade chaud, pour le prochain trajet */
+  .card-feature {
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+    background:
+      radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%),
+      linear-gradient(180deg, var(--surface), var(--surface-2));
+    box-shadow: var(--shadow-md), var(--highlight);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+
+  /* Onglets en pilule, defilables sur telephone */
+  .tabbar {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0.3rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .tabbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .tab:hover {
+    color: var(--text);
+  }
+
+  .tab-active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .tab-count {
+    min-width: 1.25rem;
+    border-radius: 99px;
+    background: var(--halo);
+    padding: 0 0.4rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  /* Pastille d'etat ou de categorie */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    padding: 0.18rem 0.6rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-soft);
+    white-space: nowrap;
+  }
+
+  .chip-accent {
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    background: var(--halo);
+    color: var(--accent);
+  }
+
+  .chip-warn {
+    border-color: rgba(196, 128, 32, 0.35);
+    background: rgba(216, 162, 74, 0.14);
+    color: #a26a12;
+  }
+
+  :root[data-theme='dark'] .chip-warn,
+  :root:not([data-theme]) .chip-warn {
+    color: var(--color-ochre);
+  }
+
+  .chip-bad {
+    border-color: rgba(180, 83, 63, 0.4);
+    background: rgba(180, 83, 63, 0.12);
+    color: #b4533f;
+  }
+
+  .chip-ok {
+    border-color: rgba(124, 135, 103, 0.4);
+    background: rgba(124, 135, 103, 0.14);
+    color: var(--color-olive);
+  }
+
+  /* Icone ronde : moyen de transport, type de document */
+  .glyph {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--accent);
+  }
+
+  .hairline {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--line-strong), transparent);
   }
 
   .panel-flush {
@@ -300,15 +549,23 @@ body::before {
   }
 
   .btn-accent {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
+    border-color: color-mix(in srgb, var(--accent) 80%, black);
     color: var(--accent-ink);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 8px 20px -10px color-mix(in srgb, var(--accent) 70%, transparent);
   }
 
   .btn-accent:hover {
-    background: var(--color-clay-soft);
-    border-color: var(--color-clay-soft);
+    background: linear-gradient(180deg, var(--color-clay-soft), color-mix(in srgb, var(--accent) 92%, white));
+    border-color: color-mix(in srgb, var(--accent) 80%, black);
     color: var(--accent-ink);
+  }
+
+  .btn-lg {
+    padding: 0.8rem 1.6rem;
+    font-size: 0.875rem;
   }
 
   .btn-quiet {
@@ -338,9 +595,10 @@ body::before {
      ------------------------------------------------------------------------ */
   .field {
     width: 100%;
-    background: var(--surface-2);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: 14px;
+    box-shadow: inset 0 1px 2px rgba(60, 40, 20, 0.05);
     padding: 0.68rem 0.95rem;
     font-size: 0.9rem;
     color: var(--text);

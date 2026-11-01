@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PlacesProvider } from './context/PlacesContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { ModeProvider } from './context/ModeContext'
 import { I18nProvider } from './i18n/I18nContext'
 import { TrackerProvider } from './context/TrackerContext'
 import Login from './pages/Login'
@@ -15,6 +16,7 @@ import BucketlistPage from './pages/BucketlistPage'
 import EventsPage from './pages/EventsPage'
 import PlannerPage from './pages/PlannerPage'
 import ProfilePage from './pages/ProfilePage'
+import IdeasPage from './pages/IdeasPage'
 import SharePage from './pages/SharePage'
 import PasswordPage from './pages/PasswordPage'
 import UpdatePrompt from './components/UpdatePrompt'
@@ -43,6 +45,7 @@ function Splash() {
 export default function App() {
   return (
     <ThemeProvider>
+    <ModeProvider>
       <BrowserRouter>
         <AuthProvider>
           {/* Sous AuthProvider : la langue est lue dans le profil du compte */}
@@ -121,6 +124,14 @@ export default function App() {
               }
             />
             <Route
+              path="/idees"
+              element={
+                <Protected>
+                  <IdeasPage />
+                </Protected>
+              }
+            />
+            <Route
               path="/profil"
               element={
                 <Protected>
@@ -133,6 +144,7 @@ export default function App() {
           </I18nProvider>
         </AuthProvider>
       </BrowserRouter>
+    </ModeProvider>
     </ThemeProvider>
   )
 }

@@ -128,6 +128,154 @@ export type PublicShare = {
   created_at: string
 }
 
+/* -------------------------------------------------------------------------- */
+/* Voyage partage : etapes, a faire, documents                                */
+/* -------------------------------------------------------------------------- */
+
+export type TransportMode = 'plane' | 'train' | 'bus' | 'boat' | 'car' | 'taxi' | 'motorbike' | 'other'
+
+/**
+ * Une etape de l'itineraire : une ville ou une region ou l'on dort.
+ * Les heures de transport sont en heure LOCALE, sans fuseau
+ * (« 2026-12-18T10:30:00 »), exactement ce qu'affiche le billet.
+ */
+export type TripStop = {
+  id: string
+  trip_id: string
+  created_by: string | null
+  position: number
+  name: string
+  country: string | null
+  lat: number | null
+  lng: number | null
+  arrive_date: string | null
+  leave_date: string | null
+  stay_name: string | null
+  stay_address: string | null
+  stay_ref: string | null
+  stay_url: string | null
+  transport_mode: TransportMode | null
+  transport_details: string | null
+  transport_departs: string | null
+  transport_arrives: string | null
+  transport_ref: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type TodoKind = 'todo' | 'booking' | 'admin' | 'packing'
+
+export type TripTodo = {
+  id: string
+  trip_id: string
+  stop_id: string | null
+  created_by: string | null
+  title: string
+  notes: string | null
+  kind: TodoKind
+  /** Heure locale sans fuseau. */
+  due_at: string | null
+  has_time: boolean
+  remind_minutes: number | null
+  done: boolean
+  done_by: string | null
+  position: number
+  created_at: string
+}
+
+export type DocKind =
+  | 'passport'
+  | 'visa'
+  | 'flight'
+  | 'transport'
+  | 'stay'
+  | 'insurance'
+  | 'health'
+  | 'money'
+  | 'other'
+
+export type TripDocument = {
+  id: string
+  trip_id: string
+  stop_id: string | null
+  created_by: string | null
+  kind: DocKind
+  title: string
+  holder: string | null
+  reference: string | null
+  doc_date: string | null
+  valid_until: string | null
+  notes: string | null
+  /** Chemin dans le bucket prive trip-docs, pas une URL. */
+  path: string | null
+  file_name: string | null
+  mime: string | null
+  size_bytes: number | null
+  created_at: string
+}
+
+export type TripPerson = {
+  user_id: string
+  display_name: string
+  avatar_url: string | null
+  is_owner: boolean
+}
+
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
+
+export type IdeaStatus = 'pending' | 'processing' | 'ready' | 'error' | 'archived'
+
+/** Resultat de l'analyse d'un lien, ecrit par l'analyseur (worker). */
+export type IdeaAnalysis = {
+  name: string
+  kind: string
+  summary: string
+  place: {
+    name: string
+    city: string
+    country: string
+    address: string
+    lat: number | null
+    lng: number | null
+  }
+  price: string
+  duration: string
+  schedule: string
+  booking: string
+  booking_url: string
+  best_time: string
+  tips: string[]
+  fit: {
+    stop_name: string
+    reason: string
+    suggested_dates: string[]
+  } | null
+  transcript_excerpt: string
+  sources: { title: string; url: string }[]
+}
+
+export type LinkIdea = {
+  id: string
+  user_id: string
+  trip_id: string | null
+  url: string
+  platform: string | null
+  note: string | null
+  status: IdeaStatus
+  error: string | null
+  attempts: number
+  title: string | null
+  thumbnail: string | null
+  analysis: IdeaAnalysis | null
+  place_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type NewTripStop =Omit<TripStop, 'id' | 'created_at' | 'created_by'>
+export type NewTripTodo = Omit<TripTodo, 'id' | 'created_at' | 'created_by'>
+export type NewTripDocument = Omit<TripDocument, 'id' | 'created_at' | 'created_by'>
+
 export type NewPlace = Omit<Place, 'id' | 'created_at'>
 export type NewTrip = Omit<Trip, 'id' | 'created_at'>
 export type NewTrack = Omit<Track, 'id' | 'created_at'>
@@ -204,9 +352,84 @@ export type Database = {
         Update: Partial<Omit<PublicShare, 'created_at'>>
         Relationships: []
       }
+      trip_stops: {
+        Row: TripStop
+        Insert: NewTripStop
+        Update: Partial<NewTripStop>
+        Relationships: []
+      }
+      trip_todos: {
+        Row: TripTodo
+        Insert: Partial<NewTripTodo> & Pick<NewTripTodo, 'trip_id' | 'title'>
+        Update: Partial<NewTripTodo>
+        Relationships: []
+      }
+      trip_documents: {
+        Row: TripDocument
+        Insert: Partial<NewTripDocument> & Pick<NewTripDocument, 'trip_id' | 'title' | 'kind'>
+        Update: Partial<NewTripDocument>
+        Relationships: []
+      }
+      drafts: {
+        Row: {
+          id: string
+          user_id: string
+          key: string
+          kind: string
+          trip_id: string | null
+          title: string | null
+          resume_url: string | null
+          payload: Json
+          remind_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          kind: string
+          trip_id?: string | null
+          title?: string | null
+          resume_url?: string | null
+          payload?: Json
+          remind_at?: string | null
+          updated_at?: string
+        }
+        Update: Partial<{
+          title: string | null
+          payload: Json
+          remind_at: string | null
+          updated_at: string
+        }>
+        Relationships: []
+      }
+      link_ideas: {
+        Row: LinkIdea
+        Insert: { url: string; platform?: string | null; note?: string | null; trip_id?: string | null }
+        Update: Partial<Pick<LinkIdea, 'trip_id' | 'status' | 'place_id' | 'note' | 'attempts' | 'error'>>
+        Relationships: []
+      }
+      analyzer_status: {
+        Row: { id: string; last_seen: string; version: string | null }
+        Insert: { id: string; last_seen?: string; version?: string | null }
+        Update: { last_seen?: string; version?: string | null }
+        Relationships: []
+      }
+      trip_members: {
+        Row: { trip_id: string; user_id: string; added_at: string }
+        Insert: { trip_id: string; user_id: string }
+        Update: never
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
+      invite_trip_member: {
+        Args: { p_trip: string; p_email: string }
+        Returns: string
+      }
+      trip_people: {
+        Args: { p_trip: string }
+        Returns: TripPerson[]
+      }
       shared_profile: {
         Args: { share_token: string }
         Returns: { display_name: string | null; avatar_url: string | null; lang: Lang }[]
