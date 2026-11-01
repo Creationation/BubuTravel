@@ -44,10 +44,12 @@ export default defineConfig({
           {
             // Tuiles de carte : l'app reste lisible hors ligne sur les zones
             // deja consultees, ce qui compte en voyage.
-            urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
+            // Nouveau nom de cache : l'ancien « tuiles-carto » contient les
+            // images « API KEY REQUIRED » et ne doit plus etre relu.
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'tuiles-carto',
+              cacheName: 'tuiles-osm',
               expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },

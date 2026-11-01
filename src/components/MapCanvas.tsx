@@ -96,10 +96,10 @@ function MapCanvasInner({
   children,
 }: Props) {
   const { theme } = useTheme()
-  const tileUrl =
-    theme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+  // CARTO exige une cle API depuis l'automne 2026 (tuiles « API KEY
+  // REQUIRED »). On prend les tuiles OpenStreetMap, sans cle ; le theme
+  // sombre est obtenu par filtre CSS (voir .leaflet-tile-pane dans index.css).
+  const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
   // Les gestionnaires passent par des references : leur nouvelle identite a
   // chaque rendu suffirait sinon a faire remonter tous les marqueurs.
@@ -225,7 +225,8 @@ function MapCanvasInner({
       <TileLayer
         key={theme}
         url={tileUrl}
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        maxZoom={19}
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       />
 
       <ZoomControl position="bottomright" />

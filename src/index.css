@@ -487,7 +487,13 @@ body::before {
 
 /* Les tuiles gardent le ton chaud du theme au lieu du gris d'origine */
 .leaflet-tile-pane {
-  filter: sepia(0.22) saturate(0.92);
+  filter: sepia(0.28) saturate(0.7) brightness(1.02);
+}
+
+/* Theme sombre : les tuiles OSM sont claires, on les inverse en gardant
+   les teintes (hue-rotate) puis on les rechauffe vers la terre brulee. */
+:root[data-theme='dark'] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) sepia(0.35) saturate(0.6);
 }
 
 .leaflet-control-attribution {
