@@ -38,3 +38,8 @@ android/capacitor-cordova-android-plugins/build/
 *.jks
 *.keystore
 keystore.properties
+
+# Analyseur : environnement et secrets locaux
+analyzer/.venv/
+analyzer/.env
+analyzer/__pycache__/

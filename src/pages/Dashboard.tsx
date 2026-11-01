@@ -9,6 +9,7 @@ import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import TripCover from '../components/TripCover'
 import { useI18n } from '../i18n/I18nContext'
+import CurrentTripCard from '../components/CurrentTripCard'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
@@ -56,6 +57,7 @@ export default function Dashboard() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl px-5 pb-24 sm:px-8">
+        <CurrentTripCard />
         {/* En-tete editorial */}
         <section className="border-b border-line py-14 sm:py-20">
           <Reveal>

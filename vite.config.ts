@@ -20,9 +20,17 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#17120e',
-        theme_color: '#17120e',
+        background_color: '#1d1422',
+        theme_color: '#2a1630',
         categories: ['travel', 'lifestyle'],
+        // « Partager vers BuBuTravel » depuis TikTok, Instagram, YouTube ou
+        // Maps (Android, app installee) : le lien arrive sur /idees et part
+        // directement a l'analyse.
+        share_target: {
+          action: '/idees',
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -34,6 +42,7 @@ export default defineConfig({
           },
         ],
         shortcuts: [
+          { name: 'Coller un lien', url: '/idees' },
           { name: 'Ouvrir la carte', url: '/carte' },
           { name: 'Mes envies', url: '/bucketlist' },
         ],

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { formatRange, plural } from '../lib/stats'
 import AppShell from '../components/AppShell'
@@ -11,7 +11,8 @@ import { useI18n } from '../i18n/I18nContext'
 export default function TripsPage() {
   const { t, locale } = useI18n()
   const { trips, places, loading } = usePlaces()
-  const [creating, setCreating] = useState(false)
+  const [params] = useSearchParams()
+  const [creating, setCreating] = useState(() => params.get('nouveau') === '1')
 
   return (
     <AppShell>
