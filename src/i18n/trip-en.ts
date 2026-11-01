@@ -384,4 +384,9 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'pd.copied': "Copied",
   'pd.route': "Directions",
   'pd.locate': "Find the exact address",
+  'common.showMore': "Show more",
+  'common.showLess': "Show less",
+  'doc.edit': "Edit document",
+  'doc.replaceFile': "Replace the file",
+  'doc.keepFile': "Current file: {name}",
 }

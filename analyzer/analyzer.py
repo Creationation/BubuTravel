@@ -517,13 +517,28 @@ class PlaceDetails(BaseModel):
     sources: list[Source]
 
 
+def image_ok(url: str) -> bool:
+    """L'image existe-t-elle vraiment (pas une page, pas un lien mort, pas une icone) ?"""
+    try:
+        r = requests.get(url, headers={"User-Agent": UA, "Range": "bytes=0-2048"}, timeout=12, stream=True, allow_redirects=True)
+        ok = r.status_code < 400 and r.headers.get("content-type", "").startswith("image/")
+        size = int(r.headers.get("content-range", "/0").split("/")[-1] or 0) or int(r.headers.get("content-length") or 0)
+        r.close()
+        return ok and (size == 0 or size > 15000)
+    except Exception:
+        return False
+
+
 DETAILS_BRIEF = """Fais la fiche pratique complete de ce lieu pour deux voyageurs, en cherchant sur le web
 (WebSearch, WebFetch : site officiel, Google Maps, Tripadvisor, Instagram, articles recents).
 Identifie le lieu exact. L'ADRESSE COMPLETE (numero, rue, quartier, ville) et les coordonnees GPS
 PRECISES du lieu lui-meme sont obligatoires : verifie-les sur Google Maps ou le site officiel.
 Donne de VRAIES infos : prix, horaires, plats ou billets phares avec prix,
 reservation, conseils. Ajoute des URL directes d'images de CE lieu (ouvre les pages pour trouver
-les fichiers images). N'invente rien : laisse vide ce que tu ne trouves pas.
+les fichiers images). Pour les images : uniquement des PHOTOS du lieu lui-meme (facade, interieur, vue, plats), jamais une
+miniature Instagram, un logo, une capture avec du texte, une carte ou un lieu voisin. Verifie que
+chaque URL est bien un fichier image de CE lieu avant de la donner.
+N'invente rien : laisse vide ce que tu ne trouves pas.
 {lang}
 
 Lieu : {name}
@@ -900,9 +915,12 @@ def link_place(idea: dict) -> None:
     for place in places:
         patch: dict = {}
         frames = idea.get("frames") or []
-        if frames:
-            patch["gallery"] = frames
-            patch["image_url"] = frames[0]
+        verified = ((place.get("details") or {}).get("images")) or []
+        if frames or verified:
+            # Les photos verifiees du lieu restent devant les images de la video
+            gallery = verified + [u for u in frames if u not in verified]
+            patch["gallery"] = gallery[:10]
+            patch["image_url"] = gallery[0]
         elif idea.get("thumbnail") and str(idea["thumbnail"]).startswith("http"):
             patch["image_url"] = idea["thumbnail"]
         if not place.get("details"):
@@ -976,13 +994,15 @@ def process_ai_job(job: dict) -> None:
             )
             data = claude_json(prompt, PlaceDetails, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
             images = [u for u in data.get("images", []) if isinstance(u, str) and u.startswith("http")]
+            images = [u for u in images if image_ok(u)]
+            data["images"] = images
             patch = {"details": data}
-            gallery = list(place.get("gallery") or [])
-            for u in images:
-                if u not in gallery:
-                    gallery.append(u)
+            # Photos verifiees du lieu d'abord ; les images de la video (souvent
+            # du texte, des visages, une miniature) passent apres.
+            frames = [u for u in (place.get("gallery") or []) if FRAMES_BUCKET in u]
+            gallery = images + [u for u in frames if u not in images]
             patch["gallery"] = gallery[:10]
-            if not place.get("image_url") and gallery:
+            if gallery:
                 patch["image_url"] = gallery[0]
             lat, lng = data.get("lat"), data.get("lng")
             if (lat is None or lng is None) and data.get("address"):

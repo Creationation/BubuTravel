@@ -399,4 +399,9 @@ export const tripFr = {
   'pd.copied': "Copié",
   'pd.route': "Itinéraire",
   'pd.locate': "Trouver l'adresse exacte",
+  'common.showMore': "Voir plus",
+  'common.showLess': "Voir moins",
+  'doc.edit': "Modifier le document",
+  'doc.replaceFile': "Remplacer le fichier",
+  'doc.keepFile': "Fichier actuel : {name}",
 } as const

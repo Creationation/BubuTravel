@@ -16,6 +16,7 @@ import {
 import type { Trip, TripStop } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
+import ClampText from '../ClampText'
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -343,7 +344,7 @@ export default function RouteTab({
           </div>
         )}
         {stop.notes && (
-          <p className="mt-4 whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">{stop.notes}</p>
+          <ClampText text={stop.notes} lines={4} className="mt-4 text-[14px] leading-relaxed text-text-soft" />
         )}
       </article>
     )

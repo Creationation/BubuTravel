@@ -10,6 +10,7 @@ import PlaceDetailsView, { PlaceHero } from './PlaceDetailsView'
 import PlaceExtras, { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
+import ClampText from './ClampText'
 
 type Props = {
   place: Place
@@ -429,11 +430,11 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         {/* Notes */}
         <section className={editing ? 'hidden' : ''}>
           <p className="label">{t('common.notes')}</p>
-          <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">
-            {place.notes?.trim() || (
-              <span className="text-text-muted">{t('place.noNote')}</span>
-            )}
-          </p>
+          {place.notes?.trim() ? (
+            <ClampText text={place.notes.trim()} lines={4} className="text-[14px] leading-relaxed text-text-soft" />
+          ) : (
+            <p className="text-[14px] text-text-muted">{t('place.noNote')}</p>
+          )}
         </section>
 
         {/* Photos */}

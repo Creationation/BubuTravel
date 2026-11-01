@@ -5,6 +5,7 @@ import type { Place } from '../lib/types'
 import { usePlaces } from '../context/PlacesContext'
 import { useI18n } from '../i18n/I18nContext'
 import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
+import ClampText from './ClampText'
 
 /** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
 export function isExact(place: Place): boolean {
@@ -207,7 +208,7 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
       {d && (
         <>
           {d.kind && <p className="eyebrow eyebrow-dot">{d.kind}</p>}
-          {d.summary && <p className="text-[15px] leading-relaxed text-text-soft">{d.summary}</p>}
+          {d.summary && <ClampText text={d.summary} lines={4} className="text-[15px] leading-relaxed text-text-soft" />}
 
           {facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-2">

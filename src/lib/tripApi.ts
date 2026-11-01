@@ -149,6 +149,24 @@ export async function updateDocument(
   return data
 }
 
+/** Remplace le fichier d'un document : nouveau fichier envoye, ancien supprime. */
+export async function replaceDocumentFile(doc: TripDocument, file: File): Promise<TripDocument> {
+  const path = `${doc.trip_id}/${crypto.randomUUID()}-${safeName(file.name)}`
+  const { error: upErr } = await supabase.storage
+    .from(DOCS_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined, upsert: false })
+  if (upErr) throw upErr
+  const updated = await updateDocument(doc.id, {
+    path,
+    file_name: file.name,
+    mime: file.type || null,
+    size_bytes: file.size,
+  })
+  if (doc.path) await supabase.storage.from(DOCS_BUCKET).remove([doc.path])
+  await forgetOffline(doc.id)
+  return updated
+}
+
 export async function deleteDocument(doc: TripDocument): Promise<void> {
   const { error } = await supabase.from('trip_documents').delete().eq('id', doc.id)
   if (error) throw error

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { errorMessage } from '../../lib/errors'
-import { forgetOffline, keepOffline, offlineIds, openDocumentUrl } from '../../lib/tripApi'
+import { forgetOffline, keepOffline, offlineIds, openDocumentUrl, replaceDocumentFile } from '../../lib/tripApi'
+import ClampText from '../ClampText'
 import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import type { DocKind, TripDocument } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
@@ -28,6 +29,7 @@ export const docKindKey = (k: DocKind): Key => `doc.kind.${k}` as Key
 export default function DocsTab({ hub, autoAdd = false }: { hub: TripHub; autoAdd?: boolean }) {
   const { t } = useI18n()
   const [adding, setAdding] = useState(autoAdd)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [offline, setOffline] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +92,12 @@ export default function DocsTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
                 <span className="num normal-case tracking-normal">{docs.length}</span>
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {docs.map((doc) => (
+                {docs.map((doc) =>
+                  editingId === doc.id ? (
+                    <div key={doc.id} className="sm:col-span-2">
+                      <DocForm hub={hub} doc={doc} onDone={() => setEditingId(null)} />
+                    </div>
+                  ) : (
                   <DocCard
                     key={doc.id}
                     doc={doc}
@@ -106,9 +113,11 @@ export default function DocsTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
                       }
                     }}
                     onDelete={() => hub.removeDoc(doc).catch((e) => setError(errorMessage(e)))}
+                    onEdit={() => setEditingId(doc.id)}
                     onError={setError}
                   />
-                ))}
+                  ),
+                )}
               </div>
             </section>
           )
@@ -125,12 +134,14 @@ function DocCard({
   offline,
   onOffline,
   onDelete,
+  onEdit,
   onError,
 }: {
   doc: TripDocument
   offline: boolean
   onOffline: (on: boolean) => Promise<void>
   onDelete: () => void
+  onEdit: () => void
   onError: (e: string) => void
 }) {
   const { t, locale } = useI18n()
@@ -191,7 +202,7 @@ function DocCard({
           {t('doc.validUntil')} <span className="num text-text-soft">{shortDate(doc.valid_until, locale)}</span>
         </p>
       )}
-      {doc.notes && <p className="mt-2 text-[13px] text-text-soft">{doc.notes}</p>}
+      {doc.notes && <ClampText text={doc.notes} lines={3} className="mt-2 text-[13px] text-text-soft" />}
 
       <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
         {(doc.path || offline) && (
@@ -214,9 +225,12 @@ function DocCard({
             {offline ? t('doc.offlineOn') : t('doc.offline')}
           </button>
         )}
+        <button onClick={onEdit} className="btn btn-quiet btn-xs ml-auto">
+          {t('common.edit')}
+        </button>
         <button
           onClick={() => (confirm ? onDelete() : setConfirm(true))}
-          className={`btn btn-xs ml-auto ${confirm ? 'border-red-500/60 text-red-500' : 'btn-quiet'}`}
+          className={`btn btn-xs ${confirm ? 'border-red-500/60 text-red-500' : 'btn-quiet'}`}
         >
           {confirm ? t('doc.deleteConfirm') : <TrashIcon size={13} />}
         </button>
@@ -225,15 +239,15 @@ function DocCard({
   )
 }
 
-function DocForm({ hub, onDone }: { hub: TripHub; onDone: () => void }) {
+function DocForm({ hub, doc, onDone }: { hub: TripHub; doc?: TripDocument; onDone: () => void }) {
   const { t } = useI18n()
-  const [kind, setKind] = useState<DocKind>('passport')
-  const [title, setTitle] = useState('')
-  const [holder, setHolder] = useState('')
-  const [reference, setReference] = useState('')
-  const [docDate, setDocDate] = useState('')
-  const [validUntil, setValidUntil] = useState('')
-  const [notes, setNotes] = useState('')
+  const [kind, setKind] = useState<DocKind>(doc?.kind ?? 'passport')
+  const [title, setTitle] = useState(doc?.title ?? '')
+  const [holder, setHolder] = useState(doc?.holder ?? '')
+  const [reference, setReference] = useState(doc?.reference ?? '')
+  const [docDate, setDocDate] = useState(doc?.doc_date ?? '')
+  const [validUntil, setValidUntil] = useState(doc?.valid_until ?? '')
+  const [notes, setNotes] = useState(doc?.notes ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -245,18 +259,24 @@ function DocForm({ hub, onDone }: { hub: TripHub; onDone: () => void }) {
     setBusy(true)
     setError(null)
     try {
-      await hub.addDoc(
-        {
-          kind,
-          title: title.trim(),
-          holder: holder.trim() || null,
-          reference: reference.trim() || null,
-          doc_date: docDate || null,
-          valid_until: validUntil || null,
-          notes: notes.trim() || null,
-        },
-        file,
-      )
+      const fields = {
+        kind,
+        title: title.trim(),
+        holder: holder.trim() || null,
+        reference: reference.trim() || null,
+        doc_date: docDate || null,
+        valid_until: validUntil || null,
+        notes: notes.trim() || null,
+      }
+      if (doc) {
+        await hub.editDoc(doc.id, fields)
+        if (file) {
+          await replaceDocumentFile(doc, file)
+          await hub.reload()
+        }
+      } else {
+        await hub.addDoc(fields, file)
+      }
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -266,7 +286,7 @@ function DocForm({ hub, onDone }: { hub: TripHub; onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="panel space-y-5 p-5 sm:p-7">
-      <h3 className="display-sm text-2xl">{t('doc.add')}</h3>
+      <h3 className="display-sm text-2xl">{doc ? t('doc.edit') : t('doc.add')}</h3>
       {error && <p className="notice notice-bad">{error}</p>}
 
       <div className="flex flex-wrap gap-1.5">
@@ -317,7 +337,7 @@ function DocForm({ hub, onDone }: { hub: TripHub; onDone: () => void }) {
         </div>
         <div className="sm:col-span-2">
           <label className="label">{t('common.notes')}</label>
-          <input className="field" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <textarea className="field min-h-24 resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>
 
@@ -332,7 +352,12 @@ function DocForm({ hub, onDone }: { hub: TripHub; onDone: () => void }) {
             <PlusIcon size={16} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[14px] font-medium">{file ? file.name : t('doc.choose')}</span>
+            <span className="block truncate text-[14px] font-medium">
+              {file ? file.name : doc?.file_name ? t('doc.replaceFile') : t('doc.choose')}
+            </span>
+            {!file && doc?.file_name && (
+              <span className="block truncate text-[12px] text-text-muted">{t('doc.keepFile', { name: doc.file_name })}</span>
+            )}
             <span className="block text-[12px] text-text-muted">{t('doc.fileHint')}</span>
           </span>
         </button>

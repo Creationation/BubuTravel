@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..500,0..100;1,9..144,300..400,0..100&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @import 'leaflet/dist/leaflet.css';
 @import 'leaflet.markercluster/dist/MarkerCluster.css';
@@ -12,8 +12,8 @@
    ========================================================================== */
 
 @theme {
-  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
 
   /* Constantes de marque, identiques dans les deux themes */
   --color-clay: #c0653f;
@@ -230,32 +230,28 @@ body::before {
      Typographie
      ------------------------------------------------------------------------ */
   /*
-   * Titres : Fraunces en graisse legere et grande taille optique, comme une
-   * couverture de magazine de voyage. SOFT arrondit les empattements (le
-   * cote boho), l'italique sert de ponctuation : un mot par titre, en accent.
+   * Titres : une seule police, Plus Jakarta Sans, sans empattements ni
+   * italique (demande de Diego : simple, gros, imposant). Les titres sont en
+   * extra-gras serre, le mot mis en avant (em) passe en couleur d'accent.
    */
   .display {
     font-family: var(--font-display);
-    font-weight: 300;
-    font-variation-settings: 'opsz' 144, 'SOFT' 50, 'WONK' 0;
-    letter-spacing: -0.028em;
-    line-height: 0.98;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
     text-wrap: balance;
   }
 
   .display em,
   .display-sm em {
-    font-style: italic;
-    font-weight: 300;
+    font-style: normal;
     color: var(--accent);
-    font-variation-settings: 'opsz' 144, 'SOFT' 100, 'WONK' 1;
   }
 
   .display-sm {
     font-family: var(--font-display);
-    font-weight: 400;
-    font-variation-settings: 'opsz' 36, 'SOFT' 50, 'WONK' 0;
-    letter-spacing: -0.012em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     line-height: 1.15;
   }
 
@@ -263,9 +259,9 @@ body::before {
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.22em;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
@@ -754,6 +750,54 @@ body::before {
   filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) sepia(0.35) saturate(0.6);
 }
 
+/* --------------------------------------------------------------------------
+   Retour au toucher : tout ce qui est cliquable reagit (survol, pression).
+   Les marqueurs et controles de la carte sont exclus, Leaflet les gere.
+   -------------------------------------------------------------------------- */
+:where(button, a[href], [role='button'], summary):not(:disabled):not(.leaflet-container *) {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease,
+    opacity 0.25s ease;
+}
+
+:where(button, a[href], [role='button']):not(:disabled):not(.leaflet-container *):active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) {
+  :where(.btn, .pill, .tab, .chip):not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  :where(.card, .card-feature):is(a, button):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md), var(--highlight);
+  }
+  /* Vignettes cliquables : leger zoom */
+  :where(button, a) > img {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  :where(button, a):hover > img {
+    transform: scale(1.06);
+  }
+}
+
+:where(button, a[href]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a[href], [role='button']) {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 /* Pays « illumines » : ceux ou l'on est alle (mode Visité) et ceux dont
    tout est fait. La lueur respire doucement ; immobile si on le demande. */
 .leaflet-overlay-pane path.country-glow {
@@ -944,3 +988,24 @@ body::before {
   background: transparent !important;
   border: 0 !important;
 }
+
+
+/* --------------------------------------------------------------------------
+   Textes plus grands partout (demande de Diego) : les petites tailles fixes
+   des composants sont relevees d'un cran. Hors calque : passe devant les
+   utilitaires Tailwind sans toucher a chaque composant.
+   -------------------------------------------------------------------------- */
+body {
+  font-size: 16px;
+}
+.text-\[10px\] { font-size: 11.5px; }
+.text-\[10\.5px\] { font-size: 11.5px; }
+.text-\[11px\] { font-size: 12.5px; }
+.text-\[12px\] { font-size: 13.5px; }
+.text-\[13px\] { font-size: 14.5px; }
+.text-\[14px\] { font-size: 15.5px; }
+.text-\[15px\] { font-size: 16.5px; }
+.lede { font-size: 1.15rem; }
+.btn { font-size: 0.875rem; font-weight: 700; }
+.btn-xs { font-size: 0.78rem; }
+.label { font-size: 0.75rem; }
