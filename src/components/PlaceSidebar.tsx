@@ -12,6 +12,7 @@ import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
 import ClampText from './ClampText'
 import { askReview } from './ReviewSheet'
+import { countryName, categoryLabel } from '../lib/countryName'
 
 type Props = {
   place: Place
@@ -182,8 +183,8 @@ export default function PlaceSidebar({ place, onClose }: Props) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="eyebrow">
-              {place.country}
-              {categoryOf(place) && ` · ${categoryOf(place)!.name}`}
+              {countryName(place.country)}
+              {categoryOf(place) && ` · ${categoryLabel(categoryOf(place)!.name)}`}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -285,7 +286,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                 <option value="">{t('place.noCategory')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {categoryLabel(c.name)}
                   </option>
                 ))}
               </select>
@@ -388,7 +389,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
                   type="date"
                   value={form.promo_until}
                   onChange={(e) => setForm({ ...form, promo_until: e.target.value })}
-                  title="Valable jusqu'au"
+                  title={t('doc.validUntil')}
                 />
               </div>
             </div>
@@ -404,7 +405,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           <p className="label">{t('common.trip')}</p>
           {trips.length === 0 ? (
             <p className="text-[13px] text-text-muted">
-              Aucun voyage cree pour l'instant.{' '}
+              {t('place.noTripYet')}{' '}
               <Link to="/voyages" className="text-accent underline-offset-4 hover:underline">{t('place.createOne')}</Link>
             </p>
           ) : (
@@ -531,7 +532,7 @@ export default function PlaceSidebar({ place, onClose }: Props) {
           index={Math.min(zoom, gallery.length - 1)}
           onIndexChange={setZoom}
           onClose={() => setZoom(null)}
-          caption={`${place.name}, ${place.country}`}
+          caption={`${place.name}, ${countryName(place.country)}`}
         />
       )}
     </aside>

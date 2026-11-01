@@ -10,6 +10,7 @@ import Reveal from '../components/Reveal'
 import TripCover from '../components/TripCover'
 import { useI18n } from '../i18n/I18nContext'
 import CurrentTripCard from '../components/CurrentTripCard'
+import { countryName } from '../lib/countryName'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
@@ -75,11 +76,10 @@ export default function Dashboard() {
             </div>
             <p className="lede mt-6 max-w-xl">
               {stats.countries > 0
-                ? `${plural(stats.countries, t('unit.country'), t('unit.country'))}, ${plural(stats.cities, t('unit.city'))}, ${formatKm(
-                    stats.km,
-                  )} ${stats.km > 1 ? 'kilometres parcourus' : 'kilometre parcouru'}${
-                    stats.firstYear ? ` depuis ${stats.firstYear}` : ''
-                  }.`
+                ? `${plural(stats.countries, t('unit.country'), t('unit.countries'))}, ${plural(stats.cities, t('unit.city'), t('unit.cities'))}, ${t(
+                    stats.km > 1 ? 'journal.kmTravelled' : 'journal.kmTravelled1',
+                    { km: formatKm(stats.km) },
+                  )}${stats.firstYear ? t('share.since', { year: stats.firstYear }) : ''}.`
                 : t('journal.firstPlace')}
             </p>
             <div className="mt-8 flex flex-wrap gap-2.5">
@@ -172,13 +172,13 @@ export default function Dashboard() {
             <Reveal className="mb-6">
               <p className="eyebrow">{t('journal.passport')}</p>
               <h2 className="display-sm mt-2 text-3xl">
-                {plural(countries.length, 'pays visite', 'pays visites')}
+                {t(countries.length > 1 ? 'journal.countriesVisited' : 'journal.countryVisited', { n: countries.length })}
               </h2>
             </Reveal>
             <Reveal className="flex flex-wrap gap-2">
               {topCountries.map(([country, count]) => (
                 <span key={country} className="pill">
-                  {country}
+                  {countryName(country)}
                   <span className="text-text-muted">{count}</span>
                 </span>
               ))}
@@ -198,7 +198,7 @@ export default function Dashboard() {
               {years.map(({ year, items }) => (
                 <div key={year}>
                   <Reveal className="mb-5 flex items-center gap-4">
-                    <h3 className="display text-4xl text-text-muted">{year}</h3>
+                    <h3 className="display text-4xl text-text-muted">{year === 'Sans date' ? t('trips.noStep') : year}</h3>
                     <span className="ornament flex-1">
                       <span className="ornament-dot" />
                     </span>
@@ -283,7 +283,7 @@ function TimelineRow({
             {place.name}
           </span>
           <span className="mt-0.5 block truncate text-[13px] text-text-muted">
-            {place.country}
+            {countryName(place.country)}
             {tripTitle && ` · ${tripTitle}`}
           </span>
         </span>

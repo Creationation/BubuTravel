@@ -1,10 +1,11 @@
+import { tr } from '../i18n/current'
 /**
  * Les erreurs de supabase-js ne sont pas des instances d'Error : ce sont des
  * objets { message, code, details, hint }. Un String(err) dessus affiche
  * "[object Object]" a l'ecran, d'ou ce passage oblige.
  */
 export function errorMessage(err: unknown): string {
-  if (!err) return 'Erreur inconnue.'
+  if (!err) return tr('error.unknown')
   if (typeof err === 'string') return err
   if (err instanceof Error) return err.message
 
@@ -14,9 +15,9 @@ export function errorMessage(err: unknown): string {
       (p): p is string => typeof p === 'string' && p.length > 0,
     )
     if (parts.length > 0) return parts.join(' ')
-    if (typeof e.code === 'string') return `Erreur ${e.code}`
+    if (typeof e.code === 'string') return tr('error.code', { code: e.code })
   }
-  return 'Erreur inconnue.'
+  return tr('error.unknown')
 }
 
 const MISSING_TABLE = /does not exist|schema cache|Could not find the (table|function)/i

@@ -6,6 +6,7 @@ import { CURRENCIES } from './PlaceExtras'
 import type { TravelEvent } from '../lib/types'
 import type { Key } from '../i18n/fr'
 import { useT } from '../i18n/I18nContext'
+import { countryName, categoryLabel } from '../lib/countryName'
 
 type Props = {
   event?: TravelEvent
@@ -220,7 +221,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             <option value="">{t('events.elsewhere')}</option>
             {places.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}, {p.country}
+                {p.name}, {countryName(p.country)}
               </option>
             ))}
           </select>
@@ -260,7 +261,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             <option value="">{t('common.none')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {categoryLabel(c.name)}
               </option>
             ))}
           </select>
@@ -323,7 +324,7 @@ export default function EventForm({ event, onDone, onCancel }: Props) {
             className="field"
             value={form.organizer}
             onChange={(e) => set('organizer', e.target.value)}
-            placeholder="Ville de Vienne"
+            placeholder={t('ph.organizer')}
           />
         </div>
         <div>

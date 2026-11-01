@@ -5,6 +5,7 @@ import { errorMessage } from '../lib/errors'
 import { formatDate, plural, totalDistanceKm } from '../lib/stats'
 import type { Place, Trip } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
+import { countryName, categoryLabel } from '../lib/countryName'
 
 /**
  * Preparation d'un voyage : etapes ordonnees a la main, dates visees et
@@ -82,7 +83,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="eyebrow">{t('planner.itinerary')}</p>
-            <h2 className="display-sm mt-2 text-3xl">{plural(steps.length, t('unit.step'))}</h2>
+            <h2 className="display-sm mt-2 text-3xl">{plural(steps.length, t('unit.step'), t('unit.steps'))}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/carte?envie=1" className="btn btn-xs">{t('planner.addStep')}</Link>
@@ -104,7 +105,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
 
         {km > 0 && (
           <p className="mb-4 text-[13px] text-text-muted">
-            Environ {km} km entre les etapes datees, a vol d'oiseau.
+            {t('trips.kmBetween', { km })}
           </p>
         )}
 
@@ -122,7 +123,7 @@ export default function TripPlanner({ trip }: { trip: Trip }) {
                 index={i}
                 total={steps.length}
                 color={categoryOf(step)?.color ?? null}
-                categoryName={categoryOf(step)?.name ?? null}
+                categoryName={categoryLabel(categoryOf(step)?.name) || null}
                 busy={busy}
                 onMove={move}
                 onDate={(date) => void run(() => edit(step.id, { visit_date: date || null }))}
@@ -173,7 +174,7 @@ function StepRow({
         </span>
         <span className="mt-0.5 block truncate text-[13px] text-text-muted">
           {step.city ? `${step.city}, ` : ''}
-          {step.country}
+          {countryName(step.country)}
           {categoryName && ` · ${categoryName}`}
         </span>
       </span>
@@ -183,7 +184,7 @@ function StepRow({
         className="field w-auto shrink-0 py-1.5 text-[12px]"
         value={step.visit_date ?? ''}
         onChange={(e) => onDate(e.target.value)}
-        title={step.visit_date ? `Prevu le ${formatDate(step.visit_date)}` : t('trips.noStep')}
+        title={step.visit_date ? t('trips.plannedOn', { date: formatDate(step.visit_date) }) : t('trips.noStep')}
       />
 
       <span className="flex shrink-0 gap-1">

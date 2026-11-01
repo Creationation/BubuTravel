@@ -93,7 +93,7 @@ export default function TripForm({ trip, onDone, onCancel }: Props) {
           className="field"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Road trip en Autriche"
+          placeholder={t('ph.trip')}
           required
           autoFocus
         />

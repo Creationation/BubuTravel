@@ -214,7 +214,7 @@ export default function PinGate({
               key={i}
               onClick={() => (k === '⌫' ? setCode((c) => c.slice(0, -1)) : press(k))}
               disabled={waiting || success}
-              aria-label={k === '⌫' ? 'effacer' : k}
+              aria-label={k === '⌫' ? t('common.erase') : k}
               className="aspect-square rounded-full border border-line bg-surface text-[1.6rem] font-bold shadow-[var(--shadow-sm)] active:bg-[var(--halo)]"
             >
               {k}

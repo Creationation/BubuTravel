@@ -262,7 +262,7 @@ export default function PlannerPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="label">Budget</label>
+                <label className="label">{t('planner.budget')}</label>
                 <div className="flex flex-wrap gap-2">
                   {BUDGETS.map((b) => (
                     <button
@@ -277,7 +277,7 @@ export default function PlannerPage() {
                 </div>
               </div>
               <div>
-                <label className="label">Rythme</label>
+                <label className="label">{t('planner.pace')}</label>
                 <div className="flex flex-wrap gap-2">
                   {PACES.map((p) => (
                     <button

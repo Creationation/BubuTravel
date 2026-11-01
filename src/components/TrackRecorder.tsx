@@ -7,6 +7,7 @@ import { formatDuration } from '../lib/geolocation'
 import type { Track } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
 import { errorMessage } from '../lib/errors'
+import { fmtNum } from '../i18n/current'
 
 type Props = {
   onSaved: (track: Track) => void
@@ -73,11 +74,11 @@ export default function TrackRecorder({ onSaved }: Props) {
       <div className="panel fade-in w-72 p-4 shadow-xl">
         <p className="eyebrow">{t('track.done')}</p>
         <p className="display-sm mt-2 text-2xl">
-          {finishing.distanceKm.toFixed(2).replace('.', ',')} km
+          {fmtNum(finishing.distanceKm, 2)} km
         </p>
         <p className="mt-1 text-[12px] text-text-muted">
           {finishing.points.length} points ·{' '}
-          {formatDuration(finishing.startedAt, finishing.endedAt) || 'moins d une minute'}
+          {formatDuration(finishing.startedAt, finishing.endedAt) || t('track.shortDuration')}
         </p>
 
         <input
@@ -128,11 +129,11 @@ export default function TrackRecorder({ onSaved }: Props) {
         </div>
 
         <p className="display-sm mt-2 text-3xl">
-          {distanceKm.toFixed(2).replace('.', ',')} km
+          {fmtNum(distanceKm, 2)} km
         </p>
         <p className="mt-1 text-[12px] text-text-muted">
           {recording.points.length} points ·{' '}
-          {formatDuration(recording.startedAt, now) || 'moins d une minute'}
+          {formatDuration(recording.startedAt, now) || t('track.shortDuration')}
         </p>
 
         {error && <p className="notice notice-bad mt-2">{t(error)}</p>}

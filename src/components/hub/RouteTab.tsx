@@ -27,6 +27,7 @@ import {
   SparkIcon,
   TransportIcon,
 } from './icons'
+import { countryName } from '../../lib/countryName'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -267,7 +268,7 @@ export default function RouteTab({
               <h3 className="display-sm text-[1.75rem] leading-tight hover:text-accent">{stop.name}</h3>
             </button>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {stop.country && <span className="chip">{stop.country}</span>}
+              {stop.country && <span className="chip">{countryName(stop.country)}</span>}
               {nights !== null && (
                 <span className="chip chip-accent num">
                   {nights === 1 ? t('hub.night') : t('hub.nights', { n: nights })}

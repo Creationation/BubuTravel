@@ -15,6 +15,7 @@ import type { ReactNode } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { clusterIcon, draftIcon, haloIcon, placeIcon, wishIcon } from './mapIcon'
 import type { TrackPoint } from '../lib/types'
+import { countryName } from '../lib/countryName'
 
 type Point = {
   id: string
@@ -206,7 +207,7 @@ function MapCanvasInner({
           <Tooltip direction="top" opacity={1}>
             <span>
               {p.name}
-              <span style={{ opacity: 0.6 }}>, {p.country}</span>
+              <span style={{ opacity: 0.6 }}>, {countryName(p.country)}</span>
             </span>
           </Tooltip>
         </Marker>

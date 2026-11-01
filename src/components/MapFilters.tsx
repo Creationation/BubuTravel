@@ -3,6 +3,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { plural } from '../lib/stats'
 import { useT } from '../i18n/I18nContext'
 import type { Place } from '../lib/types'
+import { categoryLabel } from '../lib/countryName'
 
 export type MapFilter = {
   query: string
@@ -147,7 +148,7 @@ export default function MapFilters({
                 <option value="">{t('common.all')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {categoryLabel(c.name)}
                   </option>
                 ))}
               </select>

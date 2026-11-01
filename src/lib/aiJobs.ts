@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Json } from './types'
+import { tr } from '../i18n/current'
 
 /**
  * Demande a l'IA traitee par l'analyseur du PC (Claude Code + abonnement).
@@ -30,7 +31,7 @@ export async function runAiJob<T>(kind: string, input: unknown, tripId: string |
       } else if (row.status === 'error') {
         done = true
         cleanup()
-        reject(new Error(row.error || "L'IA n'a pas pu repondre."))
+        reject(new Error(row.error || tr('error.aiFailed')))
       }
     }
     const channel = supabase
@@ -49,7 +50,7 @@ export async function runAiJob<T>(kind: string, input: unknown, tripId: string |
       if (done) return
       done = true
       cleanup()
-      reject(new Error("Pas de reponse de l'analyseur. Le PC est-il allume ?"))
+      reject(new Error(tr('error.analyzerOffline')))
     }, TIMEOUT_MS)
     function cleanup() {
       window.clearInterval(poll)

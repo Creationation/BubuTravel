@@ -4,12 +4,12 @@ import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
 import { RECURRENCES, formatEventDate, nextOccurrence, sortByNext } from '../lib/events'
 import { formatMoney } from '../components/PlaceExtras'
-import { plural } from '../lib/stats'
 import type { TravelEvent } from '../lib/types'
 import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
 import EventForm from '../components/EventForm'
 import { useI18n, useT } from '../i18n/I18nContext'
+import { categoryLabel } from '../lib/countryName'
 
 export default function EventsPage() {
   const t = useT()
@@ -43,7 +43,7 @@ export default function EventsPage() {
             <p className="eyebrow">{t('nav.events')}</p>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
               <h1 className="display text-[clamp(2.2rem,6vw,4rem)]">
-                {upcoming.length > 0 ? plural(upcoming.length, 'a venir', 'a venir') : t('events.calendar')}
+                {upcoming.length > 0 ? t('events.upcomingCount', { count: upcoming.length }) : t('events.calendar')}
               </h1>
               <button onClick={() => setEditing('new')} className="btn btn-accent">{t('events.new')}</button>
             </div>
@@ -182,7 +182,7 @@ function EventCard({
                   className="rounded-full px-2 py-0.5 text-[11px]"
                   style={{ background: `${category.color}22`, color: category.color }}
                 >
-                  {category.name}
+                  {categoryLabel(category.name)}
                 </span>
               )}
               {event.recurrence !== 'none' && repeat && (

@@ -6,6 +6,7 @@ import type { Lang } from '../lib/types'
 import { fr } from './fr'
 import type { Key } from './fr'
 import { en } from './en'
+import { setCurrentLang } from './current'
 
 const DICTS = { fr, en }
 const STORAGE_KEY = 'bubutravel:lang'
@@ -65,6 +66,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<I18nValue>(() => {
     const dict = DICTS[lang]
+    setCurrentLang(lang)
     return {
       lang,
       locale: lang === 'fr' ? 'fr-FR' : 'en-GB',

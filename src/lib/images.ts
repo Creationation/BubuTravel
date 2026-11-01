@@ -1,4 +1,5 @@
 import imageCompression from 'browser-image-compression'
+import { fmtNum, tr } from '../i18n/current'
 
 /**
  * Compression avant envoi. Une photo de telephone pese couramment 4 a 12 Mo :
@@ -50,6 +51,6 @@ export async function compressImage(file: File): Promise<Compressed> {
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} Mo`
-  return `${Math.round(bytes / 1024)} ko`
+  if (bytes >= 1024 * 1024) return `${fmtNum(bytes / (1024 * 1024), 1)} ${tr('unit.mb')}`
+  return `${Math.round(bytes / 1024)} ${tr('unit.kb')}`
 }

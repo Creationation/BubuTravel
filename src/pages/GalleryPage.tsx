@@ -9,6 +9,7 @@ import { plural } from '../lib/stats'
 import Lightbox from '../components/Lightbox'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
+import { countryName } from '../lib/countryName'
 
 type Filter = { kind: 'all' } | { kind: 'country'; value: string } | { kind: 'trip'; value: string }
 
@@ -62,7 +63,7 @@ export default function GalleryPage() {
           <Reveal>
             <p className="eyebrow">{t('nav.gallery')}</p>
             <h1 className="display mt-4 text-[clamp(2.2rem,6vw,4rem)]">
-              {plural(photos.length, t('unit.photo'))}
+              {plural(photos.length, t('unit.photo'), t('unit.photos'))}
             </h1>
             <p className="lede mt-5 max-w-xl">{t('gallery.intro')}</p>
           </Reveal>
@@ -82,7 +83,7 @@ export default function GalleryPage() {
                 filter.kind === 'country' && filter.value === country ? 'pill-active' : ''
               }`}
             >
-              {country}
+              {countryName(country)}
             </button>
           ))}
           {trips.map((trip) => (
@@ -155,7 +156,7 @@ export default function GalleryPage() {
           caption={(() => {
             const photo = visible[Math.min(zoom, visible.length - 1)]
             const place = photo ? placeById.get(photo.place_id) : null
-            return place ? `${place.name}, ${place.country}` : undefined
+            return place ? `${place.name}, ${countryName(place.country)}` : undefined
           })()}
         />
       )}

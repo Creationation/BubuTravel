@@ -12,6 +12,7 @@ import { Avatar } from '../components/AppShell'
 import type { Place } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../i18n/I18nContext'
+import { countryName } from '../lib/countryName'
 
 /**
  * Vue publique en lecture seule. Aucun compte n'est requis : tout passe par
@@ -98,12 +99,12 @@ export default function SharePage() {
               <p className="eyebrow mb-0">{t('share.journalOf')}</p>
             </div>
             <h1 className="display mt-6 text-[clamp(2.4rem,7vw,4.6rem)]">
-              {plural(stats.countries, t('unit.country'), t('unit.country'))}, {plural(stats.places, t('unit.place'), t('unit.places'))}
+              {plural(stats.countries, t('unit.country'), t('unit.countries'))}, {plural(stats.places, t('unit.place'), t('unit.places'))}
             </h1>
             <p className="lede mt-5 max-w-xl">
-              {formatKm(stats.km)} {stats.km > 1 ? t('unit.kms') : t('unit.km')} a vol d'oiseau,{' '}
-              {plural(stats.photos, t('unit.photo'))}
-              {stats.firstYear ? `, depuis ${stats.firstYear}` : ''}.
+              {formatKm(stats.km)} {stats.km > 1 ? t('unit.kms') : t('unit.km')} {t('stat.asCrowFlies')},{' '}
+              {plural(stats.photos, t('unit.photo'), t('unit.photos'))}
+              {stats.firstYear ? t('share.since', { year: stats.firstYear }) : ''}.
             </p>
           </Reveal>
         </section>
@@ -153,7 +154,7 @@ export default function SharePage() {
           {years.map(({ year, items }) => (
             <div key={year}>
               <Reveal className="mb-5 flex items-center gap-4">
-                <h3 className="display text-4xl text-text-muted">{year}</h3>
+                <h3 className="display text-4xl text-text-muted">{year === 'Sans date' ? t('trips.noStep') : year}</h3>
                 <span className="ornament flex-1">
                   <span className="ornament-dot" />
                 </span>
@@ -170,7 +171,7 @@ export default function SharePage() {
                         <h4 className="display-sm mt-2 text-2xl">{place.name}</h4>
                         <p className="mt-1 text-[13px] text-text-muted">
                           {place.city ? `${place.city}, ` : ''}
-                          {place.country}
+                          {countryName(place.country)}
                         </p>
                         {place.notes && (
                           <p className="mt-3 max-w-2xl whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">

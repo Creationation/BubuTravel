@@ -8,6 +8,7 @@ import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { CheckIcon, PlusIcon, SparkIcon, TodoKindIcon, TrashIcon, WalletIcon } from './icons'
+import { countryName } from '../../lib/countryName'
 
 const PASSPORT_KEY = 'bubutravel:passport'
 
@@ -153,7 +154,7 @@ function CountryCard({
         <button onClick={() => setOpen((v) => !v)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="text-3xl leading-none">{flagOf(country)}</span>
           <span className="min-w-0">
-            <span className="display-sm block truncate text-2xl">{country}</span>
+            <span className="display-sm block truncate text-2xl">{countryName(country)}</span>
             {guide && (
               <span className="num block text-[12px] text-text-muted">
                 {guide.currency.code} · {guide.currency.rate_hint.split(/[.(;]/)[0].trim()}
@@ -197,7 +198,7 @@ function CountryCard({
           {guide && <GuideView guide={guide} />}
 
           <Checklist
-            title={`${t('country.checklist')} · ${country}`}
+            title={`${t('country.checklist')} · ${countryName(country)}`}
             country={country}
             hub={hub}
             suggestions={guide?.checklist ?? []}

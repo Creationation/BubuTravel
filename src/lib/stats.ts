@@ -1,5 +1,6 @@
 import type { Place } from './types'
 import type { Key } from '../i18n/fr'
+import { currentLocale, fmtNum } from '../i18n/current'
 
 type Translate = (key: Key, params?: Record<string, string | number>) => string
 
@@ -70,14 +71,14 @@ export function plural(n: number, one: string, many?: string): string {
 }
 
 export function formatKm(km: number): string {
-  if (km >= 1000) return `${(km / 1000).toFixed(km >= 10000 ? 0 : 1).replace('.', ',')} k`
+  if (km >= 1000) return `${fmtNum(km / 1000, km >= 10000 ? 0 : 1)} k`
   return String(km)
 }
 
 export function formatDate(
   iso: string | null,
   opts?: Intl.DateTimeFormatOptions,
-  locale = 'fr-FR',
+  locale = currentLocale(),
 ): string {
   if (!iso) return ''
   return new Date(`${iso}T00:00:00`).toLocaleDateString(
@@ -91,7 +92,7 @@ export function formatRange(
   start: string | null,
   end: string | null,
   t: Translate,
-  locale = 'fr-FR',
+  locale = currentLocale(),
 ): string {
   if (!start && !end) return t('trips.datesUnset')
   if (start && !end) return t('trips.rangeFrom', { date: formatDate(start, undefined, locale) })

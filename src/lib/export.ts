@@ -1,3 +1,5 @@
+import { currentLang, tr } from '../i18n/current'
+import { categoryLabel } from './countryName'
 import type { Category, Photo, Place, Track, Trip } from './types'
 
 /** Declenche un telechargement depuis des donnees deja en memoire. */
@@ -91,7 +93,10 @@ ${points}
 export function exportPlacesCsv(places: Place[], categories: Category[], trips: Trip[]) {
   const catById = new Map(categories.map((c) => [c.id, c.name]))
   const tripById = new Map(trips.map((t) => [t.id, t.title]))
-  const head = ['nom', 'ville', 'pays', 'latitude', 'longitude', 'date', 'statut', 'categorie', 'voyage', 'notes']
+  const head =
+    currentLang() === 'en'
+      ? ['name', 'city', 'country', 'latitude', 'longitude', 'date', 'status', 'category', 'trip', 'notes']
+      : ['nom', 'ville', 'pays', 'latitude', 'longitude', 'date', 'statut', 'categorie', 'voyage', 'notes']
 
   const cell = (value: string | number | null) => {
     const text = value === null ? '' : String(value)
@@ -107,8 +112,8 @@ export function exportPlacesCsv(places: Place[], categories: Category[], trips: 
       p.lat.toFixed(6),
       p.lng.toFixed(6),
       p.visit_date ?? '',
-      p.status === 'wishlist' ? 'a visiter' : 'visite',
-      p.category_id ? (catById.get(p.category_id) ?? '') : '',
+      p.status === 'wishlist' ? tr('place.wantToVisit') : tr('place.alreadyVisited'),
+      p.category_id ? categoryLabel(catById.get(p.category_id)) : '',
       p.trip_id ? (tripById.get(p.trip_id) ?? '') : '',
       p.notes ?? '',
     ]

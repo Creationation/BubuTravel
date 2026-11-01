@@ -3,6 +3,7 @@ import { useT } from '../i18n/I18nContext'
 import { usePlaces } from '../context/PlacesContext'
 import { pinSvg } from './mapIcon'
 import type { Place } from '../lib/types'
+import { countryName, categoryLabel } from '../lib/countryName'
 
 type Props = {
   places: Place[]
@@ -72,8 +73,8 @@ export default function PlaceChooser({ places, onPick, onClose }: Props) {
                     <span className="display-sm block truncate text-lg">{place.name}</span>
                     <span className="mt-0.5 block truncate text-[13px] text-text-muted">
                       {place.city ? `${place.city}, ` : ''}
-                      {place.country}
-                      {cat && ` · ${cat.name}`}
+                      {countryName(place.country)}
+                      {cat && ` · ${categoryLabel(cat.name)}`}
                     </span>
                   </span>
                   <span className="shrink-0 text-[11px] text-text-muted">

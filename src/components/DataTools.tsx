@@ -6,6 +6,7 @@ import { exportBackup, exportPlacesCsv, exportTrackGpx } from '../lib/export'
 import { errorMessage } from '../lib/errors'
 import type { Photo } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
+import { fmtNum } from '../i18n/current'
 
 /** Sauvegarde et exports : rien ne doit rester prisonnier de l'app. */
 export default function DataTools() {
@@ -70,7 +71,7 @@ export default function DataTools() {
               >
                 {track.name}
                 <span className="text-text-muted">
-                  {track.distance_km.toFixed(1).replace('.', ',')} km
+                  {fmtNum(track.distance_km, 1)} km
                 </span>
               </button>
             ))}

@@ -3,7 +3,7 @@ import { Flag } from './flags'
 import type { Lang } from '../lib/types'
 
 const LANGS: { value: Lang; label: string }[] = [
-  { value: 'fr', label: 'Francais' },
+  { value: 'fr', label: 'Français' },
   { value: 'en', label: 'English' },
 ]
 

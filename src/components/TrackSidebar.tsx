@@ -5,6 +5,7 @@ import { formatDuration } from '../lib/geolocation'
 import type { Track } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../i18n/I18nContext'
+import { fmtNum } from '../i18n/current'
 
 export default function TrackSidebar({ track, onClose }: { track: Track; onClose: () => void }) {
   const { t, locale } = useI18n()
@@ -68,7 +69,7 @@ export default function TrackSidebar({ track, onClose }: { track: Track; onClose
 
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-line bg-line">
-          <Cell label={t('track.distance')} value={`${track.distance_km.toFixed(2).replace('.', ',')} km`} />
+          <Cell label={t('track.distance')} value={`${fmtNum(track.distance_km, 2)} km`} />
           <Cell
             label={t('track.duration')}
             value={formatDuration(track.started_at, track.ended_at) || t('track.short')}
@@ -78,13 +79,10 @@ export default function TrackSidebar({ track, onClose }: { track: Track; onClose
 
         {started && (
           <p className="text-[13px] text-text-muted">
-            Enregistre le{' '}
-            {started.toLocaleDateString(locale, {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}{' '}
-            a {started.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+            {t('track.recordedOn', {
+              date: started.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+              time: started.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+            })}
           </p>
         )}
 

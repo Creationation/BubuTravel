@@ -8,6 +8,7 @@ import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
 import Reveal from '../components/Reveal'
 import { useT } from '../i18n/I18nContext'
+import { countryName, categoryLabel } from '../lib/countryName'
 
 type Filter = { kind: 'all' } | { kind: 'country'; value: string } | { kind: 'category'; value: string }
 
@@ -58,7 +59,7 @@ export default function BucketlistPage() {
             <p className="eyebrow">{t('wish.eyebrow')}</p>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
               <h1 className="display text-[clamp(2.2rem,6vw,4rem)]">
-                {wishlist.length > 0 ? plural(wishlist.length, t('unit.wish')) : t('wish.title')}
+                {wishlist.length > 0 ? plural(wishlist.length, t('unit.wish'), t('unit.wishes')) : t('wish.title')}
               </h1>
               <Link to="/carte?envie=1" className="btn btn-accent">{t('map.addWish')}</Link>
             </div>
@@ -111,7 +112,7 @@ export default function BucketlistPage() {
                     filter.kind === 'country' && filter.value === country ? 'pill-active' : ''
                   }`}
                 >
-                  {country}
+                  {countryName(country)}
                 </button>
               ))}
               {categories.map((cat) => (
@@ -123,7 +124,7 @@ export default function BucketlistPage() {
                   }`}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: cat.color }} />
-                  {cat.name}
+                  {categoryLabel(cat.name)}
                 </button>
               ))}
             </Reveal>
@@ -149,7 +150,7 @@ export default function BucketlistPage() {
                             className="mt-1 shrink-0 rounded-full px-2 py-0.5 text-[11px]"
                             style={{ background: `${cat.color}22`, color: cat.color }}
                           >
-                            {cat.name}
+                            {categoryLabel(cat.name)}
                           </span>
                         )}
                       </div>
@@ -161,7 +162,7 @@ export default function BucketlistPage() {
                       )}
 
                       <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-text-muted">
-                        {place.visit_date && <span>Vise le {formatDate(place.visit_date)}</span>}
+                        {place.visit_date && <span>{t('wish.targetedOn', { date: formatDate(place.visit_date) })}</span>}
                         {trip && <span>· {trip.title}</span>}
                       </div>
 

@@ -8,6 +8,7 @@ import type {
   TripStop,
   TripTodo,
 } from './types'
+import { tr } from '../i18n/current'
 
 /**
  * Tout ce qui vit DANS un voyage : etapes, a faire, documents, personnes.
@@ -198,7 +199,7 @@ export async function keepOffline(doc: TripDocument): Promise<void> {
   if (!doc.path || !cachesAvailable()) return
   const url = await signDocumentUrl(doc.path)
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`Telechargement impossible (${res.status})`)
+  if (!res.ok) throw new Error(tr('error.downloadFailed', { status: res.status }))
   const blob = await res.blob()
   const cache = await caches.open(OFFLINE_CACHE)
   await cache.put(

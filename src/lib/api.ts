@@ -19,6 +19,7 @@ import type {
   TravelEvent,
   Trip,
 } from './types'
+import { categoryLabel } from './countryName'
 
 const SIGNED_URL_TTL = 60 * 60 // 1 h
 
@@ -409,7 +410,7 @@ export async function deleteCategory(id: string): Promise<void> {
 export async function seedCategories(userId: string): Promise<Category[]> {
   const rows = DEFAULT_CATEGORIES.map((c) => ({
     user_id: userId,
-    name: c.name,
+    name: categoryLabel(c.name),
     color: c.color,
     icon: null,
   }))

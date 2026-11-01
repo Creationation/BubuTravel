@@ -30,6 +30,8 @@ import { useI18n } from '../i18n/I18nContext'
 import TripHero from '../components/hub/TripHero'
 import type { Key } from '../i18n/fr'
 import type { TransportMode } from '../lib/types'
+import { fmtNum } from '../i18n/current'
+import { countryName } from '../lib/countryName'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -270,7 +272,7 @@ function Memories({ tripId, planning }: { tripId: string; planning: boolean }) {
               <div key={track.id} className="card p-4">
                 <p className="display-sm text-lg">{track.name}</p>
                 <p className="num mt-1 text-[13px] text-text-muted">
-                  {track.distance_km.toFixed(2).replace('.', ',')} km
+                  {fmtNum(track.distance_km, 2)} km
                   {formatDuration(track.started_at, track.ended_at) &&
                     ` · ${formatDuration(track.started_at, track.ended_at)}`}
                 </p>
@@ -303,7 +305,7 @@ function Memories({ tripId, planning }: { tripId: string; planning: boolean }) {
                   <h3 className="display-sm mt-2 text-2xl">{step.name}</h3>
                   <p className="mt-1 text-[13px] text-text-muted">
                     {step.city ? `${step.city}, ` : ''}
-                    {step.country}
+                    {countryName(step.country)}
                   </p>
                   {step.notes && (
                     <p className="mt-3 max-w-2xl whitespace-pre-wrap text-[14px] leading-relaxed text-text-soft">

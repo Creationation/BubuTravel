@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { tr } from '../i18n/current'
 
 export type PlannedActivity = {
   name: string
@@ -46,7 +47,7 @@ export const MOMENTS: PlannedActivity['moment'][] = ['matin', 'midi', 'apres-mid
 async function call(payload: Record<string, unknown>): Promise<Plan> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
-  if (!token) throw new Error('Connexion requise')
+  if (!token) throw new Error(tr('error.loginRequired'))
 
   const res = await fetch('/api/plan', {
     method: 'POST',
@@ -55,7 +56,7 @@ async function call(payload: Record<string, unknown>): Promise<Plan> {
   })
 
   if (!res.ok) {
-    let message = `Le planificateur a repondu ${res.status}`
+    let message = tr('error.plannerStatus', { status: res.status })
     try {
       const body = (await res.json()) as { error?: string }
       if (body.error) message = body.error

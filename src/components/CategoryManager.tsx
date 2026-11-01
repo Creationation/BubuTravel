@@ -3,6 +3,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { errorMessage } from '../lib/errors'
 import type { Category } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
+import { categoryLabel } from '../lib/countryName'
 
 const PALETTE = [
   '#c4653d',
@@ -113,9 +114,9 @@ export default function CategoryManager() {
                     className="h-3 w-3 shrink-0 rounded-full"
                     style={{ background: cat.color }}
                   />
-                  <span className="min-w-0 flex-1 truncate text-[14px]">{cat.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px]">{categoryLabel(cat.name)}</span>
                   <span className="shrink-0 text-[12px] text-text-muted">
-                    {countOf(cat.id)} lieu{countOf(cat.id) > 1 ? 'x' : ''}
+                    {countOf(cat.id)} {countOf(cat.id) > 1 ? t('unit.places') : t('unit.place')}
                   </span>
                   <button onClick={() => setEditingId(cat.id)} className="btn btn-xs btn-quiet">{t('common.edit')}</button>
                   <button

@@ -1,3 +1,4 @@
+import { tr } from '../i18n/current'
 /**
  * Geocodage via Nominatim (OpenStreetMap). Gratuit, sans cle ni compte.
  * Regle d'usage imposee par OSM : 1 requete par seconde maximum et un
@@ -77,7 +78,7 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
     'accept-language': 'fr',
   })
   const res = await fetch(`${BASE}/search?${params}`, { signal })
-  if (!res.ok) throw new Error(`Recherche indisponible (${res.status})`)
+  if (!res.ok) throw new Error(tr('error.searchDown', { status: res.status }))
   const data = (await res.json()) as NominatimPlace[]
   return data.map(toResult)
 }

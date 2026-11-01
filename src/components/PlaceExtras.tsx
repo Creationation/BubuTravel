@@ -1,6 +1,7 @@
 import type { Place } from '../lib/types'
 import { useI18n } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
+import { currentLocale } from '../i18n/current'
 
 export const PRICE_LEVELS: { value: number; label: string; hint: Key }[] = [
   { value: 1, label: '€', hint: 'price.1' },
@@ -11,7 +12,7 @@ export const PRICE_LEVELS: { value: number; label: string; hint: Key }[] = [
 
 export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'THB', 'MAD', 'CAD'] as const
 
-export function formatMoney(amount: number, currency: string, locale = 'fr-FR'): string {
+export function formatMoney(amount: number, currency: string, locale = currentLocale()): string {
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',

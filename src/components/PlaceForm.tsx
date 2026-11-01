@@ -10,6 +10,7 @@ import type { Place, PlaceStatus } from '../lib/types'
 import { CURRENCIES, PRICE_LEVELS, Stars } from './PlaceExtras'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
+import { categoryLabel } from '../lib/countryName'
 
 export type Draft = {
   name: string
@@ -172,7 +173,7 @@ export default function PlaceForm({
     onDraftChange(next)
     setExifNote(
       bits.length > 0
-        ? `Rempli depuis la photo : ${bits.join(', ')}.`
+        ? t('place.exifFilled', { fields: bits.join(', ') })
         : t('place.exifNothing'),
     )
   }
@@ -214,7 +215,7 @@ export default function PlaceForm({
 
       if (pending.length > 0 && user) {
         for (let i = 0; i < pending.length; i++) {
-          setStep(`Envoi des photos ${i + 1} / ${pending.length}`)
+          setStep(t('place.uploading', { done: i + 1, total: pending.length }))
           await uploadPhoto(user.id, created.id, pending[i])
         }
         bumpPhotoCount(pending.length)
@@ -265,8 +266,7 @@ export default function PlaceForm({
             <p className="label mb-1">{t('place.rightAddress')}</p>
             <p className="text-[13px] leading-relaxed text-text-soft">{gps.label}</p>
             <p className="mt-2 text-[11px] text-text-muted">
-              Position relevee a environ {Math.round(gps.accuracy)} m pres. En ville, entre deux
-              batiments, le releve peut tomber a cote.
+              {t('place.accuracy', { metres: Math.round(gps.accuracy) })}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" className="btn btn-accent btn-xs" onClick={() => setGpsConfirmed(true)}>{t('place.yesHere')}</button>
@@ -327,7 +327,7 @@ export default function PlaceForm({
               touchedRef.current = true
               setQuery(e.target.value)
             }}
-            placeholder="Vienne, Autriche"
+            placeholder={t('ph.cityCountry')}
             autoComplete="off"
           />
           {searching && <p className="mt-1.5 text-[11px] text-text-muted">{t('place.searching')}</p>}
@@ -385,7 +385,7 @@ export default function PlaceForm({
               className="field"
               value={draft.country}
               onChange={(e) => onDraftChange({ ...draft, country: e.target.value })}
-              placeholder="Autriche"
+              placeholder={t('ph.country')}
               required
             />
           </div>
@@ -395,7 +395,7 @@ export default function PlaceForm({
               className="field"
               value={draft.city}
               onChange={(e) => onDraftChange({ ...draft, city: e.target.value })}
-              placeholder="Vienne"
+              placeholder={t('ph.city')}
             />
           </div>
         </div>
@@ -441,7 +441,7 @@ export default function PlaceForm({
               <option value="">{t('place.noCategory')}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {categoryLabel(c.name)}
                 </option>
               ))}
             </select>
@@ -572,7 +572,7 @@ export default function PlaceForm({
                   type="date"
                   value={draft.promo_until}
                   onChange={(e) => onDraftChange({ ...draft, promo_until: e.target.value })}
-                  title="Valable jusqu'au"
+                  title={t('doc.validUntil')}
                 />
               </div>
             </div>

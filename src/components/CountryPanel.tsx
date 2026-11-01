@@ -8,6 +8,7 @@ import type { Place } from '../lib/types'
 import { useI18n } from '../i18n/I18nContext'
 import { CheckIcon, PinIcon } from './hub/icons'
 import { askReview } from './ReviewSheet'
+import { countryName } from '../lib/countryName'
 
 type Show = 'todo' | 'done' | 'all'
 
@@ -70,7 +71,7 @@ export default function CountryPanel({
         <div className="flex items-center gap-3">
           <span className="shrink-0 text-3xl leading-none">{flagOf(country.nameFr)}</span>
           <div className="min-w-0 flex-1">
-            <h2 className="display truncate text-[1.8rem] leading-none">{country.nameFr}</h2>
+            <h2 className="display truncate text-[1.8rem] leading-none">{countryName(country.nameFr)}</h2>
             <p className="num mt-1 text-[12px] text-text-muted">
               {t('map.countryCount', { n: inCountry.length })} ·{' '}
               {cities.length > 1 ? t('map.cities', { n: cities.length }) : t('map.city')}

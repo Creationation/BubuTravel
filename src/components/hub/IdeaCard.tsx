@@ -8,6 +8,7 @@ import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import type { LinkIdea } from '../../lib/types'
 import { useI18n } from '../../i18n/I18nContext'
 import { CalendarIcon, ExternalIcon, PinIcon, SparkIcon, TrashIcon } from './icons'
+import { countryName } from '../../lib/countryName'
 
 const PLATFORM_LABEL: Record<string, string> = {
   tiktok: 'TikTok',
@@ -169,7 +170,7 @@ export default function IdeaCard({ idea, defaultTripId }: { idea: LinkIdea; defa
         <h3 className="display-sm mt-4 text-[1.6rem] leading-tight">{a.name}</h3>
         <p className="mt-1 flex items-center gap-1.5 text-[13px] text-text-muted">
           <PinIcon size={13} />
-          {[a.place.name !== a.name ? a.place.name : '', a.place.city, a.place.country].filter(Boolean).join(', ')}
+          {[a.place.name !== a.name ? a.place.name : '', a.place.city, countryName(a.place.country)].filter(Boolean).join(', ')}
         </p>
         <p className="mt-3 text-[14px] leading-relaxed text-text-soft">{a.summary}</p>
 

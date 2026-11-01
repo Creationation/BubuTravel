@@ -14,6 +14,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { modeKey } from './StopForm'
 import { SparkIcon, TodoKindIcon, TransportIcon } from './icons'
+import { countryName } from '../../lib/countryName'
 
 const BUDGETS: { value: ItineraryRequest['budget']; label: Key }[] = [
   { value: 'petit', label: 'planner.budgetSmall' },
@@ -286,7 +287,7 @@ export default function TripAssistant({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-baseline justify-between gap-2">
                               <h3 className="display-sm text-xl">
-                                {s.name} <span className="text-[14px] text-text-muted">{s.country}</span>
+                                {s.name} <span className="text-[14px] text-text-muted">{countryName(s.country)}</span>
                               </h3>
                               <span className="num text-[12px] text-text-muted">
                                 {shortDate(s.arrive_date, locale)} → {shortDate(s.leave_date, locale)}

@@ -7,6 +7,7 @@ import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { BellIcon, CheckIcon, TodoKindIcon, TrashIcon } from './icons'
+import { countryName } from '../../lib/countryName'
 
 export const KINDS: TodoKind[] = ['todo', 'booking', 'admin', 'packing']
 const kindKey = (k: TodoKind): Key => `todo.kind.${k}` as Key
@@ -90,7 +91,7 @@ export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
           {[
             { value: '*', label: t('todo.all') },
             { value: '', label: t('todo.general') },
-            ...countries.map((c) => ({ value: c, label: `${flagOf(c)} ${c}` })),
+            ...countries.map((c) => ({ value: c, label: `${flagOf(c)} ${countryName(c)}` })),
           ].map((opt) => (
             <button
               key={opt.value || 'general'}
@@ -351,7 +352,7 @@ function AddTodo({
                 <option value="">{t('todo.general')}</option>
                 {countries.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {countryName(c)}
                   </option>
                 ))}
               </select>
