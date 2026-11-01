@@ -8,6 +8,9 @@ import type { Place } from '../lib/types'
 import AppShell from '../components/AppShell'
 import MapCanvas from '../components/MapCanvas'
 import TripStopsLayer, { useCurrentTripStops } from '../components/TripStopsLayer'
+import CountriesLayer from '../components/CountriesLayer'
+import CountryPanel from '../components/CountryPanel'
+import type { CountryProps } from '../lib/worldCountries'
 import PlaceSidebar from '../components/PlaceSidebar'
 import PlaceForm, { emptyDraft } from '../components/PlaceForm'
 import type { Draft, GpsInfo } from '../components/PlaceForm'
@@ -42,6 +45,7 @@ export default function MapPage() {
   const [choices, setChoices] = useState<string[] | null>(null)
   const t = useT()
   const tripStops = useCurrentTripStops()
+  const [country, setCountry] = useState<CountryProps | null>(null)
 
   const selected = useMemo(
     () => (panel.kind === 'place' ? (places.find((p) => p.id === panel.id) ?? null) : null),
@@ -245,8 +249,28 @@ export default function MapPage() {
               onMapClick={picking ? onMapClick : undefined}
               focus={focus}
             >
+              <CountriesLayer
+                places={places}
+                extraCountries={tripStops.stops.map((s) => s.country ?? '').filter(Boolean)}
+                interactive={!picking}
+                onCountry={(props) => {
+                  setPanel({ kind: 'none' })
+                  setCountry(props)
+                }}
+              />
               <TripStopsLayer stops={tripStops.stops} />
             </MapCanvas>
+
+            {country && (
+              <CountryPanel
+                country={country}
+                onClose={() => setCountry(null)}
+                onOpenPlace={(place) => {
+                  setCountry(null)
+                  selectPlace(place)
+                }}
+              />
+            )}
 
             {/* Legende : la couleur des marqueurs porte une information */}
             <div className="absolute right-4 top-4 z-[1000]">
