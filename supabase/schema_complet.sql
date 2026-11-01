@@ -1720,3 +1720,261 @@ notify pgrst, 'reload schema';
 alter table public.places add column if not exists details jsonb;
 
 notify pgrst, 'reload schema';
+
+
+-- ####################################################################
+-- ## Migration 015_programme
+-- ## source : supabase\migrations\015_programme.sql
+-- ####################################################################
+
+-- ============================================================================
+-- BuBuTravel  |  015 : programme du voyage
+--
+-- Une chose a faire peut etre placee dans le voyage : un jour (visit_date,
+-- deja existant), une heure de debut et une duree. Sert a construire le
+-- programme jour par jour et a detecter les chevauchements.
+--
+-- Idempotent.
+-- ============================================================================
+
+alter table public.places add column if not exists plan_time text;
+alter table public.places add column if not exists plan_minutes integer;
+
+notify pgrst, 'reload schema';
+
+
+-- ####################################################################
+-- ## Migration 016_avis_compagnons
+-- ## source : supabase\migrations\016_avis_compagnons.sql
+-- ####################################################################
+
+-- ============================================================================
+-- BuBuTravel  |  016 : avis par voyageur, compagnons de voyage
+--
+-- 1. places.feedback : l'avis de chaque voyageur sur un lieu visite,
+--    { "<user_id>": { name, price, service, vibe, again, comment, at } }.
+--    Chacun ecrit le sien via set_place_feedback (pas d'ecrasement de l'avis
+--    de l'autre), lisible par les membres du voyage.
+-- 2. add_trip_companion : ajouter en un tap une personne avec qui on a deja
+--    voyage (sans retaper son email).
+-- 3. my_companions : les personnes avec qui on partage au moins un voyage.
+--
+-- Idempotent.
+-- ============================================================================
+
+alter table public.places add column if not exists feedback jsonb not null default '{}'::jsonb;
+
+create or replace function public.set_place_feedback(p_place uuid, p_feedback jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_place public.places;
+  v_name text;
+  v_out jsonb;
+begin
+  select * into v_place from public.places where id = p_place;
+  if v_place.id is null then
+    raise exception 'Lieu introuvable' using errcode = 'P0002';
+  end if;
+  if not (v_place.user_id = auth.uid() or public.is_trip_member(v_place.trip_id)) then
+    raise exception 'Acces refuse' using errcode = '42501';
+  end if;
+  select coalesce(display_name, 'Voyageur') into v_name from public.profiles where id = auth.uid();
+  update public.places
+     set feedback = coalesce(feedback, '{}'::jsonb)
+                    || jsonb_build_object(auth.uid()::text, p_feedback || jsonb_build_object('name', v_name, 'at', now()))
+   where id = p_place
+  returning feedback into v_out;
+  return v_out;
+end
+$function$;
+
+revoke all on function public.set_place_feedback(uuid, jsonb) from anon;
+
+create or replace function public.my_companions()
+returns table (user_id uuid, display_name text, avatar_url text)
+language sql
+security definer
+stable
+set search_path = public
+as $function$
+  with mine as (
+    select t.id from public.trips t where t.user_id = auth.uid()
+    union
+    select m.trip_id from public.trip_members m where m.user_id = auth.uid()
+  ), people as (
+    select t.user_id from public.trips t where t.id in (select id from mine)
+    union
+    select m.user_id from public.trip_members m where m.trip_id in (select id from mine)
+  )
+  select p.id, coalesce(p.display_name, 'Voyageur'), p.avatar_url
+  from public.profiles p
+  where p.id in (select user_id from people) and p.id <> auth.uid()
+$function$;
+
+revoke all on function public.my_companions() from anon;
+
+create or replace function public.add_trip_companion(p_trip uuid, p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if not exists (select 1 from public.trips t where t.id = p_trip and t.user_id = auth.uid()) then
+    raise exception 'Seul l''organisateur du voyage peut inviter.' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.my_companions() c where c.user_id = p_user) then
+    raise exception 'Cette personne n''a encore partage aucun voyage avec vous : invitez-la par email.' using errcode = '42501';
+  end if;
+  insert into public.trip_members (trip_id, user_id) values (p_trip, p_user) on conflict do nothing;
+end
+$function$;
+
+revoke all on function public.add_trip_companion(uuid, uuid) from anon;
+
+notify pgrst, 'reload schema';
+
+
+-- ####################################################################
+-- ## Migration 017_coffre
+-- ## source : supabase\migrations\017_coffre.sql
+-- ####################################################################
+
+-- ============================================================================
+-- BuBuTravel  |  017 : coffre personnel
+--
+-- Passeports, cartes d'identite, cartes bancaires (4 derniers chiffres
+-- seulement), numeros importants, assurance, billets et QR codes.
+-- Prive par defaut ; « shared » le rend visible aux compagnons de voyage
+-- (personnes avec qui on partage au moins un voyage), en lecture seule.
+-- Fichiers dans le bucket prive « vault », chemin {user_id}/{uuid}.{ext}.
+--
+-- Idempotent.
+-- ============================================================================
+
+create table if not exists public.vault_items (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  /** identity, card, contact, insurance, ticket, other */
+  kind        text not null default 'other',
+  title       text not null,
+  holder      text,
+  /** Numero du document, ou 4 derniers chiffres d'une carte. */
+  number      text,
+  expires     date,
+  phone       text,
+  email       text,
+  url         text,
+  notes       text,
+  /** Chemins des fichiers (recto, verso, QR...) dans le bucket vault. */
+  files       jsonb not null default '[]'::jsonb,
+  shared      boolean not null default false,
+  position    integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists vault_items_user_idx on public.vault_items (user_id, kind);
+
+alter table public.vault_items enable row level security;
+
+/** Le proprietaire de la ligne voyage-t-il avec moi ? */
+create or replace function public.is_companion(p_user uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $function$
+  select exists (select 1 from public.my_companions() c where c.user_id = p_user)
+$function$;
+
+drop policy if exists "vault: les siens"            on public.vault_items;
+drop policy if exists "vault: partages, en lecture" on public.vault_items;
+
+create policy "vault: les siens"
+  on public.vault_items for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "vault: partages, en lecture"
+  on public.vault_items for select
+  using (shared and public.is_companion(user_id));
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('vault', 'vault', false, 15728640)
+on conflict (id) do update set public = false;
+
+/** Un fichier du coffre est lisible par son proprietaire, ou par un compagnon si l'element est partage. */
+create or replace function public.can_read_vault_file(p_name text)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $function$
+  select (storage.foldername(p_name))[1] = auth.uid()::text
+      or exists (
+        select 1 from public.vault_items v
+        where v.shared and v.files ? p_name and public.is_companion(v.user_id)
+      )
+$function$;
+
+drop policy if exists "vault: lire"      on storage.objects;
+drop policy if exists "vault: ecrire"    on storage.objects;
+drop policy if exists "vault: supprimer" on storage.objects;
+
+create policy "vault: lire"
+  on storage.objects for select
+  using (bucket_id = 'vault' and public.can_read_vault_file(name));
+create policy "vault: ecrire"
+  on storage.objects for insert
+  with check (bucket_id = 'vault' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "vault: supprimer"
+  on storage.objects for delete
+  using (bucket_id = 'vault' and (storage.foldername(name))[1] = auth.uid()::text);
+
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Code du coffre (5 chiffres). Seule une empreinte PBKDF2 salee est gardee,
+-- jamais le code lui-meme. C'est un verrou d'usage : la vraie protection
+-- reste le compte (session Supabase + RLS).
+-- ---------------------------------------------------------------------------
+create table if not exists public.vault_pins (
+  user_id    uuid primary key references auth.users (id) on delete cascade default auth.uid(),
+  salt       text not null,
+  hash       text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.vault_pins enable row level security;
+
+drop policy if exists "vault_pins: le sien" on public.vault_pins;
+create policy "vault_pins: le sien"
+  on public.vault_pins for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+notify pgrst, 'reload schema';
+
+
+-- ####################################################################
+-- ## Migration 018_hotes_accueil
+-- ## source : supabase\migrations\018_hotes_accueil.sql
+-- ####################################################################
+
+-- 018 : contacts des hotes par hebergement, et ecran d'accueil du profil.
+--
+-- 1. trip_stops.hosts : liste des hebergements d'une etape avec le contact de
+--    l'hote ([{ stay, name, phone, email, note }]). Une etape peut en avoir
+--    plusieurs (Phuket : deux logements).
+-- 2. profiles.greeting : ecran « Bonjour / Bonsoir » a l'ouverture de l'app,
+--    'big' (grande photo), 'small' (petite photo) ou 'off'.
+
+alter table public.trip_stops add column if not exists hosts jsonb not null default '[]'::jsonb;
+
+alter table public.profiles add column if not exists greeting text not null default 'big';
+alter table public.profiles drop constraint if exists profiles_greeting_check;
+alter table public.profiles add constraint profiles_greeting_check check (greeting in ('big', 'small', 'off'));

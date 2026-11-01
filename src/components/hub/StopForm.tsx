@@ -7,6 +7,7 @@ import type { NewTripStop, TransportMode, TripStop } from '../../lib/types'
 import { useT } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { PinIcon, TransportIcon } from './icons'
+import { HostsEditor } from './HostContacts'
 
 export const MODES: TransportMode[] = ['plane', 'train', 'bus', 'boat', 'car', 'taxi', 'motorbike', 'other']
 export const modeKey = (m: TransportMode): Key => `mode.${m}` as Key
@@ -24,6 +25,7 @@ const EMPTY: Draft = {
   stay_address: null,
   stay_ref: null,
   stay_url: null,
+  hosts: [],
   transport_mode: null,
   transport_details: null,
   transport_departs: null,
@@ -61,7 +63,7 @@ export default function StopForm({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [showStay, setShowStay] = useState(Boolean(stop?.stay_name || stop?.stay_address || stop?.stay_ref))
+  const [showStay, setShowStay] = useState(Boolean(stop?.stay_name || stop?.stay_address || stop?.stay_ref || stop?.hosts?.length))
   const [showTransport, setShowTransport] = useState(Boolean(stop?.transport_mode || stop?.transport_departs))
   const picked = useRef(Boolean(stop))
 
@@ -212,6 +214,8 @@ export default function StopForm({
             type="url"
           />
         </div>
+        <p className="label mt-4">{t('host.title')}</p>
+        <HostsEditor hosts={draft.hosts ?? []} onChange={(v) => set('hosts', v)} />
       </Section>
 
       {/* Transport vers la suite */}

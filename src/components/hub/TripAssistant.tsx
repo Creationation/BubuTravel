@@ -125,6 +125,7 @@ export default function TripAssistant({
           stay_address: null,
           stay_ref: null,
           stay_url: null,
+          hosts: [],
           transport_mode: tr?.mode ?? null,
           transport_details: tr
             ? [tr.details, tr.how_to_book && `${t('ai.howToBook')} : ${tr.how_to_book}`].filter(Boolean).join(' · ')

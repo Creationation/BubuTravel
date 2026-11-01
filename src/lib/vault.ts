@@ -32,10 +32,43 @@ export type VaultInput = Omit<VaultItem, 'id' | 'user_id' | 'created_at' | 'file
 const BUCKET = 'vault'
 const db = () => supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> }
 
+/* Copie locale des donnees du coffre : tout reste lisible sans reseau. */
+let owner = ''
+/** Les copies locales sont rangees par compte : deux comptes, deux coffres. */
+async function resolveOwner() {
+  const { data } = await supabase.auth.getSession()
+  owner = data.session?.user.id ?? ''
+}
+function saveLocal(key: string, value: unknown) {
+  try {
+    localStorage.setItem(`bubutravel:coffre:${owner}:${key}`, JSON.stringify(value))
+  } catch {
+    // stockage plein ou bloque : on garde au moins l'affichage en ligne
+  }
+}
+export function loadLocal<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(`bubutravel:coffre:${owner}:${key}`)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
+export { saveLocal as saveVaultLocal }
+
 export async function fetchVault(): Promise<VaultItem[]> {
-  const { data, error } = await db().from('vault_items').select('*').order('position').order('created_at')
-  if (error) throw error
-  return (data ?? []) as unknown as VaultItem[]
+  await resolveOwner()
+  try {
+    const { data, error } = await db().from('vault_items').select('*').order('position').order('created_at')
+    if (error) throw error
+    const rows = (data ?? []) as unknown as VaultItem[]
+    saveLocal('rows', rows)
+    return rows
+  } catch (err) {
+    const cached = loadLocal<VaultItem[]>('rows')
+    if (cached) return cached
+    throw err
+  }
 }
 
 async function uploadFiles(userId: string, files: File[]): Promise<string[]> {
@@ -91,22 +124,58 @@ export async function signVaultFiles(paths: string[]): Promise<Record<string, st
 const CACHE = 'bubutravel-coffre'
 const key = (path: string) => `/hors-ligne/coffre/${path}`
 
-/** Garde une copie de tous les fichiers du coffre sur cet appareil. */
+/**
+ * Garde une copie de tous les fichiers du coffre sur cet appareil. Appelee
+ * toute seule a chaque ouverture du coffre en ligne : seuls les fichiers
+ * manquants sont telecharges. Renvoie le nombre de fichiers disponibles.
+ */
 export async function cacheVaultOffline(items: VaultItem[]): Promise<number> {
   if (!('caches' in window)) return 0
-  const paths = items.flatMap((i) => i.files)
-  const urls = await signVaultFiles(paths)
+  const paths = [...new Set(items.flatMap((i) => i.files))]
   const cache = await caches.open(CACHE)
-  let n = 0
-  for (const p of paths) {
-    if (!urls[p]) continue
-    const res = await fetch(urls[p])
-    if (res.ok) {
-      await cache.put(key(p), new Response(await res.blob(), { headers: { 'Content-Type': res.headers.get('content-type') ?? '' } }))
-      n++
+  const missing: string[] = []
+  for (const p of paths) if (!(await cache.match(key(p)))) missing.push(p)
+  if (missing.length && navigator.onLine) {
+    const urls = await signVaultFiles(missing)
+    for (const p of missing) {
+      if (!urls[p]) continue
+      try {
+        const res = await fetch(urls[p])
+        if (res.ok) {
+          await cache.put(key(p), new Response(await res.blob(), { headers: { 'Content-Type': res.headers.get('content-type') ?? '' } }))
+        }
+      } catch {
+        // reseau coupe en route : on reessaiera a la prochaine ouverture
+      }
     }
   }
+  let n = 0
+  for (const p of paths) if (await cache.match(key(p))) n++
   return n
+}
+
+/** Copie locale d'un fichier quelconque (reservations du voyage). */
+export async function cacheUrl(id: string, url: () => Promise<string | null>): Promise<boolean> {
+  if (!('caches' in window)) return false
+  const cache = await caches.open(CACHE)
+  if (await cache.match(key(`doc/${id}`))) return true
+  if (!navigator.onLine) return false
+  try {
+    const u = await url()
+    if (!u) return false
+    const res = await fetch(u)
+    if (!res.ok) return false
+    await cache.put(key(`doc/${id}`), new Response(await res.blob(), { headers: { 'Content-Type': res.headers.get('content-type') ?? '' } }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function cachedUrl(id: string): Promise<string | null> {
+  if (!('caches' in window)) return null
+  const hit = await (await caches.open(CACHE)).match(key(`doc/${id}`))
+  return hit ? URL.createObjectURL(await hit.blob()) : null
 }
 
 /** URL affichable : copie locale si elle existe (hors reseau), sinon lien signe. */

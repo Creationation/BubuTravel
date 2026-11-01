@@ -6,6 +6,8 @@ export type Profile = {
   avatar_url: string | null
   /** Langue de l'interface, liee au compte et non a l'appareil. */
   lang: Lang
+  /** Ecran d'accueil : grande photo, petite photo ou aucun. */
+  greeting?: 'big' | 'small' | 'off'
   created_at: string
 }
 
@@ -183,6 +185,8 @@ export type TripStop = {
   stay_address: string | null
   stay_ref: string | null
   stay_url: string | null
+  /** Hebergements de l'etape et contact de leur hote. */
+  hosts: StopHost[]
   transport_mode: TransportMode | null
   transport_details: string | null
   transport_departs: string | null
@@ -191,6 +195,8 @@ export type TripStop = {
   notes: string | null
   created_at: string
 }
+
+export type StopHost = { stay: string; name: string; phone: string; email: string; note: string }
 
 export type TodoKind = 'todo' | 'booking' | 'admin' | 'packing'
 

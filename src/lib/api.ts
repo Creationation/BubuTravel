@@ -451,6 +451,14 @@ export async function deleteEvent(id: string): Promise<void> {
 }
 
 /** Langue de l'interface, enregistree sur le compte. */
+export async function updateGreeting(userId: string, greeting: 'big' | 'small' | 'off'): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ greeting } as never)
+    .eq('id', userId)
+  if (error) throw error
+}
+
 export async function updateLang(userId: string, lang: Lang): Promise<Profile> {
   const { data, error } = await supabase
     .from('profiles')

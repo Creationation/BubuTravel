@@ -21,6 +21,31 @@ type I18nValue = {
 
 const I18nContext = createContext<I18nValue | null>(null)
 
+/** Choix de langue fait par l'utilisateur, pas encore confirme en base. */
+const PENDING_KEY = 'bubutravel:lang-choice'
+function readPending(): Lang | null {
+  try {
+    const v = window.localStorage.getItem(PENDING_KEY)
+    return v === 'fr' || v === 'en' ? v : null
+  } catch {
+    return null
+  }
+}
+function writePending(v: Lang) {
+  try {
+    window.localStorage.setItem(PENDING_KEY, v)
+  } catch {
+    // stockage bloque : le choix part quand meme en base
+  }
+}
+function clearPending() {
+  try {
+    window.localStorage.removeItem(PENDING_KEY)
+  } catch {
+    // rien a nettoyer
+  }
+}
+
 /** Avant la connexion : dernier choix, sinon la langue du navigateur. */
 function guessLang(): Lang {
   if (typeof window === 'undefined') return 'fr'
@@ -40,12 +65,27 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const { user, profile, refreshProfile } = useAuth()
   const [lang, setLangState] = useState<Lang>(guessLang)
 
-  // Le profil fait autorite des qu'il est charge
+  // Le profil fait autorite des qu'il est charge, SAUF si un choix explicite
+  // n'est pas encore enregistre en base (fait hors connexion, avant le login,
+  // ou ecriture en cours) : ce choix-la gagne et part dans le profil.
   useEffect(() => {
-    if (profile?.lang && profile.lang !== lang) setLangState(profile.lang)
+    if (!user || !profile?.lang) return
+    const pending = readPending()
+    if (pending && pending !== profile.lang) {
+      setLangState(pending)
+      void updateLang(user.id, pending)
+        .then(() => {
+          clearPending()
+          return refreshProfile()
+        })
+        .catch((err) => console.error('[i18n] langue non enregistree', err))
+      return
+    }
+    clearPending()
+    if (profile.lang !== lang) setLangState(profile.lang)
     // lang volontairement absent : on ne veut suivre que le profil ici
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.lang])
+  }, [profile?.lang, user?.id])
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, lang)
@@ -55,10 +95,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const setLang = useCallback(
     (next: Lang) => {
       setLangState(next)
+      // Le choix est retenu tout de suite sur l'appareil, jusqu'a ce que la
+      // base l'ait bien enregistre : il ne peut plus etre ecrase.
+      writePending(next)
       if (!user) return
       // L'ecriture en base ne doit pas bloquer le changement a l'ecran
       void updateLang(user.id, next)
-        .then(() => refreshProfile())
+        .then(() => {
+          if (readPending() === next) clearPending()
+          return refreshProfile()
+        })
         .catch((err) => console.error('[i18n] langue non enregistree', err))
     },
     [user, refreshProfile],

@@ -22,6 +22,7 @@ import PasswordPage from './pages/PasswordPage'
 import UpdatePrompt from './components/UpdatePrompt'
 import { useT } from './i18n/I18nContext'
 import VaultPage from './pages/VaultPage'
+import Greeting from './components/Greeting'
 
 function Protected({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -53,6 +54,7 @@ export default function App() {
           <I18nProvider>
             {/* L'invite de mise a jour traduit, elle doit vivre sous I18nProvider */}
             <UpdatePrompt />
+            <Greeting />
             <Routes>
             <Route path="/login" element={<Login />} />
             {/* Page publique, sans compte ni session */}

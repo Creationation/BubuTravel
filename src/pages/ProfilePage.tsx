@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { usePlaces } from '../context/PlacesContext'
-import { disableShare, enableShare, fetchShare, rotateShare, updateDisplayName, uploadAvatar } from '../lib/api'
+import { disableShare, enableShare, fetchShare, rotateShare, updateDisplayName, updateGreeting, uploadAvatar } from '../lib/api'
 import type { PublicShare } from '../lib/types'
 import AppShell, { Avatar } from '../components/AppShell'
 import Reveal from '../components/Reveal'
@@ -12,6 +12,8 @@ import LanguageSwitch from '../i18n/LanguageSwitch'
 import { useT } from '../i18n/I18nContext'
 import { useTheme } from '../context/ThemeContext'
 import { errorMessage } from '../lib/errors'
+import AvatarCropper from '../components/AvatarCropper'
+import Greeting from '../components/Greeting'
 
 export default function ProfilePage() {
   const t = useT()
@@ -19,6 +21,8 @@ export default function ProfilePage() {
   const { stats } = usePlaces()
   const { theme, setTheme } = useTheme()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const [previewGreet, setPreviewGreet] = useState<'big' | 'small' | null>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -58,6 +62,17 @@ export default function ProfilePage() {
       setError(errorMessage(err))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function setGreeting(v: 'big' | 'small' | 'off') {
+    if (!user) return
+    try {
+      await updateGreeting(user.id, v)
+      await refreshProfile()
+      if (v !== 'off') setPreviewGreet(v)
+    } catch (err) {
+      setError(errorMessage(err))
     }
   }
 
@@ -143,7 +158,8 @@ export default function ProfilePage() {
                 accept="image/*"
                 className="hidden"
                 onChange={(e) => {
-                  void onAvatar(e.target.files?.[0])
+                  const f = e.target.files?.[0]
+                  if (f) setCropFile(f)
                   e.target.value = ''
                 }}
               />
@@ -165,6 +181,58 @@ export default function ProfilePage() {
             </div>
           </section>
         </Reveal>
+
+        {/* Accueil : photo ronde et « Bonjour » a l'ouverture */}
+        <Reveal className="mt-6">
+          <section className="panel p-6 sm:p-8">
+            <h2 className="display-sm text-2xl">{t('greet.settings')}</h2>
+            <p className="lede mt-2 text-[14px]">{t('greet.settingsHint')}</p>
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              <button onClick={() => fileRef.current?.click()} className="btn" disabled={busy}>
+                📷 {profile?.avatar_url ? t('avatar.change') : t('avatar.add')}
+              </button>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {(['big', 'small', 'off'] as const).map((v) => {
+                const active = (profile?.greeting ?? 'big') === v
+                return (
+                  <button
+                    key={v}
+                    onClick={() => void setGreeting(v)}
+                    className={`flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all duration-300 active:scale-95 ${
+                      active ? 'border-accent bg-[var(--halo)] shadow-[var(--shadow-sm)]' : 'border-line bg-surface'
+                    }`}
+                  >
+                    <span
+                      className="flex items-center justify-center rounded-full bg-surface-2 text-xl"
+                      style={{ width: v === 'big' ? 52 : 34, height: v === 'big' ? 52 : 34, opacity: v === 'off' ? 0.35 : 1 }}
+                    >
+                      {v === 'off' ? '🚫' : '🙂'}
+                    </span>
+                    <span className="text-[13px] font-bold">{t(`greet.style.${v}` as 'greet.style.big')}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {(profile?.greeting ?? 'big') !== 'off' && (
+              <button onClick={() => setPreviewGreet((profile?.greeting as 'big' | 'small') ?? 'big')} className="btn btn-quiet btn-xs mt-4">
+                👀 {t('greet.preview')}
+              </button>
+            )}
+          </section>
+        </Reveal>
+
+        {cropFile && (
+          <AvatarCropper
+            file={cropFile}
+            onCancel={() => setCropFile(null)}
+            onDone={async (f) => {
+              await onAvatar(f)
+              setCropFile(null)
+            }}
+          />
+        )}
+        {previewGreet && <Greeting preview={previewGreet} onEnd={() => setPreviewGreet(null)} />}
 
         {/* Apparence */}
         <Reveal className="mt-6">

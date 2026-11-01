@@ -6,11 +6,16 @@ import { useAuth } from '../context/AuthContext'
 import { usePlaces } from '../context/PlacesContext'
 import { pickCurrentTrip } from '../lib/currentTrip'
 import { errorMessage } from '../lib/errors'
-import { fetchDocuments, openDocumentUrl } from '../lib/tripApi'
+import { fetchDocuments, fetchStops, openDocumentUrl } from '../lib/tripApi'
 import { addDaysIso, shortDate, todayIso } from '../lib/tripDates'
-import type { TripDocument } from '../lib/types'
+import type { StopHost, TripDocument } from '../lib/types'
+import { HostCards } from '../components/hub/HostContacts'
 import {
+  cacheUrl,
+  cachedUrl,
   cacheVaultOffline,
+  loadLocal,
+  saveVaultLocal,
   deleteVaultItem,
   fetchVault,
   saveVaultItem,
@@ -53,7 +58,7 @@ export default function VaultPage() {
 }
 
 function Vault({ onChangePin }: { onChangePin: () => void }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { user } = useAuth()
   const { trips } = usePlaces()
   const [items, setItems] = useState<VaultItem[]>([])
@@ -61,7 +66,8 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
   const [editing, setEditing] = useState<VaultItem | VaultKind | null>(null)
   const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null)
   const [tripDocs, setTripDocs] = useState<TripDocument[]>([])
-  const [offlineMsg, setOfflineMsg] = useState<string | null>(null)
+  const [offline, setOffline] = useState<{ ready: number; total: number } | null>(null)
+  const [hosts, setHosts] = useState<{ stop: string; dates: string; hosts: StopHost[] }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [, forceLock] = useState(0)
 
@@ -70,6 +76,9 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
       const list = await fetchVault()
       setItems(list)
       setUrls(await vaultFileUrls(list.flatMap((i) => i.files)))
+      // Copie hors ligne automatique : seuls les fichiers manquants descendent
+      const total = new Set(list.flatMap((i) => i.files)).size
+      setOffline({ ready: await cacheVaultOffline(list).catch(() => 0), total })
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -78,8 +87,32 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
   useEffect(() => {
     void reload()
     const trip = pickCurrentTrip(trips)
-    if (trip) void fetchDocuments(trip.id).then((d) => setTripDocs(d.filter((x) => ['flight', 'stay', 'transport'].includes(x.kind))))
-  }, [reload, trips])
+    // Hors ligne : on relit la derniere copie gardee sur l'appareil
+    setTripDocs(loadLocal<TripDocument[]>('docs') ?? [])
+    setHosts(loadLocal<typeof hosts>('hosts') ?? [])
+    if (!trip || !navigator.onLine) return
+    void fetchDocuments(trip.id)
+      .then((d) => {
+        const docs = d.filter((x) => ['flight', 'stay', 'transport', 'insurance'].includes(x.kind))
+        setTripDocs(docs)
+        saveVaultLocal('docs', docs)
+        for (const doc of docs) if (doc.path) void cacheUrl(doc.id, () => openDocumentUrl(doc))
+      })
+      .catch(() => undefined)
+    void fetchStops(trip.id)
+      .then((stops) => {
+        const list = stops
+          .filter((st) => (st.hosts ?? []).length > 0)
+          .map((st) => ({
+            stop: st.name,
+            dates: [st.arrive_date, st.leave_date].filter(Boolean).map((d) => shortDate(d!, locale)).join(' → '),
+            hosts: st.hosts,
+          }))
+        setHosts(list)
+        saveVaultLocal('hosts', list)
+      })
+      .catch(() => undefined)
+  }, [reload, trips, locale])
 
   return (
     <div className="pt-8">
@@ -100,22 +133,21 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <button
-          onClick={async () => {
-            setOfflineMsg('…')
-            const n = await cacheVaultOffline(items).catch(() => 0)
-            setOfflineMsg(t('vault.offlineDone', { n }))
-          }}
-          className="btn btn-xs"
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <span
+          className={`chip ${offline && offline.ready >= offline.total ? 'chip-accent' : ''}`}
+          title={t('vault.offlineHint')}
         >
-          {t('vault.offline')}
-        </button>
+          {!offline
+            ? `⏳ ${t('vault.offlineSync')}`
+            : offline.ready >= offline.total
+              ? `✅ ${t('vault.offlineReady')}`
+              : `⏳ ${t('vault.offlinePartial', { n: offline.ready, total: offline.total })}`}
+        </span>
         <button onClick={onChangePin} className="btn btn-quiet btn-xs">
           {t('vault.pin.change')}
         </button>
       </div>
-      {offlineMsg && <p className="mt-2 text-[13px] text-text-muted">{offlineMsg}</p>}
       {error && <p className="notice notice-bad mt-4">{error}</p>}
 
       <div className="mt-8 space-y-8">
@@ -155,6 +187,23 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
           )
         })}
 
+        {hosts.length > 0 && (
+          <section>
+            <h2 className="text-[1.25rem] font-extrabold">🔑 {t('host.vaultTitle')}</h2>
+            <p className="mb-3 text-[13px] text-text-muted">{t('host.vaultHint')}</p>
+            <div className="space-y-4">
+              {hosts.map((h) => (
+                <div key={h.stop}>
+                  <p className="mb-1.5 text-[13px] font-bold text-text-soft">
+                    {h.stop} <span className="num font-medium text-text-muted">{h.dates}</span>
+                  </p>
+                  <HostCards hosts={h.hosts} compact />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {tripDocs.length > 0 && (
           <section>
             <h2 className="text-[1.25rem] font-extrabold">{t('vault.trip')}</h2>
@@ -165,13 +214,13 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
                   <button
                     onClick={async () => {
                       const w = window.open('', '_blank')
-                      const url = await openDocumentUrl(d).catch(() => null)
+                      const url = (await cachedUrl(d.id)) ?? (await openDocumentUrl(d).catch(() => null))
                       if (url && w) w.location.href = url
                       else w?.close()
                     }}
                     className="flex w-full items-center gap-3 border-b border-line px-4 py-3.5 text-left last:border-b-0"
                   >
-                    <span className="text-xl">{d.kind === 'flight' ? '✈️' : d.kind === 'stay' ? '🏨' : '🚆'}</span>
+                    <span className="text-xl">{d.kind === 'flight' ? '✈️' : d.kind === 'stay' ? '🏨' : d.kind === 'insurance' ? '🛟' : '🚆'}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold">{d.title}</span>
                       {d.reference && <span className="num block font-mono text-[12px] text-text-muted">{d.reference}</span>}

@@ -28,6 +28,7 @@ import {
   TransportIcon,
 } from './icons'
 import { countryName } from '../../lib/countryName'
+import { HostCards } from './HostContacts'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -331,6 +332,8 @@ export default function RouteTab({
             </div>
           </div>
         )}
+
+        <HostCards hosts={stop.hosts} />
 
         {sightBusy === stop.id && <p className="mt-4 text-[13px] text-text-muted">{t('stop.sightsBusy')}</p>}
         {sightsOf(stop, places).length > 0 && (

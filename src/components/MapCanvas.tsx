@@ -225,11 +225,23 @@ function MapCanvasInner({
       worldCopyJump
       zoomControl={false}
       className="h-full w-full"
+      // Telephone : les contours des pays en canvas (un seul calque) plutot
+      // qu'en centaines de chemins SVG, et une glisse plus longue et douce.
+      preferCanvas={TOUCH}
+      inertiaDeceleration={TOUCH ? 2200 : 3000}
+      inertiaMaxSpeed={TOUCH ? 2400 : 1500}
+      easeLinearity={0.22}
+      zoomSnap={TOUCH ? 0.25 : 1}
+      wheelPxPerZoomLevel={90}
     >
       <TileLayer
         key={theme}
         url={tileUrl}
         maxZoom={19}
+        // Garde plus de tuiles autour de l'ecran : pas de trous gris quand
+        // on glisse vite, et pas de rechargement pendant l'animation de zoom.
+        keepBuffer={TOUCH ? 6 : 3}
+        updateWhenZooming={false}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       />
 
@@ -310,8 +322,25 @@ const MapCanvas = memo(MapCanvasInner)
 export default MapCanvas
 
 /** Expose l'instance Leaflet au composant parent. */
+/** Ecran tactile : on allege les effets couteux pendant les gestes. */
+const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+
 function MapHandle({ onReady }: { onReady: (map: L.Map) => void }) {
   const map = useMap()
+  useEffect(() => {
+    // Pendant un deplacement, les lueurs et flous sont coupes (classe CSS)
+    const root = document.documentElement
+    root.classList.add('has-map')
+    const start = () => root.classList.add('map-moving')
+    const end = () => root.classList.remove('map-moving')
+    map.on('movestart zoomstart', start)
+    map.on('moveend zoomend', end)
+    return () => {
+      map.off('movestart zoomstart', start)
+      map.off('moveend zoomend', end)
+      root.classList.remove('has-map', 'map-moving')
+    }
+  }, [map])
   useEffect(() => {
     onReady(map)
     // Poignee de mise au point, uniquement en developpement : elle permet de
