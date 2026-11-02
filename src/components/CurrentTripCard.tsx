@@ -53,7 +53,7 @@ export default function CurrentTripCard() {
   return (
     <Link
       to={`/voyages/${trip.id}`}
-      className="card-feature group relative mt-8 block overflow-hidden p-6 sm:p-8"
+      className="card-feature group relative isolate mt-8 block overflow-hidden p-6 sm:p-8"
     >
       {cover && (
         <>
