@@ -25,6 +25,21 @@ function Svg({ size = 18, className, children }: IconProps & { children: React.R
   )
 }
 
+export const PencilIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 20h4L19.2 8.8a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+    <path d="m14.5 7.5 3 3" />
+  </Svg>
+)
+
+export const LogoutIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" />
+    <path d="m16 8 4 4-4 4" />
+    <path d="M20 12H9" />
+  </Svg>
+)
+
 export const PlaneIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M2.5 13.5 21 6.5c.9-.3 1.4.8.7 1.4L9 18l-1.5-4.5L2.5 13.5Z" />

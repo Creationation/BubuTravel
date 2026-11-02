@@ -31,6 +31,7 @@ import { countryName } from '../../lib/countryName'
 import { HostCards } from './HostContacts'
 import { placeName } from '../../lib/discover'
 import { updateStop } from '../../lib/tripApi'
+import EditButton from '../EditButton'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -301,9 +302,7 @@ export default function RouteTab({
               <SparkIcon size={13} />
               {sightBusy === stop.id ? t('common.wait') : t('stop.sights')}
             </button>
-            <button onClick={onEdit} className="btn btn-xs">
-              {t('common.edit')}
-            </button>
+            <EditButton onClick={onEdit} />
           </div>
         </div>
 
@@ -322,9 +321,7 @@ export default function RouteTab({
               )}
             </div>
             <div className="flex w-full flex-wrap gap-1 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
-              <button onClick={onEdit} className="btn btn-xs">
-                ✏️ {t('common.edit')}
-              </button>
+              <EditButton onClick={onEdit} />
               <a href={mapsLink(stop)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-xs">
                 {t('stop.openMap')}
               </a>

@@ -7,6 +7,7 @@ import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import type { Expense, Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
+import EditButton from '../EditButton'
 
 const PALETTE = ['#e2522c', '#ffb020', '#3f8fa3', '#9a6ea8', '#4f7a5e', '#c4653d', '#7f8f7a', '#b1552c']
 
@@ -221,9 +222,7 @@ export default function CostTab({ trip, hub }: { trip: Trip; hub: TripHub }) {
                 <p className="text-[13px] font-bold">
                   🎯 {t('cost.budget')} <span className="num">{money(budget, trip.budget_currency ?? 'EUR')}</span>
                 </p>
-                <button onClick={() => { setBudgetInput(String(budget)); setBudgetCur(trip.budget_currency ?? 'EUR'); setEditBudget(true) }} className="text-[12px] font-semibold text-accent">
-                  {t('common.edit')}
-                </button>
+                <EditButton onClick={() => { setBudgetInput(String(budget)); setBudgetCur(trip.budget_currency ?? 'EUR'); setEditBudget(true) }} />
               </div>
               {budgetHere ? (
                 <>

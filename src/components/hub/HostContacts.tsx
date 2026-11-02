@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { StopHost } from '../../lib/types'
 import { useT } from '../../i18n/I18nContext'
+import EditButton from '../EditButton'
 
 export const EMPTY_HOST: StopHost = { stay: '', name: '', phone: '', email: '', note: '' }
 
@@ -101,9 +102,7 @@ export function HostCards({
                 {h.note && <p className="mt-1 text-[12px] text-text-muted">{h.note}</p>}
               </div>
               {onSave && (
-                <button onClick={() => edit(index)} className="btn btn-xs shrink-0">
-                  ✏️ {t('common.edit')}
-                </button>
+                <EditButton onClick={() => edit(index)} />
               )}
             </div>
             {missing ? (

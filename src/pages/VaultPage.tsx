@@ -29,6 +29,7 @@ import Lightbox from '../components/Lightbox'
 import Portal from '../components/Portal'
 import VaultSharing from '../components/vault/VaultSharing'
 import type { Companion } from '../lib/companions'
+import EditButton from '../components/EditButton'
 
 const KINDS: VaultKind[] = ['identity', 'card', 'ticket', 'insurance', 'contact', 'other']
 
@@ -305,9 +306,7 @@ function VaultCard({
         {expired && <span className="chip chip-bad">{t('vault.expired')}</span>}
         {soon && <span className="chip chip-warn">{t('vault.expiresSoon')}</span>}
         {/* Coffre commun : on modifie aussi ce que l'autre a partage */}
-        <button onClick={onEdit} className="btn btn-quiet btn-xs">
-          {t('vault.edit')}
-        </button>
+        <EditButton onClick={onEdit} label={t('vault.edit')} />
       </div>
 
       {masked && (

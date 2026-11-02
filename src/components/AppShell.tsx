@@ -9,6 +9,7 @@ import { useT } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
 import { ReviewHost } from './ReviewSheet'
 import AnalyzerQuotaNotice from './AnalyzerQuotaNotice'
+import { LogoutIcon } from './hub/icons'
 
 const NAV: { to: string; label: Key; end?: boolean; advanced?: boolean }[] = [
   { to: '/', label: 'nav.journal', end: true },
@@ -82,8 +83,13 @@ export default function AppShell({
               <Avatar url={profile?.avatar_url} name={name} size={26} />
               <span className="max-w-28 truncate text-[13px] text-text-soft">{name}</span>
             </Link>
-            <button onClick={() => void signOut()} className="btn btn-quiet btn-xs hidden sm:inline-flex">
-              {t('nav.signOut')}
+            <button
+              onClick={() => void signOut()}
+              className="btn btn-icon btn-quiet hidden sm:inline-flex"
+              aria-label={t('nav.signOut')}
+              title={t('nav.signOut')}
+            >
+              <LogoutIcon size={17} />
             </button>
           </div>
         </div>

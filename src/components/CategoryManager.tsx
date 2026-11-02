@@ -4,6 +4,7 @@ import { errorMessage } from '../lib/errors'
 import type { Category } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
 import { categoryLabel } from '../lib/countryName'
+import EditButton from './EditButton'
 
 const PALETTE = [
   '#c4653d',
@@ -118,7 +119,7 @@ export default function CategoryManager() {
                   <span className="shrink-0 text-[12px] text-text-muted">
                     {countOf(cat.id)} {countOf(cat.id) > 1 ? t('unit.places') : t('unit.place')}
                   </span>
-                  <button onClick={() => setEditingId(cat.id)} className="btn btn-xs btn-quiet">{t('common.edit')}</button>
+                  <EditButton onClick={() => setEditingId(cat.id)} />
                   <button
                     onClick={() => {
                       if (confirmId !== cat.id) {

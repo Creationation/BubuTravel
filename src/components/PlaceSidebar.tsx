@@ -14,6 +14,7 @@ import ClampText from './ClampText'
 import { askReview } from './ReviewSheet'
 import { countryName, categoryLabel } from '../lib/countryName'
 import { placeName } from '../lib/discover'
+import { PencilIcon } from './hub/icons'
 
 type Props = {
   place: Place
@@ -199,10 +200,11 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               onClick={() => setEditing((v) => !v)}
-              className="btn btn-xs btn-quiet"
+              className={editing ? 'btn btn-xs btn-quiet' : 'btn btn-icon btn-quiet'}
               aria-label={t('place.editTitle')}
+              title={t('place.editTitle')}
             >
-              {editing ? t('common.cancel') : t('common.edit')}
+              {editing ? t('common.cancel') : <PencilIcon size={16} />}
             </button>
             <button onClick={onClose} className="btn btn-icon btn-quiet" aria-label={t('common.close')}>
               ✕

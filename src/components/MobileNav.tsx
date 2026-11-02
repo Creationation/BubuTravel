@@ -19,6 +19,7 @@ import {
   SparkIcon,
   WalletIcon,
 } from './hub/icons'
+import { LogoutIcon } from './hub/icons'
 
 /**
  * Navigation du telephone : une barre en bas, a portee de pouce, avec cinq
@@ -219,7 +220,8 @@ function More({ go }: { go: (path: string) => void }) {
         <button onClick={toggle} className="btn flex-1">
           {theme === 'dark' ? t('mode.light') : t('mode.dark')}
         </button>
-        <button onClick={() => void signOut()} className="btn btn-quiet flex-1">
+        <button onClick={() => void signOut()} className="btn btn-quiet flex-1 gap-2" aria-label={t('nav.signOut')} title={t('nav.signOut')}>
+          <LogoutIcon size={18} />
           {t('nav.signOut')}
         </button>
       </div>

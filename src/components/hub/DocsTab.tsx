@@ -8,6 +8,7 @@ import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { CloudOffIcon, DocIcon, PlusIcon, ShieldIcon, TrashIcon } from './icons'
+import EditButton from '../EditButton'
 
 export const DOC_KINDS: DocKind[] = [
   'passport',
@@ -225,9 +226,7 @@ function DocCard({
             {offline ? t('doc.offlineOn') : t('doc.offline')}
           </button>
         )}
-        <button onClick={onEdit} className="btn btn-quiet btn-xs ml-auto">
-          {t('common.edit')}
-        </button>
+        <EditButton onClick={onEdit} className="ml-auto" />
         <button
           onClick={() => (confirm ? onDelete() : setConfirm(true))}
           className={`btn btn-xs ${confirm ? 'border-red-500/60 text-red-500' : 'btn-quiet'}`}

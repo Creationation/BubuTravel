@@ -10,6 +10,7 @@ import Reveal from '../components/Reveal'
 import EventForm from '../components/EventForm'
 import { useI18n, useT } from '../i18n/I18nContext'
 import { categoryLabel } from '../lib/countryName'
+import EditButton from '../components/EditButton'
 
 export default function EventsPage() {
   const t = useT()
@@ -230,7 +231,7 @@ function EventCard({
             {event.place_id && (
               <Link to={`/carte?lieu=${event.place_id}`} className="btn btn-xs">{t('events.onMap')}</Link>
             )}
-            <button onClick={onEdit} className="btn btn-xs btn-quiet">{t('common.edit')}</button>
+            <EditButton onClick={onEdit} />
             <button
               onClick={onDelete}
               className={`btn btn-xs ${confirming ? 'border-red-500/60 text-red-400' : 'btn-quiet'}`}
