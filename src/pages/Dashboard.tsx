@@ -11,6 +11,8 @@ import TripCover from '../components/TripCover'
 import { useI18n } from '../i18n/I18nContext'
 import CurrentTripCard from '../components/CurrentTripCard'
 import { countryName } from '../lib/countryName'
+import { placeName } from '../lib/discover'
+import { autoCover } from '../lib/discover'
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
@@ -149,7 +151,11 @@ export default function Dashboard() {
                       className="panel lift block overflow-hidden"
                     >
                       <div className="arch aspect-[16/11] bg-surface-2">
-                        <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
+                        {trip.cover_url || !autoCover(trip.id, places) ? (
+                          <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
+                        ) : (
+                          <img src={autoCover(trip.id, places)!} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                        )}
                       </div>
                       <div className="p-5">
                         <h3 className="display-sm text-xl">{trip.title}</h3>
@@ -280,7 +286,7 @@ function TimelineRow({
 
         <span className="min-w-0 flex-1">
           <span className="display-sm block truncate text-lg group-hover:text-accent">
-            {place.name}
+            {placeName(place)}
           </span>
           <span className="mt-0.5 block truncate text-[13px] text-text-muted">
             {countryName(place.country)}

@@ -5,6 +5,7 @@ import { pinSvg } from './mapIcon'
 import type { Place } from '../lib/types'
 import { countryName, categoryLabel } from '../lib/countryName'
 import Portal from './Portal'
+import { placeName } from '../lib/discover'
 
 type Props = {
   places: Place[]
@@ -71,7 +72,7 @@ export default function PlaceChooser({ places, onPick, onClose }: Props) {
                     }}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="display-sm block truncate text-lg">{place.name}</span>
+                    <span className="display-sm block truncate text-lg">{placeName(place)}</span>
                     <span className="mt-0.5 block truncate text-[13px] text-text-muted">
                       {place.city ? `${place.city}, ` : ''}
                       {countryName(place.country)}

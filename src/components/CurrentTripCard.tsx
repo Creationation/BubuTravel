@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useCoverUrl } from './TripCover'
 import { RouteIcon } from './hub/icons'
 import Countdown from './Countdown'
+import { autoCover } from '../lib/discover'
 
 /**
  * En haut de l'accueil : le voyage du moment, en un tap. C'est le chemin le
@@ -16,7 +17,9 @@ export default function CurrentTripCard() {
   const { t, locale } = useI18n()
   const { trips, loading } = usePlaces()
   const trip = pickCurrentTrip(trips)
-  const cover = useCoverUrl(trip?.cover_url ?? null)
+  const own = useCoverUrl(trip?.cover_url ?? null)
+  const { places } = usePlaces()
+  const cover = own ?? (trip ? autoCover(trip.id, places) : null)
   if (loading) return null
 
   if (!trip) {

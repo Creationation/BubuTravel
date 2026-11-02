@@ -3,6 +3,7 @@ import { daysOf, durationOf, fmtMinutes, loadOfDay, stopOf, DAY_LIMIT } from '..
 import { shortDate } from '../../lib/tripDates'
 import type { Place, TripStop } from '../../lib/types'
 import { useI18n } from '../../i18n/I18nContext'
+import { placeName } from '../../lib/discover'
 
 /**
  * Programme d'une etape, jour par jour : ce qui est prevu (heure, duree),
@@ -62,7 +63,7 @@ export default function StopProgramme({
                       <li key={p.id}>
                         <button onClick={() => onOpen(p.id)} className="flex w-full items-center gap-2 rounded-xl px-1 py-1 text-left hover:bg-surface">
                           <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{p.plan_time ?? '·'}</span>
-                          <span className="min-w-0 flex-1 truncate text-[13px]">{p.name}</span>
+                          <span className="min-w-0 flex-1 truncate text-[13px]">{placeName(p)}</span>
                           <span className="num shrink-0 text-[11px] text-text-muted">{fmtMinutes(durationOf(p))}</span>
                         </button>
                       </li>

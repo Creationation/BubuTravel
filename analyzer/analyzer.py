@@ -1573,14 +1573,14 @@ def trip_snapshot(trip_id: str, *, max_places: int = 220) -> tuple[str, dict, li
     for s in stops:
         stays = ", ".join(h.get("stay", "") for h in (s.get("hosts") or []) if h.get("stay")) or (s.get("stay_name") or "")
         lines.append(f"- {s['name']} ({s.get('country') or ''}) du {s.get('arrive_date') or '?'} au {s.get('leave_date') or '?'}" + (f", logement : {stays}" if stays else ""))
-    lines += ["", "Lieux du voyage (id | nom | ville | statut | jour prevu | heure | duree min | type) :"]
+    lines += ["", "Lieux du voyage (id | nom | ville | latitude,longitude | statut | jour prevu | heure | duree min | type) :"]
     for p in places[:max_places]:
         d = p.get("details") or {}
         lines.append(
             " | ".join(
                 str(x)
                 for x in [
-                    p["id"], p["name"], p.get("city") or "", "fait" if p.get("status") == "visited" else "a faire",
+                    p["id"], p["name"], p.get("city") or "", f"{p['lat']:.4f},{p['lng']:.4f}", "fait" if p.get("status") == "visited" else "a faire",
                     p.get("visit_date") or "-", p.get("plan_time") or "-", p.get("plan_minutes") or "-",
                     (d.get("kind") or "")[:30],
                 ]
@@ -1724,8 +1724,13 @@ Regles :
 
 DAY_BRIEF = """Refais proprement le plan de cette journee selon la demande des voyageurs.
 Garde les lieux existants (meme id) sauf si la demande dit de les enlever ; tu peux en ajouter
-(place_id vide) si la demande le suggere ou si la journee a un vrai trou. Ordre logique dans
-l'espace (pas d'aller-retour), horaires realistes avec trajets, pauses et repas.
+(place_id vide) si la demande le suggere ou si la journee a un vrai trou.
+DISTANCES : calcule-les avec les coordonnees. Enchaine les activites de proche en proche (le
+suivant est dans le meme quartier ou a moins de 3 km du precedent, sinon prevois un vrai trajet
+dans l'horaire), sans aller-retour. Toute activite ajoutee doit etre un VRAI lieu precis et
+nomme (pas « boire un cafe »), situe dans la ville de l'etape et PROCHE de l'activite qui la
+precede ou la suit, avec ses coordonnees exactes verifiees sur le web. Horaires realistes avec
+trajets, pauses et repas ; respecte les horaires d'ouverture.
 Plage horaire autorisee : {start_time} a {end_time}. Chaque activite doit commencer a partir de
 {start_time} et se terminer au plus tard a {end_time}. Ne propose aucun horaire hors de cette plage.
 Les lieux enregistres ne sont pas un catalogue ferme : utilise-les en priorite, mais cherche aussi
@@ -1870,6 +1875,13 @@ def job_day_plan(job: dict, req: dict, tmp: Path) -> dict:
             }, prefer="return=representation")
             if row:
                 created.append(row[0]["id"])
+                try:
+                    sb("POST", "ai_jobs", body={
+                        "user_id": job["user_id"], "trip_id": trip_id, "kind": "place_info",
+                        "input": {"place_id": row[0]["id"], "lang": req.get("lang", "fr")},
+                    }, prefer="return=minimal")
+                except Exception:
+                    pass
                 selected_names.add(normalized_name)
                 planned.append((start, minutes))
     for p in today:
@@ -1931,6 +1943,85 @@ def keep_alive(job_id: str, stop: threading.Event) -> None:
 AI_WORKERS = max(2, int(os.environ.get("AI_WORKERS", "2")))
 
 
+# --------------------------------------------------------------------------
+# Traduction des fiches : chaque lieu rempli recoit sa version dans l'autre
+# langue (details.alt), pour que Diego (FR) et Vesna (EN) lisent chacun la leur.
+# --------------------------------------------------------------------------
+
+class PlaceTr(BaseModel):
+    id: str
+    name: str = Field(description="Nom traduit : on traduit la partie descriptive, JAMAIS le nom propre (enseigne, temple, lieu)")
+    kind: str
+    summary: str
+    booking: str
+    best_time: str
+    hours: str
+    duration: str
+    price: str
+    tips: list[str]
+
+
+class TrBatch(BaseModel):
+    items: list[PlaceTr]
+
+
+def guess_lang(text: str) -> str:
+    words = re.findall(r"[a-zA-Z']+", text.lower())
+    en = sum(1 for w in words if w in ("the", "and", "with", "for", "of", "is", "to", "you", "in", "on", "at", "your"))
+    fr = sum(1 for w in words if w in ("le", "la", "les", "des", "du", "et", "pour", "avec", "est", "une", "un", "dans", "sur", "de", "au", "aux"))
+    return "en" if en > fr else "fr"
+
+
+def backfill_translations(limit: int = 8) -> int:
+    """Traduit un lot de fiches qui n'ont pas encore leur version dans l'autre langue."""
+    rows = sb("GET", "places", params={"details": "not.is.null", "select": "id,name,details", "order": "created_at.asc", "limit": "400"}) or []
+    todo = [r for r in rows if isinstance(r.get("details"), dict) and not r["details"].get("alt") and (r["details"].get("summary") or r["name"])][:limit]
+    if not todo:
+        return 0
+    src = {
+        r["id"]: (r["details"].get("lang") or guess_lang(" ".join([r["name"], r["details"].get("summary", ""), " ".join(r["details"].get("tips", []))])))
+        for r in todo
+    }
+    out = 0
+    for lang_src in ("fr", "en"):
+        batch = [r for r in todo if src[r["id"]] == lang_src]
+        if not batch:
+            continue
+        dst = "en" if lang_src == "fr" else "fr"
+        items = [
+            {
+                "id": r["id"], "name": r["name"], "kind": r["details"].get("kind", ""), "summary": r["details"].get("summary", ""),
+                "booking": r["details"].get("booking", ""), "best_time": r["details"].get("best_time", ""), "hours": r["details"].get("hours", ""),
+                "duration": r["details"].get("duration", ""), "price": r["details"].get("price", ""), "tips": r["details"].get("tips", []),
+            }
+            for r in batch
+        ]
+        prompt = (
+            f"Traduis ces fiches de lieux de voyage du {'francais' if lang_src == 'fr' else 'anglais'} vers "
+            f"{'le francais' if dst == 'fr' else 'anglais'}. Garde les noms propres (enseignes, temples, rues, plats) tels quels ; "
+            "traduis le reste naturellement. Laisse vide ce qui est vide. Renvoie chaque fiche avec le meme id.\n\n"
+            + json.dumps(items, ensure_ascii=False)
+        )
+        tmp = Path(tempfile.mkdtemp(prefix="bubu-tr-"))
+        try:
+            data = claude_json(prompt, TrBatch, cwd=tmp, tools=["Read"], timeout=600)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        by_id = {x["id"]: x for x in data["items"]}
+        for r in batch:
+            tr = by_id.get(r["id"])
+            if not tr:
+                continue
+            alt = {k: v for k, v in tr.items() if k != "id"}
+            alt["lang"] = dst
+            details = {**r["details"], "lang": lang_src, "alt": alt}
+            sb("PATCH", "places", params={"id": f"eq.{r['id']}"}, body={"details": details}, prefer="return=minimal")
+            out += 1
+    if out:
+        log(f"  {out} fiche(s) traduite(s)")
+    return out
+
+
 def ai_worker(n: int) -> None:
     """Plusieurs demandes IA en parallele : on peut lancer plusieurs recherches a la fois."""
     while True:
@@ -1944,6 +2035,10 @@ def ai_worker(n: int) -> None:
                 finally:
                     stop.set()
                 continue
+            # Rien a faire : on traduit les fiches en retard (un seul travailleur)
+            if n == 1 and time.time() - getattr(ai_worker, "last_tr", 0) > 90:
+                ai_worker.last_tr = time.time()
+                backfill_translations()
         except Exception as err:
             log(f"Erreur (assistant {n}) : {str(err)[:200]}")
         time.sleep(POLL_SECONDS)

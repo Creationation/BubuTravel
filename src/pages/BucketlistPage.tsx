@@ -9,6 +9,7 @@ import MapCanvas from '../components/MapCanvas'
 import Reveal from '../components/Reveal'
 import { useT } from '../i18n/I18nContext'
 import { countryName, categoryLabel } from '../lib/countryName'
+import { placeName } from '../lib/discover'
 
 type Filter = { kind: 'all' } | { kind: 'country'; value: string } | { kind: 'category'; value: string }
 
@@ -140,7 +141,7 @@ export default function BucketlistPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="eyebrow">{place.country}</p>
-                          <h2 className="display-sm mt-1.5 truncate text-xl">{place.name}</h2>
+                          <h2 className="display-sm mt-1.5 truncate text-xl">{placeName(place)}</h2>
                           {place.city && (
                             <p className="mt-0.5 text-[13px] text-text-muted">{place.city}</p>
                           )}

@@ -74,6 +74,9 @@ export type PlaceDetails = {
   name: string
   /** Nom complet et officiel (le nom court sert aux cartes). */
   full_name?: string
+  /** Langue dans laquelle cette fiche est ecrite, et sa traduction dans l'autre. */
+  lang?: 'fr' | 'en'
+  alt?: Partial<PlaceDetails> & { lang: 'fr' | 'en' }
   kind: string
   summary: string
   address: string

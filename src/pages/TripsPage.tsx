@@ -9,6 +9,7 @@ import TripForm from '../components/TripForm'
 import Countdown from '../components/Countdown'
 import { flagOf } from '../lib/countries'
 import { useI18n } from '../i18n/I18nContext'
+import { autoCover } from '../lib/discover'
 
 export default function TripsPage() {
   const { t, locale } = useI18n()
@@ -59,6 +60,8 @@ export default function TripsPage() {
                     <div className="relative aspect-[16/10] overflow-hidden bg-[radial-gradient(120%_120%_at_100%_0%,color-mix(in_srgb,var(--accent)_35%,transparent),transparent_60%),radial-gradient(120%_120%_at_0%_100%,color-mix(in_srgb,var(--accent-2)_30%,transparent),transparent_60%)]">
                       {trip.cover_url ? (
                         <TripCover coverUrl={trip.cover_url} className="h-full w-full" />
+                      ) : autoCover(trip.id, places) ? (
+                        <img src={autoCover(trip.id, places)!} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                       ) : (
                         // Sans photo de couverture : les drapeaux des pays du voyage
                         <div className="flex h-full w-full items-center justify-center gap-3 text-6xl drop-shadow-lg">

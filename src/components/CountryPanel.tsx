@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { usePlaces } from '../context/PlacesContext'
 import { flagOf } from '../lib/countries'
 import { shortDate, todayIso } from '../lib/tripDates'
@@ -9,6 +9,8 @@ import { useI18n } from '../i18n/I18nContext'
 import { CheckIcon, PinIcon } from './hub/icons'
 import { askReview } from './ReviewSheet'
 import { countryName } from '../lib/countryName'
+import { FAMILIES, emojiOf, familyOf, imageOf, placeName } from '../lib/discover'
+import type { Family } from '../lib/discover'
 
 type Show = 'todo' | 'done' | 'all'
 
@@ -29,19 +31,54 @@ export default function CountryPanel({
   const { t, locale } = useI18n()
   const { places, edit } = usePlaces()
   const [show, setShow] = useState<Show>('todo')
+  const [family, setFamily] = useState<Family | 'all'>('all')
+  // Hauteur du panneau (telephone) : on tire la poignee vers le haut pour
+  // l'agrandir, vers le bas pour le reduire ; il s'aimante sur 3 hauteurs.
+  const box = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const drag = useRef<{ y: number; h: number; max: number } | null>(null)
+
+  function parentHeight() {
+    return box.current?.parentElement?.clientHeight ?? 600
+  }
+  function startDrag(e: React.PointerEvent) {
+    const max = parentHeight() - 12
+    drag.current = { y: e.clientY, h: box.current?.offsetHeight ?? max * 0.6, max }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    setDragging(true)
+  }
+  function moveDrag(e: React.PointerEvent) {
+    const d = drag.current
+    if (!d) return
+    setHeight(Math.min(d.max, Math.max(150, d.h + (d.y - e.clientY))))
+  }
+  function endDrag() {
+    const d = drag.current
+    drag.current = null
+    setDragging(false)
+    if (!d || height === null) return
+    const snaps = [0.32, 0.62, 1].map((f) => Math.round(d.max * f))
+    setHeight(snaps.reduce((best, v) => (Math.abs(v - height) < Math.abs(best - height) ? v : best), snaps[0]))
+  }
 
   const inCountry = useMemo(
     () => places.filter((p) => p.country && sameCountry(country, p.country)),
     [places, country],
   )
   const todoCount = inCountry.filter((p) => p.status === 'wishlist').length
+  const families = useMemo(() => {
+    const n = new Map<Family, number>()
+    for (const p of inCountry) n.set(familyOf(p), (n.get(familyOf(p)) ?? 0) + 1)
+    return FAMILIES.filter((f) => n.has(f.id)).map((f) => ({ ...f, n: n.get(f.id)! }))
+  }, [inCountry])
   const doneCount = inCountry.length - todoCount
 
   // Villes dans l'ordre chronologique du voyage (date la plus proche d'abord)
   const cities = useMemo(() => {
-    const list = inCountry.filter((p) =>
-      show === 'all' ? true : show === 'todo' ? p.status === 'wishlist' : p.status !== 'wishlist',
-    )
+    const list = inCountry
+      .filter((p) => (show === 'all' ? true : show === 'todo' ? p.status === 'wishlist' : p.status !== 'wishlist'))
+      .filter((p) => family === 'all' || familyOf(p) === family)
     const map = new Map<string, Place[]>()
     for (const p of list) {
       const key = p.city?.trim() || t('map.otherCity')
@@ -56,7 +93,7 @@ export default function CountryPanel({
         ),
       }))
       .sort((a, b) => first(a.items).localeCompare(first(b.items)) || b.items.length - a.items.length)
-  }, [inCountry, show, t])
+  }, [inCountry, show, family, t])
 
   function toggle(p: Place) {
     const visiting = p.status === 'wishlist'
@@ -66,8 +103,26 @@ export default function CountryPanel({
   }
 
   return (
-    <div className="panel-enter absolute inset-x-2 bottom-2 z-[1100] flex max-h-[68%] flex-col overflow-hidden rounded-[24px] border border-line bg-[color-mix(in_srgb,var(--surface-solid)_92%,transparent)] shadow-[var(--shadow-lg)] backdrop-blur-xl md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[420px]">
-      <header className="shrink-0 border-b border-line px-4 pb-3 pt-4 sm:px-5">
+    <div
+      ref={box}
+      style={height !== null ? { height } : undefined}
+      className={`panel-enter absolute inset-x-2 bottom-2 z-[1100] flex flex-col overflow-hidden rounded-[24px] border border-line bg-surface-solid shadow-[var(--shadow-lg)] md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:!h-auto md:max-h-none md:w-[420px] ${
+        height === null ? 'max-h-[68%]' : ''
+      } ${dragging ? '' : 'transition-[height] duration-300 ease-out'}`}
+    >
+      {/* Poignee : tirer vers le haut pour agrandir, vers le bas pour reduire */}
+      <div
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className="flex h-6 shrink-0 cursor-grab touch-none items-center justify-center md:hidden"
+        role="slider"
+        aria-label={t('map.resize')}
+      >
+        <span className="h-1.5 w-11 rounded-full bg-line-strong" />
+      </div>
+      <header className="shrink-0 border-b border-line px-4 pb-3 pt-1 sm:px-5 md:pt-4">
         <div className="flex items-center gap-3">
           <span className="shrink-0 text-3xl leading-none">{flagOf(country.nameFr)}</span>
           <div className="min-w-0 flex-1">
@@ -94,6 +149,18 @@ export default function CountryPanel({
             </button>
           ))}
         </div>
+        {families.length > 1 && (
+          <div className="nav-scroll -mx-1 mt-2.5 flex gap-1.5 overflow-x-auto px-1">
+            <button onClick={() => setFamily('all')} className={`pill shrink-0 text-[12px] ${family === 'all' ? 'pill-active' : ''}`}>
+              {t('disc.all')}
+            </button>
+            {families.map((f) => (
+              <button key={f.id} onClick={() => setFamily(f.id)} className={`pill shrink-0 text-[12px] ${family === f.id ? 'pill-active' : ''}`}>
+                {f.emoji} {t(f.label)} <span className="num opacity-60">{f.n}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-4">
@@ -103,16 +170,26 @@ export default function CountryPanel({
           <div className="space-y-5">
             {cities.map(({ city, items }) => (
               <section key={city}>
-                <div className="sticky top-0 z-10 -mx-1 mb-2 flex items-baseline justify-between bg-[color-mix(in_srgb,var(--surface-solid)_94%,transparent)] px-2 py-1.5 backdrop-blur">
+                <div className="sticky top-0 z-10 -mx-1 mb-2 flex items-baseline justify-between bg-surface-solid px-2 py-1.5">
                   <h3 className="display-sm text-xl">{city}</h3>
                   <span className="num text-[12px] text-text-muted">{items.length}</span>
                 </div>
                 <ul className="space-y-1.5">
-                  {items.map((p) => {
+                  {[...items]
+                    .sort((x, y) => FAMILIES.findIndex((f) => f.id === familyOf(x)) - FAMILIES.findIndex((f) => f.id === familyOf(y)))
+                    .map((p, i, arr) => {
+                    const fam = familyOf(p)
+                    const newFamily = i === 0 || familyOf(arr[i - 1]) !== fam
                     const done = p.status !== 'wishlist'
-                    const img = p.gallery?.[0] || p.image_url
+                    const img = imageOf(p)
                     return (
-                      <li key={p.id} className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-surface-2">
+                      <li key={p.id} className="list-none">
+                        {newFamily && family === 'all' && (
+                          <p className="mb-1 mt-2 px-1 text-[11px] font-bold uppercase tracking-[0.1em] text-text-muted first:mt-0">
+                            {emojiOf(fam)} {t(FAMILIES.find((f) => f.id === fam)!.label)}
+                          </p>
+                        )}
+                      <div className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-surface-2">
                         <button onClick={() => onOpenPlace(p)} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-2">
                           {img ? (
                             <img
@@ -130,8 +207,9 @@ export default function CountryPanel({
                         </button>
                         <button onClick={() => onOpenPlace(p)} className="min-w-0 flex-1 text-left">
                           <span className={`line-clamp-2 text-[14px] leading-snug ${done ? 'text-text-muted line-through' : 'font-semibold'}`}>
-                            {p.name}
+                            {placeName(p)}
                           </span>
+                          {p.details?.kind && <span className="block truncate text-[11px] capitalize text-text-muted">{p.details.kind}</span>}
                           <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-text-muted">
                             {p.visit_date && <span className="chip chip-accent num py-0">{shortDate(p.visit_date, locale)}</span>}
                             {p.details?.price && <span className="truncate">{p.details.price}</span>}
@@ -146,6 +224,7 @@ export default function CountryPanel({
                         >
                           {done && <CheckIcon size={14} />}
                         </button>
+                      </div>
                       </li>
                     )
                   })}

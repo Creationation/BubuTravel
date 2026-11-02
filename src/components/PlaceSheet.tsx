@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { usePlaces } from '../context/PlacesContext'
 import { countryName } from '../lib/countryName'
-import { emojiOf, familyOf } from '../lib/discover'
+import { emojiOf, familyOf, placeName } from '../lib/discover'
 import { useI18n } from '../i18n/I18nContext'
 import PlaceDetailsView, { PlaceHero } from './PlaceDetailsView'
 import Lightbox from './Lightbox'
@@ -80,7 +80,7 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
               <p className="text-[13px] font-semibold text-text-muted">
                 {emojiOf(familyOf(place))} {[place.city, countryName(place.country)].filter(Boolean).join(', ')}
               </p>
-              <h2 className="mt-1 text-[1.6rem] font-extrabold leading-tight">{place.name}</h2>
+              <h2 className="mt-1 text-[1.6rem] font-extrabold leading-tight">{placeName(place)}</h2>
             </div>
             <PlaceDetailsView place={place} />
           </div>

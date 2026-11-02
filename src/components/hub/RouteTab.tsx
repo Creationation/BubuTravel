@@ -29,6 +29,7 @@ import {
 } from './icons'
 import { countryName } from '../../lib/countryName'
 import { HostCards } from './HostContacts'
+import { placeName } from '../../lib/discover'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -343,7 +344,7 @@ export default function RouteTab({
               .slice(0, 6)
               .map((p) => (
                 <button key={p.id} onClick={() => navigate(`/carte?lieu=${p.id}`)} className="chip hover:border-accent">
-                  {p.name}
+                  {placeName(p)}
                 </button>
               ))}
           </div>

@@ -8,6 +8,7 @@ import { ExternalIcon, PinIcon, SparkIcon } from './hub/icons'
 import ClampText from './ClampText'
 import PlanBox from './PlanBox'
 import { ReviewSummary, askReview } from './ReviewSheet'
+import { pickDetails } from '../lib/discover'
 
 /** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
 export function isExact(place: Place): boolean {
@@ -117,7 +118,7 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
   const { t, lang } = useI18n()
   const online = useAnalyzerOnline()
   const { queue, activeFor, jobs } = useAiJobs()
-  const d = place.details
+  const d = pickDetails(place.details)
   const [error, setError] = useState<string | null>(null)
   const running = activeFor('place_info', 'place_id', place.id)
   const failed = jobs.find((j) => j.kind === 'place_info' && j.input?.place_id === place.id && j.status === 'error')

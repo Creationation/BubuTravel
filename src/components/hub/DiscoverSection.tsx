@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAiJobs } from '../../context/AiJobsContext'
 import { usePlaces } from '../../context/PlacesContext'
-import { FAMILIES, emojiOf, familyOf, imageOf } from '../../lib/discover'
+import { FAMILIES, emojiOf, familyOf, imageOf, placeName } from '../../lib/discover'
 import type { Family } from '../../lib/discover'
 import { isStay, photoScore } from '../../lib/schedule'
 import { shortDate } from '../../lib/tripDates'
@@ -126,7 +126,7 @@ export default function DiscoverSection({ trip }: { trip: Trip }) {
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 line-clamp-2 text-[14px] font-bold leading-snug">{p.name}</p>
+                    <p className="mt-2 line-clamp-2 text-[14px] font-bold leading-snug">{placeName(p)}</p>
                     <p className="truncate text-[12px] text-text-muted">{p.details?.kind || p.city}</p>
                   </button>
                 )

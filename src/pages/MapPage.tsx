@@ -218,7 +218,7 @@ export default function MapPage() {
   return (
     <AppShell wide>
       <div className="flex h-[calc(100dvh-8rem-env(safe-area-inset-bottom))] flex-col sm:h-[calc(100vh-4rem)]">
-        <div className="relative flex shrink-0 flex-col gap-2 border-b border-line px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-8 sm:py-3">
+        <div className="relative z-[1050] flex shrink-0 flex-col gap-2 border-b border-line bg-surface-solid px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-8 sm:py-3">
           <div className="min-w-0">
             <p className="eyebrow mb-1.5 hidden sm:flex">{t('map.eyebrow')}</p>
             {loading ? (

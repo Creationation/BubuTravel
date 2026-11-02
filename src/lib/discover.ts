@@ -1,4 +1,6 @@
-import type { Place } from './types'
+import type { Place, PlaceDetails } from './types'
+import { currentLang } from '../i18n/current'
+import { photoScore } from './schedule'
 import type { Key } from '../i18n/fr'
 
 /**
@@ -76,3 +78,42 @@ export const TOPICS: { id: Topic; emoji: string; label: Key }[] = [
   { id: 'packing', emoji: '🧳', label: 'topic.packing' },
   { id: 'other', emoji: '📝', label: 'topic.other' },
 ]
+
+/* ------------------------------------------------------------- langue */
+
+/**
+ * Nom et fiche d'un lieu dans la langue de l'utilisateur : l'analyseur ecrit
+ * la traduction dans details.alt, on l'affiche quand elle correspond.
+ */
+export function placeName(p: Place): string {
+  const alt = p.details?.alt
+  return alt && alt.lang === currentLang() && alt.name ? alt.name : p.name
+}
+
+export function pickDetails<T extends PlaceDetails | null | undefined>(d: T): T {
+  if (!d || !d.alt || d.alt.lang !== currentLang()) return d
+  const { lang: _l, ...alt } = d.alt
+  const merged = { ...d } as Record<string, unknown>
+  for (const [k, v] of Object.entries(alt)) {
+    if (v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)) merged[k] = v
+  }
+  return merged as unknown as T
+}
+
+/* ------------------------------------------------------------ couverture */
+
+/**
+ * Photo de couverture automatique d'un voyage sans photo choisie : le plus
+ * beau lieu (monument, plage, vue) parmi ses vraies photos, pas une image de video.
+ */
+export function autoCover(tripId: string, places: Place[]): string | null {
+  let best: { url: string; score: number } | null = null
+  for (const p of places) {
+    if (p.trip_id !== tripId) continue
+    const url = (p.gallery ?? []).find((u) => !u.includes('idea-frames/') || u.includes('idea-frames/places/')) || null
+    if (!url) continue
+    const score = photoScore(p)
+    if (!best || score > best.score) best = { url, score }
+  }
+  return best?.url ?? null
+}

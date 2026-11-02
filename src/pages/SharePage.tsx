@@ -13,6 +13,7 @@ import type { Place } from '../lib/types'
 import { errorMessage } from '../lib/errors'
 import { useI18n } from '../i18n/I18nContext'
 import { countryName } from '../lib/countryName'
+import { placeName } from '../lib/discover'
 
 /**
  * Vue publique en lecture seule. Aucun compte n'est requis : tout passe par
@@ -168,7 +169,7 @@ export default function SharePage() {
                         <p className="eyebrow">
                           {place.visit_date ? formatDate(place.visit_date) : t('trips.noStep')}
                         </p>
-                        <h4 className="display-sm mt-2 text-2xl">{place.name}</h4>
+                        <h4 className="display-sm mt-2 text-2xl">{placeName(place)}</h4>
                         <p className="mt-1 text-[13px] text-text-muted">
                           {place.city ? `${place.city}, ` : ''}
                           {countryName(place.country)}

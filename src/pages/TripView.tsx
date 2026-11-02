@@ -34,6 +34,7 @@ import type { Key } from '../i18n/fr'
 import type { TransportMode } from '../lib/types'
 import { fmtNum } from '../i18n/current'
 import { countryName } from '../lib/countryName'
+import AgendaSheet from '../components/hub/AgendaSheet'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -62,6 +63,7 @@ export default function TripView() {
   const hub = useTripHub(id)
   const [editing, setEditing] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [agenda, setAgenda] = useState(false)
   // ?assistant=1 : on revient d'un brouillon de l'assistant
   const [assistant, setAssistant] = useState(() => params.get('assistant') === '1')
 
@@ -107,7 +109,18 @@ export default function TripView() {
       reference: t('stop.booking'),
       todo: t('hub.tab.todo'),
     })
-    downloadIcs(trip.title.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase(), ics)
+    const name = `${trip.title.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.ics`
+    // Telephone : la feuille de partage ouvre directement le calendrier
+    try {
+      const file = new File([ics], name, { type: 'text/calendar' })
+      if (navigator.canShare?.({ files: [file] })) {
+        void navigator.share({ files: [file], title: trip.title }).catch(() => downloadIcs(name, ics))
+        return
+      }
+    } catch {
+      // pas de partage de fichier : telechargement classique
+    }
+    downloadIcs(name, ics)
   }
 
   return (
@@ -120,7 +133,7 @@ export default function TripView() {
         totalDays={totalDays}
         editing={editing}
         onAssistant={() => setAssistant(true)}
-        onCalendar={exportCalendar}
+        onCalendar={() => setAgenda(true)}
         onShare={() => setSharing((v) => !v)}
         onEdit={() => setEditing((v) => !v)}
       />
@@ -182,6 +195,7 @@ export default function TripView() {
         </div>
       </div>
 
+      {agenda && <AgendaSheet trip={trip} hub={hub} onExport={exportCalendar} onClose={() => setAgenda(false)} />}
       {assistant && (
         <TripAssistant
           trip={trip}

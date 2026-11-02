@@ -13,6 +13,7 @@ import { useT } from '../i18n/I18nContext'
 import ClampText from './ClampText'
 import { askReview } from './ReviewSheet'
 import { countryName, categoryLabel } from '../lib/countryName'
+import { placeName } from '../lib/discover'
 
 type Props = {
   place: Place
@@ -213,9 +214,9 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
           className={`display mt-2 line-clamp-3 break-words leading-[1.08] ${
             place.name.length <= 18 ? 'text-[2rem]' : place.name.length <= 32 ? 'text-[1.6rem]' : 'text-[1.3rem]'
           }`}
-          title={place.name}
+          title={placeName(place)}
         >
-          {place.name}
+          {placeName(place)}
         </h2>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
           {place.city && <span className="font-semibold text-text-soft">{place.city}</span>}
@@ -530,7 +531,7 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
           index={heroZoom.index}
           onIndexChange={(index) => setHeroZoom({ ...heroZoom, index })}
           onClose={() => setHeroZoom(null)}
-          caption={place.name}
+          caption={placeName(place)}
         />
       )}
 
@@ -540,7 +541,7 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
           index={Math.min(zoom, gallery.length - 1)}
           onIndexChange={setZoom}
           onClose={() => setZoom(null)}
-          caption={`${place.name}, ${countryName(place.country)}`}
+          caption={`${placeName(place)}, ${countryName(place.country)}`}
         />
       )}
     </aside>

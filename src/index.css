@@ -847,9 +847,15 @@ body::before {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
+  /* Sans flou, un fond translucide laisse voir la carte au travers : on le
+     rend plein, partout sur la page carte. */
   .has-map header,
-  .has-map .fixed.bottom-0 {
-    background: color-mix(in srgb, var(--surface-solid) 94%, transparent) !important;
+  .has-map .fixed.bottom-0,
+  .has-map .panel,
+  .has-map .card,
+  .has-map .card-feature,
+  .has-map .tabbar {
+    background: var(--surface-solid) !important;
   }
   .has-map .leaflet-tooltip.stop-label,
   .has-map .leaflet-control-attribution {

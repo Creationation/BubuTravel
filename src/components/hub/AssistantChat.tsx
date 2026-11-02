@@ -231,12 +231,14 @@ export default function AssistantChat({ trip, hub }: { trip: Trip; hub: TripHub 
           ;[lat, lng] = [s?.lat ?? null, s?.lng ?? null]
         }
         if (lat == null || lng == null) throw new Error(t('chat.noPlace'))
-        await add({
+        const created = await add({
           trip_id: trip.id, category_id: null, name: a.name.slice(0, 120), country: a.country, city: a.city || null, lat, lng,
           visit_date: a.date || null, notes: a.notes || null, status: 'wishlist', planned_order: null, cost: null, currency: 'EUR',
           price_level: null, promo_code: null, promo_note: null, promo_until: null, rating: null, review: null,
           plan_time: a.time || null, plan_minutes: a.minutes ?? null,
         })
+        // Photos, adresse et infos : la fiche se remplit toute seule en fond
+        void queue('place_info', { place_id: created.id, lang }, trip.id).catch(() => undefined)
       }
       const applied = [...(m.applied ?? []), i]
       setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, applied } : x)))

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAiJobs } from '../../context/AiJobsContext'
 import { usePlaces } from '../../context/PlacesContext'
-import { emojiOf, familyOf, imageOf } from '../../lib/discover'
+import { emojiOf, familyOf, imageOf, placeName } from '../../lib/discover'
 import { durationOf, fmtMinutes, isStay, stopOf, stopOnDay, toHHMM, toMinutes } from '../../lib/schedule'
 import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import type { Place, Trip } from '../../lib/types'
@@ -366,7 +366,7 @@ function SortableList({
                 )}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[15px] font-bold">{p.name}</span>
+                <span className="block truncate text-[15px] font-bold">{placeName(p)}</span>
                 <span className="num block text-[12px] text-text-muted">
                   {fmtMinutes(durationOf(p))}
                   {p.plan_time && ` · ${t('day.until', { time: toHHMM(toMinutes(p.plan_time) + durationOf(p)) })}`}
@@ -459,7 +459,7 @@ function AddActivity({
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-2">
                         {imageOf(p) ? <img src={imageOf(p)!} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : emojiOf(familyOf(p))}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{p.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{placeName(p)}</span>
                       <span className="text-accent">＋</span>
                     </button>
                   </li>

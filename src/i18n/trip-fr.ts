@@ -733,4 +733,12 @@ export const tripFr = {
   'route.intro': "Enregistrez un trajet de A à B : la trace se dessine en direct, puis elle est rangée ici avec sa distance et sa durée.",
   'route.history': "Parcours enregistrés",
   'route.empty': "Aucun parcours pour l'instant. Touchez « Enregistrer un parcours » sur la carte, puis marchez, roulez ou naviguez : l'arrêt vous propose un nom « Départ → Arrivée ».",
+  'map.resize': "Agrandir ou réduire le panneau",
+  'agenda.title': "Agenda du voyage",
+  'agenda.empty': "Rien de daté pour l'instant : placez des activités dans l'onglet Jour.",
+  'agenda.arrive': "Arrivée à {name}",
+  'agenda.leave': "Départ de {name}",
+  'agenda.transport': "Trajet",
+  'agenda.export': "Ajouter à mon calendrier",
+  'agenda.exportHint': "Envoie le voyage vers le calendrier de votre téléphone.",
 } as const

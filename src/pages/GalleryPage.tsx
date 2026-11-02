@@ -10,6 +10,7 @@ import Lightbox from '../components/Lightbox'
 import { errorMessage } from '../lib/errors'
 import { useT } from '../i18n/I18nContext'
 import { countryName } from '../lib/countryName'
+import { placeName } from '../lib/discover'
 
 type Filter = { kind: 'all' } | { kind: 'country'; value: string } | { kind: 'trip'; value: string }
 
@@ -135,7 +136,7 @@ export default function GalleryPage() {
                     )}
                     {place && (
                       <span className="absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-bg-deep/90 to-transparent px-3 py-2.5 text-left text-[12px] text-text transition-transform duration-300 group-hover:translate-y-0">
-                        <span className="block truncate font-medium">{place.name}</span>
+                        <span className="block truncate font-medium">{placeName(place)}</span>
                         <span className="block truncate text-text-muted">{place.country}</span>
                       </span>
                     )}
@@ -156,7 +157,7 @@ export default function GalleryPage() {
           caption={(() => {
             const photo = visible[Math.min(zoom, visible.length - 1)]
             const place = photo ? placeById.get(photo.place_id) : null
-            return place ? `${place.name}, ${countryName(place.country)}` : undefined
+            return place ? `${placeName(place)}, ${countryName(place.country)}` : undefined
           })()}
         />
       )}

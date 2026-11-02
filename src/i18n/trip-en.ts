@@ -718,4 +718,12 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'route.intro': "Record a journey from A to B: the trace is drawn live, then filed here with its distance and duration.",
   'route.history': "Saved routes",
   'route.empty': "No routes yet. Tap “Record a route” on the map, then walk, ride or sail: when you stop, it suggests a “Start → End” name.",
+  'map.resize': "Resize the panel",
+  'agenda.title': "Trip agenda",
+  'agenda.empty': "Nothing dated yet: place activities in the Day tab.",
+  'agenda.arrive': "Arrive in {name}",
+  'agenda.leave': "Leave {name}",
+  'agenda.transport': "Journey",
+  'agenda.export': "Add to my calendar",
+  'agenda.exportHint': "Sends the trip to your phone's calendar.",
 }
