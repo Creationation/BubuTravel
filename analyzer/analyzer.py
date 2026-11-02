@@ -2274,7 +2274,8 @@ def job_emergency(job: dict, req: dict, tmp: Path) -> dict:
         if nat.lower() == country.lower():
             continue
         owners = [p for p in people if (p.get("nationality") or "").strip() == nat]
-        title = f"🏛️ Ambassade de {nat} · {country}"
+        particle = "d'" if nat[:1].lower() in "aeiouyéèêâîôûh" else "de "
+        title = f"🏛️ Ambassade {particle}{nat} · {country}"
         if all(sb("GET", "vault_items", params={"user_id": f"eq.{o['id']}", "title": f"eq.{title}", "select": "id"}) for o in owners):
             continue
         emb = claude_json(EMBASSY_BRIEF.format(lang=lang_line(lang), nationality=nat, country=country), Embassy, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=900, span=(60, 92))

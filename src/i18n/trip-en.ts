@@ -800,5 +800,5 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'tid.natPh': "E.g. Belgium",
   'tid.resPh': "E.g. Austria",
   'sos.refresh': "Find embassies and emergency numbers",
-  'sos.started': "Search started for {n} countries: the contacts will appear under “Contacts”.",
+  'sos.started': "Search started for {n} countries: the numbers will appear under “Important numbers”.",
 }

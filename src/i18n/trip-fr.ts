@@ -815,5 +815,5 @@ export const tripFr = {
   'tid.natPh': "Ex. Belgique",
   'tid.resPh': "Ex. Autriche",
   'sos.refresh': "Chercher ambassades et numéros d’urgence",
-  'sos.started': "Recherche lancée pour {n} pays : les contacts arrivent dans « Contacts ».",
+  'sos.started': "Recherche lancée pour {n} pays : les numéros arrivent dans « Numéros importants ».",
 } as const
