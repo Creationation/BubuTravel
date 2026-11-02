@@ -10,6 +10,7 @@ import { createExpense, fetchExpenses, removeExpense } from '../lib/expenses'
 import { errorMessage } from '../lib/errors'
 import { runAiJob } from '../lib/aiJobs'
 import type { Expense } from '../lib/types'
+import { useSearchParams } from 'react-router-dom'
 
 type ReceiptResult = {
   merchant: string
@@ -47,7 +48,8 @@ export default function ExpensesPage() {
   const [spentAt, setSpentAt] = useState(isoLocalInput)
   const [category, setCategory] = useState('')
   const [notes, setNotes] = useState('')
-  const [tripId, setTripId] = useState('')
+  const [params] = useSearchParams()
+  const [tripId, setTripId] = useState(() => params.get('voyage') ?? '')
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +58,8 @@ export default function ExpensesPage() {
     if (!user) return
     fetchExpenses(user.id)
       .then(({ rows: loaded, localOnly: local }) => {
-        setRows(loaded)
+        // Les depenses de l'autre voyageur restent dans « Cout du voyage »
+        setRows(loaded.filter((r) => r.user_id === user.id))
         setLocalOnly(local)
       })
       .catch((err) => setError(errorMessage(err)))

@@ -9,7 +9,7 @@ import { modeKey } from './StopForm'
 import DiscoverSection from './DiscoverSection'
 import { DocIcon, RouteIcon, ShareIcon, ShieldIcon, TodoKindIcon, TransportIcon } from './icons'
 
-export type HubTab = 'overview' | 'day' | 'route' | 'todo' | 'docs' | 'countries' | 'ideas' | 'assistant' | 'memories'
+export type HubTab = 'overview' | 'day' | 'route' | 'todo' | 'docs' | 'cost' | 'countries' | 'ideas' | 'assistant' | 'memories'
 
 /**
  * Le tableau de bord du voyage : ce qui arrive, ce qu'il ne faut pas oublier

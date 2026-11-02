@@ -57,6 +57,9 @@ export type Trip = {
   notes: string | null
   status: TripStatus
   checklist: ChecklistItem[]
+  /** Budget facultatif du voyage. */
+  budget?: number | null
+  budget_currency?: string
   created_at: string
 }
 

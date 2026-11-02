@@ -24,12 +24,14 @@ export default function AgendaSheet({
 }: {
   trip: Trip
   hub: TripHub
-  onExport: () => void
+  onExport: () => void | Promise<void>
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
   const { places } = usePlaces()
   const [openId, setOpenId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -118,10 +120,22 @@ export default function AgendaSheet({
           </div>
 
           <div className="border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <button onClick={onExport} className="btn btn-accent w-full">
-              📲 {t('agenda.export')}
+            <button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await onExport()
+                  setDone(true)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              className="btn btn-accent w-full"
+            >
+              {busy ? t('agenda.preparing') : `📲 ${t('agenda.export')}`}
             </button>
-            <p className="mt-2 text-center text-[11px] text-text-muted">{t('agenda.exportHint')}</p>
+            <p className="mt-2 text-center text-[11.5px] leading-snug text-text-muted">{done ? t('agenda.exportDone') : t('agenda.exportHint')}</p>
           </div>
         </div>
       </div>

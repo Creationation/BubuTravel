@@ -35,12 +35,15 @@ import type { TransportMode } from '../lib/types'
 import { fmtNum } from '../i18n/current'
 import { countryName } from '../lib/countryName'
 import AgendaSheet from '../components/hub/AgendaSheet'
+import CostTab from '../components/hub/CostTab'
+import { supabase } from '../lib/supabase'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
   { id: 'day', label: 'hub.tab.day' },
   { id: 'route', label: 'hub.tab.route' },
   { id: 'todo', label: 'hub.tab.todo' },
+  { id: 'cost', label: 'hub.tab.cost' },
   { id: 'docs', label: 'hub.tab.docs' },
   { id: 'countries', label: 'hub.tab.countries' },
   { id: 'ideas', label: 'hub.tab.ideas' },
@@ -100,7 +103,7 @@ export default function TripView() {
   const totalDays = trip.start_date && trip.end_date ? daysBetween(trip.start_date, trip.end_date) + 1 : null
   const openTodos = hub.todos.filter((x) => !x.done).length
 
-  function exportCalendar() {
+  async function exportCalendar() {
     if (!trip) return
     const labels = Object.fromEntries(MODES.map((m) => [m, t(modeKey(m))])) as Record<TransportMode, string>
     const ics = buildTripIcs(trip, hub.stops, hub.todos, {
@@ -110,7 +113,26 @@ export default function TripView() {
       todo: t('hub.tab.todo'),
     })
     const name = `${trip.title.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.ics`
-    // Telephone : la feuille de partage ouvre directement le calendrier
+    // Methode fiable sur telephone (navigateur comme appli) : le fichier est
+    // depose en ligne puis ouvert par son lien ; le systeme propose alors le
+    // calendrier. Un telechargement local (blob) ne marche pas dans l'appli.
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const uid = sess.session?.user.id
+      if (uid) {
+        const path = `${uid}/agenda/${Date.now()}.ics`
+        const up = await supabase.storage.from('assistant').upload(path, new Blob([ics], { type: 'text/calendar' }), { contentType: 'text/calendar' })
+        if (!up.error) {
+          const signed = await supabase.storage.from('assistant').createSignedUrl(path, 900, { download: name })
+          if (signed.data?.signedUrl) {
+            window.location.assign(signed.data.signedUrl)
+            return
+          }
+        }
+      }
+    } catch {
+      // hors ligne : on essaie les autres methodes
+    }
     try {
       const file = new File([ics], name, { type: 'text/calendar' })
       if (navigator.canShare?.({ files: [file] })) {
@@ -188,6 +210,7 @@ export default function TripView() {
           {tab === 'assistant' && <AssistantChat trip={trip} hub={hub} />}
           {tab === 'route' && <RouteTab trip={trip} hub={hub} autoAdd={autoAdd} onOpenAssistant={() => setAssistant(true)} />}
           {tab === 'todo' && <TodoTab hub={hub} autoAdd={autoAdd} />}
+          {tab === 'cost' && <CostTab trip={trip} hub={hub} />}
           {tab === 'docs' && <DocsTab hub={hub} autoAdd={autoAdd} />}
           {tab === 'countries' && <CountriesTab trip={trip} hub={hub} />}
           {tab === 'ideas' && <IdeasTab trip={trip} hub={hub} />}
