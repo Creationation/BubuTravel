@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { usePlaces } from '../context/PlacesContext'
 import { pickCurrentTrip } from '../lib/currentTrip'
 import { errorMessage } from '../lib/errors'
-import { fetchDocuments, fetchStops, openDocumentUrl } from '../lib/tripApi'
+import { fetchDocuments, fetchStops, openDocumentUrl, updateStop } from '../lib/tripApi'
 import { addDaysIso, shortDate, todayIso } from '../lib/tripDates'
 import type { StopHost, TripDocument } from '../lib/types'
 import { HostCards } from '../components/hub/HostContacts'
@@ -27,6 +27,8 @@ import type { Key } from '../i18n/fr'
 import { PlusIcon } from '../components/hub/icons'
 import Lightbox from '../components/Lightbox'
 import Portal from '../components/Portal'
+import VaultSharing from '../components/vault/VaultSharing'
+import type { Companion } from '../lib/companions'
 
 const KINDS: VaultKind[] = ['identity', 'card', 'ticket', 'insurance', 'contact', 'other']
 
@@ -68,8 +70,9 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
   const [editing, setEditing] = useState<VaultItem | VaultKind | null>(null)
   const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null)
   const [tripDocs, setTripDocs] = useState<TripDocument[]>([])
+  const [people, setPeople] = useState<Companion[]>([])
   const [offline, setOffline] = useState<{ ready: number; total: number } | null>(null)
-  const [hosts, setHosts] = useState<{ stop: string; dates: string; hosts: StopHost[] }[]>([])
+  const [hosts, setHosts] = useState<{ stopId: string; stop: string; dates: string; hosts: StopHost[] }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [, forceLock] = useState(0)
 
@@ -106,6 +109,7 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
         const list = stops
           .filter((st) => (st.hosts ?? []).length > 0)
           .map((st) => ({
+            stopId: st.id,
             stop: st.name,
             dates: [st.arrive_date, st.leave_date].filter(Boolean).map((d) => shortDate(d!, locale)).join(' → '),
             hosts: st.hosts,
@@ -152,6 +156,8 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
       </div>
       {error && <p className="notice notice-bad mt-4">{error}</p>}
 
+      <VaultSharing onChange={setPeople} />
+
       <div className="mt-8 space-y-8">
         {KINDS.map((kind) => {
           const list = items.filter((i) => i.kind === kind)
@@ -179,6 +185,7 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
                       item={item}
                       urls={urls}
                       mine={item.user_id === user?.id}
+                      ownerName={people.find((p) => p.user_id === item.user_id)?.display_name ?? ''}
                       onEdit={() => setEditing(item)}
                       onView={(index) => setViewer({ urls: item.files.map((f) => urls[f]).filter(Boolean), index })}
                     />
@@ -195,11 +202,20 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
             <p className="mb-3 text-[13px] text-text-muted">{t('host.vaultHint')}</p>
             <div className="space-y-4">
               {hosts.map((h) => (
-                <div key={h.stop}>
+                <div key={h.stopId}>
                   <p className="mb-1.5 text-[13px] font-bold text-text-soft">
                     {h.stop} <span className="num font-medium text-text-muted">{h.dates}</span>
                   </p>
-                  <HostCards hosts={h.hosts} compact />
+                  <HostCards
+                    hosts={h.hosts}
+                    compact
+                    onSave={async (next) => {
+                      await updateStop(h.stopId, { hosts: next })
+                      const list = hosts.map((x) => (x.stopId === h.stopId ? { ...x, hosts: next } : x))
+                      setHosts(list)
+                      saveVaultLocal('hosts', list)
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -257,12 +273,14 @@ function VaultCard({
   item,
   urls,
   mine,
+  ownerName,
   onEdit,
   onView,
 }: {
   item: VaultItem
   urls: Record<string, string>
   mine: boolean
+  ownerName: string
   onEdit: () => void
   onView: (index: number) => void
 }) {
@@ -280,17 +298,16 @@ function VaultCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[16px] font-bold">{item.title}</p>
           <p className="text-[13px] text-text-muted">
-            {[item.holder, !mine && t('vault.sharedBy', { name: '' }).trim()].filter(Boolean).join(' · ')}
+            {[item.holder, !mine && t('vault.sharedBy', { name: ownerName || '…' })].filter(Boolean).join(' · ')}
             {item.shared && mine && ' · 👫'}
           </p>
         </div>
         {expired && <span className="chip chip-bad">{t('vault.expired')}</span>}
         {soon && <span className="chip chip-warn">{t('vault.expiresSoon')}</span>}
-        {mine && (
-          <button onClick={onEdit} className="btn btn-quiet btn-xs">
-            {t('vault.edit')}
-          </button>
-        )}
+        {/* Coffre commun : on modifie aussi ce que l'autre a partage */}
+        <button onClick={onEdit} className="btn btn-quiet btn-xs">
+          {t('vault.edit')}
+        </button>
       </div>
 
       {masked && (
@@ -395,7 +412,7 @@ function VaultForm({
     email: item?.email ?? '',
     url: item?.url ?? '',
     notes: item?.notes ?? '',
-    shared: item?.shared ?? false,
+    shared: item?.shared ?? true,
   })
   const [files, setFiles] = useState<File[]>([])
   const [removed, setRemoved] = useState<string[]>([])

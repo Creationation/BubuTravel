@@ -30,6 +30,7 @@ import {
 import { countryName } from '../../lib/countryName'
 import { HostCards } from './HostContacts'
 import { placeName } from '../../lib/discover'
+import { updateStop } from '../../lib/tripApi'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -321,6 +322,9 @@ export default function RouteTab({
               )}
             </div>
             <div className="flex w-full flex-wrap gap-1 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
+              <button onClick={onEdit} className="btn btn-xs">
+                ✏️ {t('common.edit')}
+              </button>
               <a href={mapsLink(stop)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-xs">
                 {t('stop.openMap')}
               </a>
@@ -334,7 +338,7 @@ export default function RouteTab({
           </div>
         )}
 
-        <HostCards hosts={stop.hosts} />
+        <HostCards hosts={stop.hosts} onSave={async (next) => { await updateStop(stop.id, { hosts: next }); await hub.reload() }} />
 
         {sightBusy === stop.id && <p className="mt-4 text-[13px] text-text-muted">{t('stop.sightsBusy')}</p>}
         {sightsOf(stop, places).length > 0 && (
