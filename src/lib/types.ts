@@ -8,6 +8,8 @@ export type Profile = {
   lang: Lang
   /** Ecran d'accueil : grande photo, petite photo ou aucun. */
   greeting?: 'big' | 'small' | 'off'
+  /** Moteur des recherches IA : Claude Code, ChatGPT, ou automatique. */
+  ai_provider?: 'auto' | 'claude' | 'chatgpt'
   created_at: string
 }
 

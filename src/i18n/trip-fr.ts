@@ -741,4 +741,13 @@ export const tripFr = {
   'agenda.transport': "Trajet",
   'agenda.export': "Ajouter à mon calendrier",
   'agenda.exportHint': "Envoie le voyage vers le calendrier de votre téléphone.",
+  'aip.title': "Moteur des recherches IA",
+  'aip.intro': "Choisissez qui fait les recherches : fiches des lieux, plan du jour, assistant, tickets de caisse.",
+  'aip.auto': "Automatique",
+  'aip.autoHint': "Claude Code d'abord ; ChatGPT prend le relais si sa limite est atteinte, puis Claude reprend.",
+  'aip.claude': "Claude Code seulement",
+  'aip.claudeHint': "Toujours Claude. Si sa limite est atteinte, la recherche attend.",
+  'aip.chatgpt': "ChatGPT seulement",
+  'aip.chatgptHint': "Toujours ChatGPT (votre abonnement), sans toucher à Claude.",
+  'aip.note': "Le choix s'applique à la prochaine recherche lancée. Les recherches déjà en cours finissent avec leur moteur.",
 } as const

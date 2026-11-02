@@ -726,4 +726,13 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'agenda.transport': "Journey",
   'agenda.export': "Add to my calendar",
   'agenda.exportHint': "Sends the trip to your phone's calendar.",
+  'aip.title': "AI search engine",
+  'aip.intro': "Choose who does the searches: place details, day plan, assistant, receipts.",
+  'aip.auto': "Automatic",
+  'aip.autoHint': "Claude Code first; ChatGPT steps in when its limit is reached, then Claude takes over again.",
+  'aip.claude': "Claude Code only",
+  'aip.claudeHint': "Always Claude. If its limit is reached, the search waits.",
+  'aip.chatgpt': "ChatGPT only",
+  'aip.chatgptHint': "Always ChatGPT (your subscription), without touching Claude.",
+  'aip.note': "The choice applies to the next search you start. Searches already running finish with their engine.",
 }

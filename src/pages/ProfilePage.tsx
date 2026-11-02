@@ -15,6 +15,7 @@ import { errorMessage } from '../lib/errors'
 import AvatarCropper from '../components/AvatarCropper'
 import Greeting from '../components/Greeting'
 import ErrorLogPanel from '../components/ErrorLogPanel'
+import AiProviderPanel from '../components/AiProviderPanel'
 
 export default function ProfilePage() {
   const t = useT()
@@ -181,6 +182,11 @@ export default function ProfilePage() {
               </div>
             </div>
           </section>
+        </Reveal>
+
+        {/* Moteur IA : Claude Code, ChatGPT ou automatique */}
+        <Reveal className="mt-6">
+          <AiProviderPanel />
         </Reveal>
 
         {/* Accueil : photo ronde et « Bonjour » a l'ouverture */}

@@ -209,6 +209,16 @@ def update_idea(idea_id: str, **fields) -> None:
     sb("PATCH", "link_ideas", params={"id": f"eq.{idea_id}"}, body=fields, prefer="return=minimal")
 
 
+def user_provider(user_id: str) -> str:
+    """Moteur IA choisi dans les reglages : auto, claude ou chatgpt."""
+    try:
+        rows = sb("GET", "profiles", params={"id": f"eq.{user_id}", "select": "ai_provider"})
+        value = (rows[0].get("ai_provider") if rows else None) or "auto"
+        return value if value in ("auto", "claude", "chatgpt") else "auto"
+    except Exception:
+        return "auto"
+
+
 def user_lang(user_id: str) -> str:
     try:
         rows = sb("GET", "profiles", params={"id": f"eq.{user_id}", "select": "lang"})
@@ -933,6 +943,17 @@ def claude_json(
     jusqu'au retest automatique.
     """
     global CLAUDE_PAUSED_UNTIL
+    # Choix de l'utilisateur (reglages de l'app) : un seul moteur, sans bascule
+    mode = getattr(CURRENT, "provider", "auto")
+    if mode == "claude":
+        return claude_only_json(prompt, model, cwd=cwd, tools=tools, timeout=timeout, span=span)
+    if mode == "chatgpt":
+        with CODEX_CALL_LOCK:
+            log(f"ChatGPT/{CODEX_MODEL} (choix de l'utilisateur).")
+            return codex_json(
+                prompt, model, cwd=cwd, timeout=timeout, span=span,
+                images=codex_images, web_search="WebSearch" in tools,
+            )
     with CLAUDE_STATE_LOCK:
         claude_paused = time.time() < CLAUDE_PAUSED_UNTIL
     claude_error: Exception | None = None
@@ -1185,6 +1206,7 @@ def process(job: dict) -> None:
     CURRENT.kind, CURRENT.codex_allowed = "link_idea", True
     try:
         lang = user_lang(job["user_id"])
+        CURRENT.provider = user_provider(job["user_id"])
         context = trip_context(job)
         data, title, thumb, frames = analyse(job["url"], job.get("note"), context, lang, key=job["id"])
         update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, frames=frames, error=None)
@@ -1349,6 +1371,7 @@ def process_ai_job(job: dict) -> None:
     log(f"Demande IA {job['id'][:8]} : {job['kind']}")
     req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
+    CURRENT.provider = user_provider(job["user_id"])
     CURRENT.codex_allowed = job["kind"] in (
         "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
         "stop_places", "country_guide", "itinerary", "receipt_scan",
@@ -1974,6 +1997,7 @@ def guess_lang(text: str) -> str:
 
 def backfill_translations(limit: int = 8) -> int:
     """Traduit un lot de fiches qui n'ont pas encore leur version dans l'autre langue."""
+    CURRENT.provider = "auto"
     rows = sb("GET", "places", params={"details": "not.is.null", "select": "id,name,details", "order": "created_at.asc", "limit": "400"}) or []
     todo = [r for r in rows if isinstance(r.get("details"), dict) and not r["details"].get("alt") and (r["details"].get("summary") or r["name"])][:limit]
     if not todo:
