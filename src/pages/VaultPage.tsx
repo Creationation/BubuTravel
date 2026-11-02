@@ -31,6 +31,37 @@ import VaultSharing from '../components/vault/VaultSharing'
 import type { Companion } from '../lib/companions'
 import EditButton from '../components/EditButton'
 import { useAiJobs } from '../context/AiJobsContext'
+import { flagOf } from '../lib/countries'
+import { countryName } from '../lib/countryName'
+
+/**
+ * Numeros importants ranges par pays : le titre automatique se termine par
+ * « · Pays » (urgences, ambassade). Les pays du voyage choisi passent d'abord,
+ * puis le pays de residence ; les contacts ajoutes a la main restent a part.
+ * Les contacts automatiques d'un pays qui n'est ni dans ce voyage ni le pays
+ * de residence ne sont pas montres : ils appartiennent a un autre voyage.
+ */
+function groupContacts(list: VaultItem[], tripCountries: string[]) {
+  const groups = new Map<string, { key: string; country: string | null; residence: boolean; items: VaultItem[] }>()
+  const auto = /^(🚨|🏛️)/u
+  for (const item of list) {
+    const m = auto.test(item.title) ? item.title.match(/·\s*([^·]+)$/u) : null
+    const country = m ? m[1].trim() : null
+    const residence = item.holder === 'Pays de résidence'
+    if (country && !residence && tripCountries.length > 0 && !tripCountries.some((c) => c.toLowerCase() === country.toLowerCase())) continue
+    const key = country ? `${country}${residence ? ':res' : ''}` : '_other'
+    const g = groups.get(key) ?? { key, country, residence, items: [] }
+    g.items.push(item)
+    groups.set(key, g)
+  }
+  const rank = (g: { country: string | null; residence: boolean }) => {
+    if (!g.country) return 1000
+    if (g.residence) return 500
+    const i = tripCountries.findIndex((c) => c.toLowerCase() === g.country!.toLowerCase())
+    return i < 0 ? 400 : i
+  }
+  return [...groups.values()].sort((a, b) => rank(a) - rank(b))
+}
 
 const KINDS: VaultKind[] = ['identity', 'card', 'ticket', 'insurance', 'contact', 'other']
 
@@ -74,6 +105,9 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
   const [tripDocs, setTripDocs] = useState<TripDocument[]>([])
   const [people, setPeople] = useState<Companion[]>([])
   const [sosMsg, setSosMsg] = useState<string | null>(null)
+  const [selTrip, setSelTrip] = useState<string | null>(null)
+  const [tripCountries, setTripCountries] = useState<string[]>([])
+  const activeTrip = trips.find((x) => x.id === selTrip) ?? pickCurrentTrip(trips)
   const { queue: queueAi } = useAiJobs()
   const [offline, setOffline] = useState<{ ready: number; total: number } | null>(null)
   const [hosts, setHosts] = useState<{ stopId: string; stop: string; dates: string; hosts: StopHost[] }[]>([])
@@ -95,7 +129,7 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
 
   useEffect(() => {
     void reload()
-    const trip = pickCurrentTrip(trips)
+    const trip = activeTrip
     // Hors ligne : on relit la derniere copie gardee sur l'appareil
     setTripDocs(loadLocal<TripDocument[]>('docs') ?? [])
     setHosts(loadLocal<typeof hosts>('hosts') ?? [])
@@ -110,6 +144,7 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
       .catch(() => undefined)
     void fetchStops(trip.id)
       .then((stops) => {
+        setTripCountries([...new Set(stops.map((x) => x.country).filter(Boolean) as string[])])
         const list = stops
           .filter((st) => (st.hosts ?? []).length > 0)
           .map((st) => ({
@@ -122,7 +157,7 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
         saveVaultLocal('hosts', list)
       })
       .catch(() => undefined)
-  }, [reload, trips, locale])
+  }, [reload, trips, locale, activeTrip?.id])
 
   return (
     <div className="pt-8">
@@ -160,11 +195,21 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
       </div>
       {error && <p className="notice notice-bad mt-4">{error}</p>}
 
+      {trips.length > 1 && (
+        <div className="nav-scroll -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+          {trips.map((tr) => (
+            <button key={tr.id} onClick={() => setSelTrip(tr.id)} className={`pill shrink-0 ${activeTrip?.id === tr.id ? 'pill-active' : ''}`}>
+              ✈️ {tr.title}
+            </button>
+          ))}
+        </div>
+      )}
+
       <VaultSharing onChange={setPeople} />
 
       <button
         onClick={async () => {
-          const trip = pickCurrentTrip(trips)
+          const trip = activeTrip
           if (!trip) return
           setSosMsg('…')
           const stops = await fetchStops(trip.id).catch(() => [])
@@ -197,6 +242,31 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
                 >
                   {t('vault.empty')} +
                 </button>
+              ) : kind === 'contact' ? (
+                <div className="space-y-6">
+                  {groupContacts(list, tripCountries).map((g) => (
+                    <div key={g.key}>
+                      <p className="mb-2 flex items-center gap-2 text-[14px] font-extrabold">
+                        <span className="text-xl">{g.country ? flagOf(g.country) : '📇'}</span>
+                        {g.country ? countryName(g.country) : t('vault.contactsOther')}
+                        {g.residence && <span className="chip">{t('vault.residence')}</span>}
+                      </p>
+                      <ul className="space-y-3">
+                        {g.items.map((item) => (
+                          <VaultCard
+                            key={item.id}
+                            item={item}
+                            urls={urls}
+                            mine={item.user_id === user?.id}
+                            ownerName={people.find((p) => p.user_id === item.user_id)?.display_name ?? ''}
+                            onEdit={() => setEditing(item)}
+                            onView={(index) => setViewer({ urls: item.files.map((f) => urls[f]).filter(Boolean), index })}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <ul className="space-y-3">
                   {list.map((item) => (

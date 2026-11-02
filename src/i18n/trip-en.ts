@@ -801,4 +801,6 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'tid.resPh': "E.g. Austria",
   'sos.refresh': "Find embassies and emergency numbers",
   'sos.started': "Search started for {n} countries: the numbers will appear under “Important numbers”.",
+  'vault.contactsOther': "Other contacts",
+  'vault.residence': "country of residence",
 }

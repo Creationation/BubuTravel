@@ -1212,6 +1212,7 @@ def process(job: dict) -> None:
         update_idea(job["id"], status="ready", analysis=data, title=title, thumbnail=thumb, frames=frames, error=None)
         log(f"  pret : {data.get('name')}")
         link_place({**job, "analysis": data, "thumbnail": thumb, "frames": frames})
+        auto_place_idea({**job, "analysis": data, "thumbnail": thumb, "frames": frames, "status": "ready"})
     except ProviderPausedError as err:
         update_idea(job["id"], status="pending", error=None)
         log(f"  en pause : {err}")
@@ -2290,6 +2291,100 @@ def job_emergency(job: dict, req: dict, tmp: Path) -> dict:
     return {"country": country, "added": added}
 
 
+
+# --------------------------------------------------------------------------
+# Idees -> carte : une idee analysee devient un lieu du voyage sur la carte
+# puis disparait de la liste des idees (archivee).
+# --------------------------------------------------------------------------
+
+IDEA_SKIPPED: set[str] = set()
+
+
+def auto_place_idea(idea: dict) -> str:
+    """Pose l'idee sur la carte, puis l'archive. Renvoie placed, no-coords ou skip."""
+    a = idea.get("analysis") or {}
+    if not a or idea.get("status") != "ready":
+        return "skip"
+    trip_id = idea.get("trip_id")
+    code = shortcode(idea["url"])
+    params = {"notes": f"ilike.*{code}*", "select": "id", "limit": "1"}
+    params["trip_id" if trip_id else "user_id"] = f"eq.{trip_id or idea['user_id']}"
+    found = sb("GET", "places", params=params) or []
+    place_id = found[0]["id"] if found else idea.get("place_id")
+
+    pl = a.get("place") or {}
+    name = (a.get("name") or pl.get("name") or "").strip()[:120]
+    city = (pl.get("city") or "").strip()
+    if not place_id and name:
+        # Meme nom et meme ville dans le voyage : c'est le meme lieu
+        same = sb("GET", "places", params={
+            "name": f"ilike.{name}", "select": "id,city", **({"trip_id": f"eq.{trip_id}"} if trip_id else {"user_id": f"eq.{idea['user_id']}"}),
+        }) or []
+        for x in same:
+            if (x.get("city") or "").strip().lower() == city.lower():
+                place_id = x["id"]
+                break
+    if not place_id:
+        if not name:
+            return "no-coords"
+        lat, lng = pl.get("lat"), pl.get("lng")
+        if lat is None or lng is None:
+            for q in [pl.get("address"), f"{name}, {city}", city]:
+                if q and q.strip(", "):
+                    hit = geocode_osm(f"{q}, {pl.get('country', '')}".strip(", "))
+                    if hit:
+                        lat, lng = hit
+                        break
+        if lat is None or lng is None:
+            return "no-coords"
+        frames = [u for u in (idea.get("frames") or []) if isinstance(u, str)]
+        row = {
+            "user_id": idea["user_id"], "trip_id": trip_id, "name": name, "country": pl.get("country") or "", "city": city or None,
+            "lat": lat, "lng": lng, "status": "wishlist",
+            "notes": "\n\n".join(x for x in [a.get("summary"), f"Réserver : {a['booking']}" if a.get("booking") else "", a.get("booking_url"), idea["url"]] if x),
+            "details": details_from_analysis(a),
+        }
+        if frames:
+            row["gallery"] = frames[:10]
+            row["image_url"] = frames[0]
+        created = sb("POST", "places", body=row, prefer="return=representation")
+        place_id = created[0]["id"] if created else None
+        if not place_id:
+            return "no-coords"
+    sb("PATCH", "link_ideas", params={"id": f"eq.{idea['id']}"}, body={"place_id": place_id, "status": "archived", "updated_at": now_iso()}, prefer="return=minimal")
+    return "placed"
+
+
+def backfill_ideas(limit: int = 25) -> int:
+    """Pose sur la carte les idees deja analysees, par lots. Renvoie le nombre traite."""
+    rows = sb("GET", "link_ideas", params={"status": "eq.ready", "select": "*", "order": "created_at.asc", "limit": "300"}) or []
+    todo = [r for r in rows if r["id"] not in IDEA_SKIPPED][:limit]
+    placed = 0
+    for idea in todo:
+        try:
+            res = auto_place_idea(idea)
+        except Exception as err:
+            log(f"  idee {idea['id'][:8]} ignoree : {str(err)[:120]}")
+            res = "skip"
+        if res == "placed":
+            placed += 1
+        else:
+            IDEA_SKIPPED.add(idea["id"])
+    if todo:
+        log(f"  idees : {placed} posees sur la carte, {len(todo) - placed} laissees dans la liste")
+    return len(todo)
+
+
+def ideas_loop() -> None:
+    while True:
+        try:
+            n = backfill_ideas()
+            time.sleep(2 if n else 180)
+        except Exception as err:
+            log(f"Erreur (idees) : {str(err)[:150]}")
+            time.sleep(60)
+
+
 def check_env() -> None:
     missing = [k for k in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY") if not os.environ.get(k)]
     if missing:
@@ -2329,6 +2424,7 @@ def main() -> None:
     except Exception:
         pass
     if not args.once:
+        threading.Thread(target=ideas_loop, daemon=True).start()
         for n in range(AI_WORKERS):
             threading.Thread(target=ai_worker, args=(n + 1,), daemon=True).start()
     log(f"Analyseur BuBuTravel {VERSION} en ligne sous le nom « {NAME} » (Claude via l'abonnement). Ctrl+C pour arreter.")
