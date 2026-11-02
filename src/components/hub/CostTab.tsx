@@ -46,6 +46,7 @@ export default function CostTab({ trip, hub }: { trip: Trip; hub: TripHub }) {
   const [cur, setCur] = useState<string | null>(null)
   const [mode, setMode] = useState<'day' | 'cumul'>('day')
   const [picked, setPicked] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [editBudget, setEditBudget] = useState(false)
   const [budgetInput, setBudgetInput] = useState('')
   const [budgetCur, setBudgetCur] = useState(trip.budget_currency ?? 'EUR')
@@ -162,6 +163,17 @@ export default function CostTab({ trip, hub }: { trip: Trip; hub: TripHub }) {
     const px = ((e.clientX - r.left) / r.width) * W
     const i = Math.round(((px - pad.l) / (W - pad.l - pad.r)) * (series.length - 1))
     setPicked(Math.min(series.length - 1, Math.max(0, i)))
+  }
+
+  async function removeExpense(id: string) {
+    if (confirmId !== id) {
+      setConfirmId(id)
+      return
+    }
+    const { error: err } = await supabase.from('expenses').delete().eq('id', id)
+    setConfirmId(null)
+    if (err) setError(errorMessage(err))
+    else setRows((prev) => prev.filter((r) => r.id !== id))
   }
 
   const nameOf = (uid: string) => hub.people.find((p) => p.user_id === uid)?.display_name ?? '·'
@@ -396,6 +408,13 @@ export default function CostTab({ trip, hub }: { trip: Trip; hub: TripHub }) {
                     </span>
                   </span>
                   <span className="num shrink-0 text-[14px] font-bold">{money(r.amount, r.currency)}</span>
+                  <button
+                    onClick={() => void removeExpense(r.id)}
+                    className={`btn btn-xs shrink-0 ${confirmId === r.id ? 'btn-accent' : 'btn-quiet'}`}
+                    aria-label={t('common.delete')}
+                  >
+                    {confirmId === r.id ? t('common.confirm') : '×'}
+                  </button>
                 </li>
               ))}
             </ul>

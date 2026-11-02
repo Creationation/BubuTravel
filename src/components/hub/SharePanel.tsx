@@ -33,7 +33,8 @@ export default function SharePanel({
   const [message, setMessage] = useState<{ ok: boolean; text: string; noAccount?: boolean } | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const isOwner = trip.user_id === user?.id
+  // Voyage a deux : memes droits pour chaque membre, createur compris
+  const isOwner = true
 
   useEffect(() => {
     void fetchCompanions().then(setCompanions).catch(() => undefined)
@@ -85,7 +86,7 @@ export default function SharePanel({
         <ul className="overflow-hidden rounded-[22px] border border-line bg-surface">
           {hub.people.map((p) => {
             const me = p.user_id === user?.id
-            const canRemove = !p.is_owner && (isOwner || me)
+            const canRemove = !p.is_owner && me
             return (
               <li key={p.user_id} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
                 <Avatar url={p.avatar_url} name={p.display_name} size={40} />
