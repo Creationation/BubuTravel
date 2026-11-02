@@ -752,7 +752,7 @@ def inline_schema(model: type[BaseModel]) -> dict:
 
 # Demande IA en cours sur ce fil : sa jauge avance avec les vraies etapes
 CURRENT = threading.local()
-EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14, "receipt_scan": 3}
+EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14, "receipt_scan": 3, "vaccines": 12, "emergency": 12}
 
 
 def progress(pct: int, step: str | None = None, *, force: bool = False) -> None:
@@ -1328,7 +1328,7 @@ def claim_ai_job() -> dict | None:
     if (claude_paused and CODEX_CALL_LOCK.locked()) or (CLAUDE_CALL_LOCK.locked() and CODEX_CALL_LOCK.locked()):
         return None
     immediate = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan,place_info,arrange_trip,stop_places)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan,vaccines,emergency,place_info,arrange_trip,stop_places)", "order": "created_at.asc", "limit": "1", "select": "*"})
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
     )
     rows = immediate if claude_paused else (
@@ -1374,7 +1374,7 @@ def process_ai_job(job: dict) -> None:
     CURRENT.provider = user_provider(job["user_id"])
     CURRENT.codex_allowed = job["kind"] in (
         "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
-        "stop_places", "country_guide", "itinerary", "receipt_scan",
+        "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency",
     ) or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
@@ -1458,6 +1458,16 @@ def process_ai_job(job: dict) -> None:
             data = claude_json(prompt, Guide, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
             update_ai_job(job["id"], status="ready", result=data, error=None)
             log(f"  fiche pays prete : {data['country']}")
+            return
+        if job["kind"] == "emergency":
+            data = job_emergency(job, req, tmp)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  urgences et ambassades prets : {data['added']} pour {data['country']}")
+            return
+        if job["kind"] == "vaccines":
+            data = job_vaccines(job, req, tmp)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  vaccins prets : {data['added']} pour {data['country']}")
             return
         if job["kind"] == "receipt_scan":
             data = job_receipt_scan(req, tmp)
@@ -2067,6 +2077,216 @@ def ai_worker(n: int) -> None:
             log(f"Erreur (assistant {n}) : {str(err)[:200]}")
         time.sleep(POLL_SECONDS)
 
+
+
+
+# --------------------------------------------------------------------------
+# Vaccins : propositions par pays, a partir de sources officielles, puis
+# mise dans les choses a faire (urgent si le delai est court).
+# --------------------------------------------------------------------------
+
+class VaccineItem(BaseModel):
+    name: str = Field(description="Nom COURT du vaccin ou de la protection, ex. « Hépatite A », « Typhoïde », « Rage », « Encéphalite japonaise », « Dengue »")
+    level: Literal["required", "recommended", "consider"] = Field(
+        description="required : exigé a l'entree ; recommended : recommandé pour ce voyage ; consider : a discuter avec le médecin selon le profil et les activités"
+    )
+    why: str = Field(description="Pourquoi pour CE pays et CE voyage, une phrase")
+    timing: str = Field(description="Quand le faire, ex. « 2 à 4 semaines avant le départ »")
+    weeks_before: int = Field(description="Délai conseillé en semaines avant le départ, 0 si aucun")
+    doses: str = Field(description="Nombre de doses et rappels, ex. « 2 doses espacées de 6 mois », chaine vide si inconnu")
+    advice: str = Field(description="Conseil pratique court (déjà fait dans l'enfance ? rappel ?), chaine vide sinon")
+    est_price: float = Field(description="Prix indicatif PAR PERSONNE en euros en Autriche, 0 si inconnu")
+    sources: list[Source]
+
+
+class VaccineList(BaseModel):
+    summary: str = Field(description="Deux phrases : ce qu'il faut retenir pour ce pays")
+    vaccines: list[VaccineItem]
+
+
+VACCINES_BRIEF = """Prépare la liste des vaccins et protections de santé à envisager pour deux voyageurs adultes
+qui vivent en Autriche et vont dans ce pays. Cherche sur le web (WebSearch, WebFetch) des sources
+OFFICIELLES et récentes : CDC, OMS, ministère autrichien de la santé, centres de médecine des voyages,
+Institut Pasteur. Indique pour chacun s'il est exigé, recommandé ou à discuter, le bon moment, le nombre
+de doses et un prix indicatif en Autriche. Ajoute la prévention du paludisme et la dengue si pertinents
+(niveau « consider »). Les vaccins de routine (tétanos-diphtérie-coqueluche-polio, rougeole) comptent
+comme « recommended » s'ils sont à jour. Ne propose RIEN d'inventé : seulement ce que les sources disent.
+Ce sont des informations générales, pas un avis médical : le médecin décide.
+{lang}
+
+Pays : {country}
+Étapes dans ce pays : {stops}
+Voyage : du {start} au {end}
+Date du jour : {today}
+"""
+
+
+def job_vaccines(job: dict, req: dict, tmp: Path) -> dict:
+    trip_id = job["trip_id"]
+    country = (req.get("country") or "").strip()
+    if not trip_id or not country:
+        raise RuntimeError("Voyage ou pays manquant")
+    trip = (sb("GET", "trips", params={"id": f"eq.{trip_id}", "select": "start_date,end_date"}) or [{}])[0]
+    stops = sb("GET", "trip_stops", params={"trip_id": f"eq.{trip_id}", "select": "name,country,arrive_date,leave_date", "order": "arrive_date.asc"}) or []
+    here = [x for x in stops if (x.get("country") or "").lower() == country.lower()]
+    prompt = VACCINES_BRIEF.format(
+        lang=lang_line(req.get("lang", "fr")), country=country,
+        stops=", ".join(f"{x['name']} ({x.get('arrive_date') or '?'} -> {x.get('leave_date') or '?'})" for x in here) or "non précisées",
+        start=trip.get("start_date") or "?", end=trip.get("end_date") or "?", today=date.today().isoformat(),
+    )
+    data = claude_json(prompt, VaccineList, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1500)
+    existing = sb("GET", "trip_vaccines", params={"trip_id": f"eq.{trip_id}", "country": f"eq.{country}", "select": "name"}) or []
+    known = {e["name"].strip().lower() for e in existing}
+    today = date.today()
+    depart = None
+    try:
+        depart = date.fromisoformat(trip["start_date"]) if trip.get("start_date") else None
+    except Exception:
+        depart = None
+    added = 0
+    for v in data["vaccines"]:
+        name = v["name"].strip()
+        if not name or name.lower() in known:
+            continue
+        known.add(name.lower())
+        todo_id = None
+        if v["level"] in ("required", "recommended"):
+            due = (depart - timedelta(weeks=max(0, int(v["weeks_before"])))) if depart else today + timedelta(days=14)
+            if due < today:
+                due = today
+            urgent = v["level"] == "required" or (due - today).days <= 14
+            notes = " ".join(x for x in [v["why"], v["timing"], v["doses"], "Pris en compte dans l'onglet Vaccins."] if x)
+            todo = sb("POST", "trip_todos", body={
+                "trip_id": trip_id, "title": f"{'⚠️ ' if urgent else ''}Vaccin : {name} ({country})",
+                "notes": notes[:600], "kind": "todo", "due_at": f"{due.isoformat()}T09:00:00", "has_time": False, "country": country,
+            }, prefer="return=representation")
+            todo_id = todo[0]["id"] if todo else None
+        sb("POST", "trip_vaccines", body={
+            "trip_id": trip_id, "country": country, "name": name[:80], "level": v["level"], "why": v["why"], "timing": v["timing"],
+            "doses": v["doses"], "advice": v["advice"], "est_price": v["est_price"] or None, "currency": "EUR",
+            "sources": v["sources"][:4], "todo_id": todo_id,
+        }, prefer="return=minimal")
+        added += 1
+    return {"summary": data["summary"], "added": added, "country": country}
+
+
+
+# --------------------------------------------------------------------------
+# Urgences et ambassades : numeros du pays visite et du pays de residence,
+# ambassade de la nationalite de chacun dans le pays visite. Tout est range
+# dans le coffre (contacts), partage entre les deux voyageurs.
+# --------------------------------------------------------------------------
+
+class CountryEmergency(BaseModel):
+    country: str
+    general: str = Field(description="Numéro d'urgence unique si le pays en a un (ex. 112), chaine vide sinon")
+    police: str = Field(description="Numéro de la police, chiffres seuls ou avec indicatif")
+    ambulance: str = Field(description="Numéro des urgences médicales / ambulance")
+    fire: str = Field(description="Numéro des pompiers")
+    tourist_police: str = Field(description="Numéro de la police touristique si elle existe, chaine vide sinon")
+    notes: str = Field(description="Une phrase utile (langue parlée au téléphone, numéro gratuit depuis un portable...), chaine vide sinon")
+    sources: list[Source]
+
+
+class Embassy(BaseModel):
+    name: str = Field(description="Nom exact, ex. « Ambassade de Belgique à Bangkok »")
+    city: str
+    address: str = Field(description="Adresse postale complète de la chancellerie")
+    phone: str = Field(description="Téléphone principal avec indicatif international, ex. +66 2 ...")
+    emergency_phone: str = Field(description="Numéro d'urgence consulaire 24 h si il existe, chaine vide sinon")
+    email: str
+    website: str
+    hours: str = Field(description="Horaires d'ouverture au public, chaine vide si inconnus")
+    notes: str = Field(description="Une phrase utile : rendez-vous obligatoire, consulat honoraire plus proche, etc.")
+    sources: list[Source]
+
+
+EMERGENCY_BRIEF = """Donne les numéros d'urgence OFFICIELS de ce pays, vérifiés sur le web (WebSearch, WebFetch :
+site du gouvernement, ministère des affaires étrangères, OMS). Numéros à composer depuis un téléphone
+portable local ou étranger. N'invente rien : laisse vide ce qui n'existe pas.
+{lang}
+
+Pays : {country}
+"""
+
+EMBASSY_BRIEF = """Trouve l'ambassade (ou à défaut le consulat) de {nationality} dans ce pays : {country}.
+Adresse complète, téléphone avec indicatif international, numéro d'urgence consulaire 24 h, email,
+site officiel et horaires. Vérifie sur le site officiel du ministère des affaires étrangères de {nationality}
+(WebSearch, WebFetch). Si plusieurs villes ont une représentation, donne celle de la capitale et signale
+les autres dans les notes. N'invente rien.
+{lang}
+"""
+
+
+def vault_put(user_id: str, title: str, **fields) -> bool:
+    """Ajoute un element de coffre (partage) s'il n'existe pas deja. Renvoie True si cree."""
+    found = sb("GET", "vault_items", params={"user_id": f"eq.{user_id}", "title": f"eq.{title}", "select": "id"}) or []
+    if found:
+        return False
+    row = {"user_id": user_id, "kind": "contact", "title": title[:120], "shared": True, "files": [], "position": -10}
+    row.update({k: v for k, v in fields.items() if v})
+    sb("POST", "vault_items", body=row, prefer="return=minimal")
+    return True
+
+
+def emergency_rows(user_id: str, country: str, e: dict, holder: str) -> int:
+    n = 0
+    items = [
+        ("Urgences", e["general"], ""), ("Police", e["police"], ""), ("Ambulance", e["ambulance"], ""),
+        ("Pompiers", e["fire"], ""), ("Police touristique", e["tourist_police"], ""),
+    ]
+    for label, number, _ in items:
+        digits = re.sub(r"[^\d+]", "", number or "")
+        if not digits:
+            continue
+        if vault_put(user_id, f"🚨 {label} · {country}", holder=holder, phone=digits, number=number.strip()[:40], notes=e.get("notes") or None):
+            n += 1
+    return n
+
+
+def job_emergency(job: dict, req: dict, tmp: Path) -> dict:
+    trip_id = job["trip_id"]
+    country = (req.get("country") or "").strip()
+    if not trip_id or not country:
+        raise RuntimeError("Voyage ou pays manquant")
+    lang = req.get("lang", "fr")
+    trip = (sb("GET", "trips", params={"id": f"eq.{trip_id}", "select": "user_id"}) or [{}])[0]
+    ids = [trip.get("user_id")] + [m["user_id"] for m in (sb("GET", "trip_members", params={"trip_id": f"eq.{trip_id}", "select": "user_id"}) or [])]
+    people = sb("GET", "profiles", params={"id": f"in.({','.join(i for i in ids if i)})", "select": "id,display_name,nationality,residence_country"}) or []
+    added = 0
+
+    # 1. Urgences du pays visite
+    dest = claude_json(EMERGENCY_BRIEF.format(lang=lang_line(lang), country=country), CountryEmergency, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=900, span=(5, 40))
+    added += emergency_rows(job["user_id"], country, dest, "Pays du voyage")
+
+    # 2. Urgences du pays de residence (une fois par pays)
+    for res in sorted({(p.get("residence_country") or "").strip() for p in people if p.get("residence_country")}):
+        if res.lower() == country.lower():
+            continue
+        done = sb("GET", "vault_items", params={"user_id": f"eq.{job['user_id']}", "title": f"like.*· {res}", "select": "id", "limit": "1"}) or []
+        if done:
+            continue
+        info = claude_json(EMERGENCY_BRIEF.format(lang=lang_line(lang), country=res), CountryEmergency, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=900, span=(40, 60))
+        added += emergency_rows(job["user_id"], res, info, "Pays de résidence")
+
+    # 3. Ambassade de la nationalite de chacun, dans le pays visite
+    for nat in sorted({(p.get("nationality") or "").strip() for p in people if p.get("nationality")}):
+        if nat.lower() == country.lower():
+            continue
+        owners = [p for p in people if (p.get("nationality") or "").strip() == nat]
+        title = f"🏛️ Ambassade de {nat} · {country}"
+        if all(sb("GET", "vault_items", params={"user_id": f"eq.{o['id']}", "title": f"eq.{title}", "select": "id"}) for o in owners):
+            continue
+        emb = claude_json(EMBASSY_BRIEF.format(lang=lang_line(lang), nationality=nat, country=country), Embassy, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=900, span=(60, 92))
+        notes = "\n".join(x for x in [
+            f"📍 {emb['address']}" if emb["address"] else "", f"🕘 {emb['hours']}" if emb["hours"] else "",
+            f"🆘 Urgence consulaire 24 h : {emb['emergency_phone']}" if emb["emergency_phone"] else "", emb["notes"],
+        ] if x)
+        for o in owners:
+            if vault_put(o["id"], title, holder=o.get("display_name") or nat, phone=re.sub(r"[^\d+]", "", emb["phone"] or ""), number=(emb["phone"] or "")[:40],
+                         email=emb["email"] or None, url=emb["website"] or None, notes=notes or None):
+                added += 1
+    return {"country": country, "added": added}
 
 
 def check_env() -> None:

@@ -10,6 +10,9 @@ export type Profile = {
   greeting?: 'big' | 'small' | 'off'
   /** Moteur des recherches IA : Claude Code, ChatGPT, ou automatique. */
   ai_provider?: 'auto' | 'claude' | 'chatgpt'
+  /** Pour l'ambassade et les numeros d'urgence. */
+  nationality?: string | null
+  residence_country?: string | null
   created_at: string
 }
 
@@ -222,6 +225,27 @@ export type TripStop = {
 }
 
 export type StopHost = { stay: string; name: string; phone: string; email: string; note: string }
+
+export type VaccineStatus = 'todo' | 'taken' | 'already' | 'skip'
+export type VaccineEntry = { status: VaccineStatus; cost?: number; currency?: string; expense_id?: string }
+export type TripVaccine = {
+  id: string
+  trip_id: string
+  country: string
+  name: string
+  level: 'required' | 'recommended' | 'consider'
+  why: string | null
+  timing: string | null
+  doses: string | null
+  advice: string | null
+  est_price: number | null
+  currency: string
+  sources: { title: string; url: string }[]
+  /** Decision de chacun : { user_id: { status, cost, ... } } */
+  entries: Record<string, VaccineEntry>
+  todo_id: string | null
+  created_at: string
+}
 
 export type TodoKind = 'todo' | 'booking' | 'admin' | 'packing'
 

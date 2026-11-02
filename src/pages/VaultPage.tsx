@@ -30,6 +30,7 @@ import Portal from '../components/Portal'
 import VaultSharing from '../components/vault/VaultSharing'
 import type { Companion } from '../lib/companions'
 import EditButton from '../components/EditButton'
+import { useAiJobs } from '../context/AiJobsContext'
 
 const KINDS: VaultKind[] = ['identity', 'card', 'ticket', 'insurance', 'contact', 'other']
 
@@ -63,7 +64,7 @@ export default function VaultPage() {
 }
 
 function Vault({ onChangePin }: { onChangePin: () => void }) {
-  const { t, locale } = useI18n()
+  const { t, locale, lang } = useI18n()
   const { user } = useAuth()
   const { trips } = usePlaces()
   const [items, setItems] = useState<VaultItem[]>([])
@@ -72,6 +73,8 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
   const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null)
   const [tripDocs, setTripDocs] = useState<TripDocument[]>([])
   const [people, setPeople] = useState<Companion[]>([])
+  const [sosMsg, setSosMsg] = useState<string | null>(null)
+  const { queue: queueAi } = useAiJobs()
   const [offline, setOffline] = useState<{ ready: number; total: number } | null>(null)
   const [hosts, setHosts] = useState<{ stopId: string; stop: string; dates: string; hosts: StopHost[] }[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -158,6 +161,22 @@ function Vault({ onChangePin }: { onChangePin: () => void }) {
       {error && <p className="notice notice-bad mt-4">{error}</p>}
 
       <VaultSharing onChange={setPeople} />
+
+      <button
+        onClick={async () => {
+          const trip = pickCurrentTrip(trips)
+          if (!trip) return
+          setSosMsg('…')
+          const stops = await fetchStops(trip.id).catch(() => [])
+          const list = [...new Set(stops.map((s) => s.country).filter(Boolean) as string[])]
+          for (const country of list) await queueAi('emergency', { country, lang }, trip.id).catch(() => undefined)
+          setSosMsg(t('sos.started', { n: list.length }))
+        }}
+        className="btn btn-xs mt-3"
+      >
+        🚨 {t('sos.refresh')}
+      </button>
+      {sosMsg && <p className="mt-2 text-[12.5px] text-text-muted">{sosMsg}</p>}
 
       <div className="mt-8 space-y-8">
         {KINDS.map((kind) => {

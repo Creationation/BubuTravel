@@ -37,6 +37,7 @@ import { countryName } from '../lib/countryName'
 import AgendaSheet from '../components/hub/AgendaSheet'
 import CostTab from '../components/hub/CostTab'
 import { supabase } from '../lib/supabase'
+import VaccinesTab, { useVaccineAutoQueue } from '../components/hub/VaccinesTab'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -44,6 +45,7 @@ const TABS: { id: HubTab; label: Key }[] = [
   { id: 'route', label: 'hub.tab.route' },
   { id: 'todo', label: 'hub.tab.todo' },
   { id: 'cost', label: 'hub.tab.cost' },
+  { id: 'vaccines', label: 'hub.tab.vaccines' },
   { id: 'docs', label: 'hub.tab.docs' },
   { id: 'countries', label: 'hub.tab.countries' },
   { id: 'ideas', label: 'hub.tab.ideas' },
@@ -64,6 +66,8 @@ export default function TripView() {
   const { trips, places: allPlaces, loading } = usePlaces()
   const tripPlaces = useMemo(() => allPlaces.filter((p) => p.trip_id === id), [allPlaces, id])
   const hub = useTripHub(id)
+  // Vaccins et ambassades : cherches tout seuls pour chaque pays du voyage
+  useVaccineAutoQueue(trips.find((x) => x.id === id), hub)
   const [editing, setEditing] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [agenda, setAgenda] = useState(false)
@@ -211,6 +215,7 @@ export default function TripView() {
           {tab === 'route' && <RouteTab trip={trip} hub={hub} autoAdd={autoAdd} onOpenAssistant={() => setAssistant(true)} />}
           {tab === 'todo' && <TodoTab hub={hub} autoAdd={autoAdd} />}
           {tab === 'cost' && <CostTab trip={trip} hub={hub} />}
+          {tab === 'vaccines' && <VaccinesTab trip={trip} hub={hub} />}
           {tab === 'docs' && <DocsTab hub={hub} autoAdd={autoAdd} />}
           {tab === 'countries' && <CountriesTab trip={trip} hub={hub} />}
           {tab === 'ideas' && <IdeasTab trip={trip} hub={hub} />}

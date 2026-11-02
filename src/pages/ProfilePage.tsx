@@ -16,6 +16,7 @@ import AvatarCropper from '../components/AvatarCropper'
 import Greeting from '../components/Greeting'
 import ErrorLogPanel from '../components/ErrorLogPanel'
 import AiProviderPanel from '../components/AiProviderPanel'
+import TravelIdentityPanel from '../components/TravelIdentityPanel'
 
 export default function ProfilePage() {
   const t = useT()
@@ -182,6 +183,11 @@ export default function ProfilePage() {
               </div>
             </div>
           </section>
+        </Reveal>
+
+        {/* Nationalite et residence : ambassade et urgences */}
+        <Reveal className="mt-6">
+          <TravelIdentityPanel />
         </Reveal>
 
         {/* Moteur IA : Claude Code, ChatGPT ou automatique */}
