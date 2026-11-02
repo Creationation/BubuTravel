@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import type { Place } from '../lib/types'
 import { useI18n } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
+import Portal from './Portal'
 
 export type Feedback = {
   overall?: number
@@ -118,7 +119,7 @@ export default function ReviewSheet({ place, onClose }: { place: Place; onClose:
   }
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    <Portal><div className="fixed inset-0 z-[1300] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         className="panel-enter max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[30px] bg-bg p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] sm:rounded-[30px]"
         onClick={(e) => e.stopPropagation()}
@@ -231,7 +232,7 @@ export default function ReviewSheet({ place, onClose }: { place: Place; onClose:
           </div>
         )}
       </div>
-    </div>
+    </div></Portal>
   )
 }
 

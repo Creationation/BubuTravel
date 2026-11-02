@@ -8,6 +8,7 @@ import type { Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useT } from '../../i18n/I18nContext'
 import { Avatar } from '../AppShell'
+import Portal from '../Portal'
 
 /**
  * Voyager ensemble, en fenetre : qui est dans le voyage, les compagnons de
@@ -65,7 +66,7 @@ export default function SharePanel({
   }
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    <Portal><div className="fixed inset-0 z-[1300] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         className="panel-enter max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-[30px] bg-bg p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] sm:rounded-[30px]"
         onClick={(e) => e.stopPropagation()}
@@ -188,6 +189,6 @@ export default function SharePanel({
           </div>
         )}
       </div>
-    </div>
+    </div></Portal>
   )
 }

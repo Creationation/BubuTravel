@@ -712,4 +712,10 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'ai.next': "Starting in a moment",
   'ai.claudeQuotaTitle': "Claude limit reached — switching automatically",
   'ai.claudeQuotaBody': "Supported requests are using {model}. Claude will be retried automatically in about {minutes} min; queued searches resume when its quota returns.",
+  'nav.route': "Routes",
+  'route.eyebrow': "Journeys",
+  'route.title': "Your routes",
+  'route.intro': "Record a journey from A to B: the trace is drawn live, then filed here with its distance and duration.",
+  'route.history': "Saved routes",
+  'route.empty': "No routes yet. Tap “Record a route” on the map, then walk, ride or sail: when you stop, it suggests a “Start → End” name.",
 }

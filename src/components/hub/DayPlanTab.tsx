@@ -10,6 +10,7 @@ import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import AiGauge from '../AiGauge'
 import PlaceSheet from '../PlaceSheet'
+import Portal from '../Portal'
 
 const GAP = 15 // minutes de trajet entre deux activites
 const QUICK = ['day.ai.relax', 'day.ai.route', 'day.ai.dinner', 'day.ai.later', 'day.ai.rain'] as const
@@ -424,7 +425,7 @@ function AddActivity({
   const [minutes, setMinutes] = useState(90)
   const [busy, setBusy] = useState(false)
   return (
-    <div className="fade-in fixed inset-0 z-[2500] flex items-end justify-center bg-[#120d09]/50 sm:items-center" onClick={onClose}>
+    <Portal><div className="fade-in fixed inset-0 z-[2500] flex items-end justify-center bg-[#120d09]/50 sm:items-center" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="sheet-in flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[28px] bg-surface-solid p-5 shadow-[var(--shadow-lg)] sm:rounded-[28px]"
@@ -489,6 +490,6 @@ function AddActivity({
           </button>
         </div>
       </div>
-    </div>
+    </div></Portal>
   )
 }

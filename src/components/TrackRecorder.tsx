@@ -8,6 +8,7 @@ import type { Track } from '../lib/types'
 import { useT } from '../i18n/I18nContext'
 import { errorMessage } from '../lib/errors'
 import { fmtNum } from '../i18n/current'
+import { reverseGeocode } from '../lib/geocode'
 
 type Props = {
   onSaved: (track: Track) => void
@@ -62,6 +63,31 @@ export default function TrackRecorder({ onSaved }: Props) {
       // La trace reste en memoire si le stockage local est indisponible.
     }
   }, [finishing])
+
+  // A l'arret : le nom « Depart → Arrivee » est propose d'apres les deux
+  // extremites de la trace (modifiable). Un nom deja tape n'est jamais ecrase.
+  useEffect(() => {
+    if (!finishing || finishing.points.length < 2) return
+    let cancelled = false
+    const first = finishing.points[0]
+    const last = finishing.points[finishing.points.length - 1]
+    void (async () => {
+      try {
+        const from = await reverseGeocode(first.lat, first.lng)
+        const to = await reverseGeocode(last.lat, last.lng)
+        const label = (r: { city?: string; name?: string } | null) => r?.city || r?.name || ''
+        const a = label(from)
+        const b = label(to)
+        if (!cancelled && a && b) setName((current) => current || (a === b ? a : `${a} → ${b}`))
+      } catch {
+        // Hors ligne : le nom reste a saisir
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishing?.startedAt])
 
   async function save() {
     if (!finishing || !user) return

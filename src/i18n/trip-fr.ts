@@ -727,4 +727,10 @@ export const tripFr = {
   'ai.next': "Démarre dans un instant",
   'ai.claudeQuotaTitle': "Limite Claude atteinte — bascule automatique en cours",
   'ai.claudeQuotaBody': "Les demandes compatibles utilisent {model}. Claude sera retesté automatiquement dans environ {minutes} min; les recherches en attente reprendront dès que son quota revient.",
+  'nav.route': "Parcours",
+  'route.eyebrow': "Trajets",
+  'route.title': "Vos parcours",
+  'route.intro': "Enregistrez un trajet de A à B : la trace se dessine en direct, puis elle est rangée ici avec sa distance et sa durée.",
+  'route.history': "Parcours enregistrés",
+  'route.empty': "Aucun parcours pour l'instant. Touchez « Enregistrer un parcours » sur la carte, puis marchez, roulez ou naviguez : l'arrêt vous propose un nom « Départ → Arrivée ».",
 } as const

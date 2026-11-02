@@ -15,6 +15,7 @@ import type { Key } from '../../i18n/fr'
 import { modeKey } from './StopForm'
 import { SparkIcon, TodoKindIcon, TransportIcon } from './icons'
 import { countryName } from '../../lib/countryName'
+import Portal from '../Portal'
 
 const BUDGETS: { value: ItineraryRequest['budget']; label: Key }[] = [
   { value: 'petit', label: 'planner.budgetSmall' },
@@ -177,7 +178,7 @@ export default function TripAssistant({
   }
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-[#120d09]/55 backdrop-blur-sm sm:items-center sm:p-6">
+    <Portal><div className="fixed inset-0 z-[1200] flex items-end justify-center bg-[#120d09]/55 backdrop-blur-sm sm:items-center sm:p-6">
       <div className="panel-enter flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[28px] border border-line bg-bg shadow-[var(--shadow-lg)] sm:rounded-[28px]">
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4 sm:px-7">
           <p className="eyebrow eyebrow-dot">{t('ai.title')}</p>
@@ -384,6 +385,6 @@ export default function TripAssistant({
           )}
         </footer>
       </div>
-    </div>
+    </div></Portal>
   )
 }

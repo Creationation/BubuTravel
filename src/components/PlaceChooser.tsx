@@ -4,6 +4,7 @@ import { usePlaces } from '../context/PlacesContext'
 import { pinSvg } from './mapIcon'
 import type { Place } from '../lib/types'
 import { countryName, categoryLabel } from '../lib/countryName'
+import Portal from './Portal'
 
 type Props = {
   places: Place[]
@@ -32,7 +33,7 @@ export default function PlaceChooser({ places, onPick, onClose }: Props) {
   }, [onClose])
 
   return (
-    <div
+    <Portal><div
       className="fade-in fixed inset-0 z-[1300] flex items-center justify-center bg-bg-deep/70 p-5 backdrop-blur-sm"
       onClick={onClose}
     >
@@ -92,6 +93,6 @@ export default function PlaceChooser({ places, onPick, onClose }: Props) {
           </button>
         </footer>
       </div>
-    </div>
+    </div></Portal>
   )
 }

@@ -178,6 +178,7 @@ function More({ go }: { go: (path: string) => void }) {
     { path: '/galerie', label: 'nav.gallery', icon: <FileIcon size={18} />, advancedOnly: true },
     { path: '/planificateur', label: 'nav.planner', icon: <SparkIcon size={18} />, advancedOnly: true },
     { path: '/evenements', label: 'nav.events', icon: <CalendarIcon size={18} />, advancedOnly: true },
+    { path: '/parcours', label: 'nav.route', icon: <span className="text-[18px] leading-none">🥾</span> },
     { path: '/depenses', label: 'nav.expenses', icon: <WalletIcon size={18} /> },
     { path: '/profil', label: 'nav.profile', icon: <ShareIcon2 /> },
   ]

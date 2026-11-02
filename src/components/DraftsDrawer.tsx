@@ -8,6 +8,7 @@ import { addDaysIso, todayIso } from '../lib/tripDates'
 import { useI18n } from '../i18n/I18nContext'
 import type { Key } from '../i18n/fr'
 import { BellIcon, FileIcon } from './hub/icons'
+import Portal from './Portal'
 
 /**
  * Le tiroir des brouillons : tout ce qui a ete commence et pas termine.
@@ -82,7 +83,7 @@ export default function DraftsButton() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[1300] flex justify-end bg-[#120d09]/45 backdrop-blur-sm" onClick={() => setOpen(false)}>
+        <Portal><div className="fixed inset-0 z-[1300] flex justify-end bg-[#120d09]/45 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <aside
             className="panel-enter flex h-full w-full max-w-md flex-col border-l border-line bg-bg shadow-[var(--shadow-lg)]"
             onClick={(e) => e.stopPropagation()}
@@ -145,7 +146,7 @@ export default function DraftsButton() {
               })}
             </ul>
           </aside>
-        </div>
+        </div></Portal>
       )}
     </>
   )
