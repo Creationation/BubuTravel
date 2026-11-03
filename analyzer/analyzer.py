@@ -752,7 +752,7 @@ def inline_schema(model: type[BaseModel]) -> dict:
 
 # Demande IA en cours sur ce fil : sa jauge avance avec les vraies etapes
 CURRENT = threading.local()
-EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14, "receipt_scan": 3, "vaccines": 12, "emergency": 12}
+EXPECTED_STEPS = {"place_info": 14, "schedule_place": 6, "arrange_trip": 10, "day_plan": 8, "chat": 6, "stop_places": 12, "country_guide": 14, "itinerary": 14, "receipt_scan": 3, "vaccines": 12, "emergency": 12, "gap_search": 12}
 
 
 def progress(pct: int, step: str | None = None, *, force: bool = False) -> None:
@@ -1329,7 +1329,7 @@ def claim_ai_job() -> dict | None:
     if (claude_paused and CODEX_CALL_LOCK.locked()) or (CLAUDE_CALL_LOCK.locked() and CODEX_CALL_LOCK.locked()):
         return None
     immediate = (
-        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan,vaccines,emergency,place_info,arrange_trip,stop_places)", "order": "created_at.asc", "limit": "1", "select": "*"})
+        sb("GET", "ai_jobs", params={"status": "eq.pending", "kind": "in.(chat,schedule_place,day_plan,itinerary,country_guide,receipt_scan,vaccines,emergency,gap_search,place_info,arrange_trip,stop_places)", "order": "created_at.asc", "limit": "1", "select": "*"})
         or sb("GET", "ai_jobs", params={"status": "eq.pending", "input->>preview": "eq.true", "order": "created_at.asc", "limit": "1", "select": "*"})
     )
     rows = immediate if claude_paused else (
@@ -1375,7 +1375,7 @@ def process_ai_job(job: dict) -> None:
     CURRENT.provider = user_provider(job["user_id"])
     CURRENT.codex_allowed = job["kind"] in (
         "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
-        "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency",
+        "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency", "gap_search",
     ) or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
@@ -1459,6 +1459,11 @@ def process_ai_job(job: dict) -> None:
             data = claude_json(prompt, Guide, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1200)
             update_ai_job(job["id"], status="ready", result=data, error=None)
             log(f"  fiche pays prete : {data['country']}")
+            return
+        if job["kind"] == "gap_search":
+            data = job_gap_search(job, req, tmp)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  trou ({(req.get('gap') or {}).get('type')}) : {len(data['options'])} options")
             return
         if job["kind"] == "emergency":
             data = job_emergency(job, req, tmp)
@@ -2383,6 +2388,97 @@ def ideas_loop() -> None:
         except Exception as err:
             log(f"Erreur (idees) : {str(err)[:150]}")
             time.sleep(60)
+
+
+
+# --------------------------------------------------------------------------
+# Trous du voyage : hebergement, transport, journee libre, jours sans etape.
+# L'IA cherche de VRAIES options pertinentes ; l'app applique celle choisie.
+# --------------------------------------------------------------------------
+
+class GapOption(BaseModel):
+    title: str = Field(description="Nom exact : de l'hébergement, de la compagnie + trajet, de l'activité ou de la ville-étape")
+    kind: Literal["stay", "transport", "activity", "stop"]
+    area: str = Field(description="Quartier ou ville pour un lieu ; « A → B » pour un trajet")
+    why: str = Field(description="POURQUOI cette option correspond au budget, aux besoins et au voyage (proximité des lieux déjà prévus, horaires...), une ou deux phrases concretes")
+    price_text: str = Field(description="Prix lisible avec devise et unité, ex. « ~45 €/nuit », « ~60 €/pers. »")
+    price_eur: float = Field(description="Prix indicatif en euros (par nuit pour un hébergement, par personne sinon), 0 si inconnu")
+    detail: str = Field(description="Horaires, durée, compagnie, équipements, note des voyageurs... en une ligne")
+    url: str = Field(description="Lien REEL de réservation ou de la page officielle, chaine vide si tu n'en as pas de sûr")
+    address: str = Field(description="Adresse complète pour un lieu, chaine vide sinon")
+    lat: float = Field(description="Latitude précise si connue, 0 sinon")
+    lng: float = Field(description="Longitude précise si connue, 0 sinon")
+    mode: Literal["plane", "train", "bus", "boat", "car", "taxi", "motorbike", "other"] = Field(description="Pour un transport : le mode ; sinon other")
+    depart_time: str = Field(description="Heure de départ conseillée HH:MM pour un transport ou une activité, chaine vide sinon")
+    pros: list[str] = Field(description="1 à 3 points forts")
+    cons: list[str] = Field(description="0 à 2 points faibles ou précautions")
+    sources: list[Source]
+
+
+class GapResult(BaseModel):
+    summary: str = Field(description="Deux phrases : ce que tu as trouvé et ce qu'il faut vérifier avant de réserver")
+    options: list[GapOption]
+
+
+GAP_BRIEFS = {
+    "nostay": """Trouve 4 à 6 HÉBERGEMENTS réels à {city} ({country}) pour {travelers} adultes, du {from_} au {to} ({days} nuits).
+Budget : {budget}. Besoins et envies : {needs}.
+PERTINENCE : privilégie les quartiers proches des lieux déjà prévus sur place (ci-dessous) et bien reliés ; respecte le budget
+(une seule option un peu au-dessus est permise si elle est nettement meilleure, dis-le dans « why »). Cherche sur le web
+(WebSearch, WebFetch) de vraies fiches (Booking, Airbnb, Agoda, site officiel) avec note et prix ACTUELS. Ne fabrique AUCUN lien.""",
+    "notransport": """Trouve les meilleures options réelles pour aller de {city} à {tocity} ({tocountry}) autour du {from_}
+(arrivée au plus tard le {to}), pour {travelers} adultes. Budget : {budget}. Besoins : {needs}.
+Compare vol, train, bus, ferry ou transfert selon ce qui existe : compagnie ou opérateur, horaires habituels, durée porte à porte
+réaliste, prix indicatif par personne, lien de réservation fiable (compagnie, 12go.asia, Skyscanner, Google Flights...).
+Indique pour chaque option si il faut réserver à l'avance. Cherche sur le web ; ne fabrique AUCUN lien.""",
+    "empty": """Propose 4 à 6 ACTIVITÉS réelles à faire à {city} ({country}) entre le {from_} et le {to} ({days} jour(s) libres),
+pour {travelers} adultes. Budget : {budget}. Besoins et envies : {needs}.
+PERTINENCE : proches des lieux déjà prévus sur place et des hébergements (ci-dessous), sans doublon avec eux, adaptées à la saison
+et à la météo, avec horaires d'ouverture vérifiés sur le web (WebSearch, WebFetch). Donne un horaire de départ conseillé.""",
+    "nostop": """Les jours du {from_} au {to} ({days} jour(s)) n'ont pas de destination dans ce voyage. Étape précédente : {city} ({country}).
+Étape suivante : {tocity} ({tocountry}). Propose 3 à 4 ÉTAPES réalistes (ville ou région) entre les deux ou à côté, faisables
+pour {travelers} adultes. Budget : {budget}. Besoins et envies : {needs}.
+Tiens compte du temps de trajet depuis l'étape précédente et vers la suivante, de la saison et du budget. Cherche sur le web.""",
+}
+
+
+def job_gap_search(job: dict, req: dict, tmp: Path) -> dict:
+    gap = req.get("gap") or {}
+    kind = gap.get("type")
+    if kind not in GAP_BRIEFS:
+        raise RuntimeError("Type de trou inconnu")
+    trip_id = job["trip_id"]
+    city = gap.get("city") or ""
+    # Contexte : lieux deja prevus dans cette ville (pour juger la proximite)
+    ctx = []
+    if city:
+        for p in sb("GET", "places", params={"trip_id": f"eq.{trip_id}", "city": f"ilike.{city}", "select": "name,lat,lng,visit_date,details", "limit": "60"}) or []:
+            if (p.get("details") or {}).get("kind", "") and re.search(r"h[oô]tel|airbnb|resort|hostel", p["name"], re.I):
+                continue
+            ctx.append(f"- {p['name']} ({p['lat']:.4f},{p['lng']:.4f})" + (f" le {p['visit_date']}" if p.get("visit_date") else ""))
+    budget = req.get("budget")
+    cur = req.get("currency") or "EUR"
+    budget_txt = (f"{budget} {cur} {'par nuit' if kind == 'nostay' else 'par personne' if kind != 'nostop' else 'au total par jour'} maximum"
+                  if budget else "pas de limite précisée : propose un bon rapport qualité-prix")
+    brief = GAP_BRIEFS[kind].format(
+        city=city, country=gap.get("country") or "", tocity=gap.get("toCity") or "", tocountry=gap.get("toCountry") or "",
+        from_=gap.get("from"), to=gap.get("to"), days=gap.get("days") or 1, travelers=req.get("travelers") or 2,
+        budget=budget_txt, needs=(req.get("needs") or "aucune précision, sois pertinent").strip(),
+    )
+    prompt = (
+        f"{brief}\n\nLieux déjà prévus sur place :\n" + ("\n".join(ctx[:40]) or "(rien pour l'instant)")
+        + f"\n\nDate du jour : {date.today().isoformat()}\nN'invente rien : si tu n'es pas sûr d'un prix ou d'un lien, laisse-le vide.\n"
+        + lang_line(req.get("lang", "fr"))
+    )
+    data = claude_json(prompt, GapResult, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=1500)
+    for o in data["options"]:
+        if abs(o["lat"]) < 0.0001 and abs(o["lng"]) < 0.0001:
+            o["lat"] = o["lng"] = None
+        if o["lat"] is None and o["address"] and kind in ("nostay", "activity", "empty"):
+            hit = geocode_osm(f"{o['address']}, {gap.get('country') or ''}")
+            if hit:
+                o["lat"], o["lng"] = hit
+    return data
 
 
 def check_env() -> None:

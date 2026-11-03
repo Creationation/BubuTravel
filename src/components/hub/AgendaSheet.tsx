@@ -8,6 +8,7 @@ import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import Portal from '../Portal'
 import PlaceSheet from '../PlaceSheet'
+import GapsPanel from './GapsPanel'
 
 type Entry = { key: string; time: string; icon: string; title: string; sub?: string; placeId?: string }
 
@@ -85,6 +86,7 @@ export default function AgendaSheet({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <GapsPanel trip={trip} hub={hub} />
             {days.length === 0 ? (
               <p className="py-10 text-center text-[14px] text-text-muted">{t('agenda.empty')}</p>
             ) : (
