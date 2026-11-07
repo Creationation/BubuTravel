@@ -1,4 +1,4 @@
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../context/AuthContext'
 import ThemeToggle from './ThemeToggle'
@@ -36,6 +36,14 @@ export default function AppShell({
 }) {
   const { profile, user, signOut } = useAuth()
   const t = useT()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  // Retour : la page d'ou l'on vient (pas l'accueil). Sans historique, l'accueil.
+  const canBack = pathname !== '/'
+  const goBack = () => {
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1)
+    else navigate('/')
+  }
   const { advanced } = useMode()
   const nav = NAV.filter((item) => advanced || !item.advanced)
   const name = profile?.display_name || user?.email?.split('@')[0] || t('common.traveller')
@@ -48,6 +56,16 @@ export default function AppShell({
             wide ? 'max-w-none' : 'max-w-6xl'
           }`}
         >
+          {canBack && (
+            <button
+              onClick={goBack}
+              aria-label={t('common.back')}
+              title={t('common.back')}
+              className="-ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[1.35rem] font-bold leading-none active:scale-90"
+            >
+              ‹
+            </button>
+          )}
           <Link to="/" className="flex shrink-0 items-center gap-2.5">
             <img src="/icons/logo-64.png" alt="" width={32} height={32} className="h-8 w-8 rounded-[9px] shadow-[var(--shadow-sm)]" />
             <span className="display-sm text-xl">{t('app.name')}</span>
