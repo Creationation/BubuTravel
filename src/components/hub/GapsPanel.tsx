@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAiJobs } from '../../context/AiJobsContext'
 import type { AiJob } from '../../context/AiJobsContext'
 import { usePlaces } from '../../context/PlacesContext'
@@ -104,7 +104,7 @@ export default function GapsPanel({ trip, hub }: { trip: Trip; hub: TripHub }) {
   )
 }
 
-function GapSearch({ trip, hub, gap, onClose }: { trip: Trip; hub: TripHub; gap: Gap; onClose: () => void }) {
+export function GapSearch({ trip, hub, gap, onClose, autoLaunch = false }: { trip: Trip; hub: TripHub; gap: Gap; onClose: () => void; autoLaunch?: boolean }) {
   const { t, lang, locale } = useI18n()
   const { queue, jobs } = useAiJobs()
   const { add } = usePlaces()
@@ -132,6 +132,15 @@ function GapSearch({ trip, hub, gap, onClose }: { trip: Trip; hub: TripHub; gap:
       setError(errorMessage(err))
     }
   }
+
+  // Depuis « Verifier mon voyage » : la recherche part toute seule, sans rien remplir
+  const auto = useRef(false)
+  useEffect(() => {
+    if (!autoLaunch || auto.current || running || ready) return
+    auto.current = true
+    void launch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLaunch])
 
   async function apply(o: Option, i: number) {
     setBusy(i)
@@ -251,6 +260,11 @@ function GapSearch({ trip, hub, gap, onClose }: { trip: Trip; hub: TripHub; gap:
             {result && (
               <div className="space-y-3">
                 <p className="text-[13.5px] leading-snug text-text-soft">{result.summary}</p>
+                {result.options.length > 0 && !applied.size && (
+                  <button onClick={() => void apply(result.options[0], 0)} disabled={busy !== null} className="btn btn-accent w-full">
+                    ✨ {t('gap.takeFirst')}
+                  </button>
+                )}
                 <p className="text-[11.5px] text-text-muted">ℹ️ {t('gap.verify')}</p>
                 <ul className="space-y-3">
                   {result.options.map((o, i) => (

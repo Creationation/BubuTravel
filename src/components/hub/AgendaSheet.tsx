@@ -15,6 +15,10 @@ import type { RoutePoint } from '../RouteSheet'
 import { HostCards } from './HostContacts'
 import GapsPanel from './GapsPanel'
 import type { HubTab } from './Overview'
+import { eachTicketDay, loadTickets } from '../../lib/tickets'
+import type { Ticket } from '../../lib/tickets'
+import TicketsSheet, { useTicketViewer } from '../TicketsSheet'
+import TripCheck from './TripCheck'
 
 type Entry = {
   key: string
@@ -22,7 +26,8 @@ type Entry = {
   icon: string
   title: string
   sub?: string
-  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo'
+  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo' | 'stayin' | 'stayout' | 'ticket'
+  ticket?: Ticket
   placeId?: string
   stop?: TripStop
   todo?: TripTodo
@@ -54,6 +59,10 @@ export default function AgendaSheet({
   const places = useMemo(() => scope.places(allPlaces), [allPlaces, scope])
   const [openId, setOpenId] = useState<string | null>(null)
   const [detail, setDetail] = useState<Entry | null>(null)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [showTickets, setShowTickets] = useState(false)
+  const [check, setCheck] = useState(false)
+  const viewer = useTicketViewer()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -61,6 +70,7 @@ export default function AgendaSheet({
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    loadTickets().then(setTickets).catch(() => undefined)
     return () => {
       document.body.style.overflow = prev
     }
@@ -73,7 +83,13 @@ export default function AgendaSheet({
       map.set(day, [...(map.get(day) ?? []), { ...e, day }])
     }
     for (const s of hub.stops) {
-      add(s.arrive_date, { key: `a${s.id}`, time: '00:00', icon: '📍', title: t('agenda.arrive', { name: s.name }), sub: s.stay_name ?? undefined, kind: 'arrive', stop: s })
+      add(s.arrive_date, { key: `a${s.id}`, time: '00:00', icon: '📍', title: t('agenda.arrive', { name: s.name }), kind: 'arrive', stop: s })
+      // Hebergements : arrivee (14 h) et depart (11 h), chacun avec son nom et son adresse
+      const stays = [s.stay_name, ...(s.hosts ?? []).map((h) => h.stay)].filter((x, i, a): x is string => Boolean(x) && a.indexOf(x) === i)
+      stays.forEach((name, k) => {
+        add(s.arrive_date, { key: `si${s.id}${k}`, time: '14:00', icon: '🏨', title: t('agenda.checkin', { name }), sub: k === 0 ? s.stay_address ?? undefined : undefined, kind: 'stayin', stop: s })
+        if (k === 0) add(s.leave_date, { key: `so${s.id}${k}`, time: '11:00', icon: '🏨', title: t('agenda.checkout', { name }), kind: 'stayout', stop: s })
+      })
       add(s.leave_date, { key: `l${s.id}`, time: '23:00', icon: '🧳', title: t('agenda.leave', { name: s.name }), kind: 'leave', stop: s })
       if (s.transport_departs) {
         const [d, h = '00:00'] = s.transport_departs.split('T')
@@ -84,13 +100,16 @@ export default function AgendaSheet({
       if (p.trip_id !== trip.id || !p.visit_date || isStay(p)) continue
       add(p.visit_date, { key: `p${p.id}`, time: p.plan_time ?? '12:00', icon: '🎯', title: placeName(p), sub: p.city ?? undefined, kind: 'place', placeId: p.id })
     }
+    for (const tk of tickets) {
+      for (const d of eachTicketDay(tk)) add(d, { key: `tk${tk.id}${d}`, time: '10:00', icon: '🎟️', title: tk.title, sub: tk.from === tk.to ? undefined : `${shortDate(tk.from, locale)} → ${shortDate(tk.to, locale)}`, kind: 'ticket', ticket: tk })
+    }
     for (const todo of hub.todos) {
       if (todo.done || !todo.due_at) continue
       if (scope.country && todo.country && !scope.isIn(todo.country)) continue
       add(todo.due_at.slice(0, 10), { key: `d${todo.id}`, time: todo.has_time ? todo.due_at.slice(11, 16) : '08:00', icon: '✅', title: todo.title, kind: 'todo', todo })
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, items]) => ({ day, items: items.sort((x, y) => x.time.localeCompare(y.time)) }))
-  }, [hub.stops, hub.todos, places, trip.id, t, scope])
+  }, [hub.stops, hub.todos, places, trip.id, t, scope, tickets, locale])
 
   const today = todayIso()
 
@@ -107,6 +126,7 @@ export default function AgendaSheet({
 
   function open(e: Entry) {
     if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
+    else if (e.kind === 'ticket' && e.ticket) void viewer.open(e.ticket)
     else setDetail(e)
   }
 
@@ -125,6 +145,15 @@ export default function AgendaSheet({
             </div>
             <button onClick={onClose} className="btn btn-quiet btn-xs shrink-0">
               {t('common.close')}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 border-b border-line px-5 py-3">
+            <button onClick={() => setCheck(true)} className="btn btn-accent btn-xs">
+              ✅ {t('chk.title')}
+            </button>
+            <button onClick={() => setShowTickets(true)} className="btn btn-xs">
+              🎟️ {t('qb.tickets')}
             </button>
           </div>
 
@@ -185,6 +214,9 @@ export default function AgendaSheet({
         </div>
       </div>
       {openId && <PlaceSheet placeId={openId} onClose={() => setOpenId(null)} />}
+      {viewer.node}
+      {showTickets && <TicketsSheet onClose={() => setShowTickets(false)} />}
+      {check && <TripCheck trip={trip} hub={hub} go={go} onClose={() => setCheck(false)} />}
       {detail && <EntryDetail entry={detail} trip={trip} hub={hub} go={go} onClose={() => setDetail(null)} />}
     </Portal>
   )
@@ -233,7 +265,7 @@ function EntryDetail({
 
         <div className="mt-4 space-y-3">
           {/* Etape : arrivee ou depart */}
-          {s && (entry.kind === 'arrive' || entry.kind === 'leave') && (
+          {s && (entry.kind === 'arrive' || entry.kind === 'leave' || entry.kind === 'stayin' || entry.kind === 'stayout') && (
             <>
               <div className="rounded-2xl bg-surface-2 p-3.5 text-[13.5px] leading-relaxed">
                 <p className="font-bold">

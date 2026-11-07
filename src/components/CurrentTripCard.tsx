@@ -8,6 +8,7 @@ import { useCoverUrl } from './TripCover'
 import { RouteIcon } from './hub/icons'
 import Countdown from './Countdown'
 import { autoCover } from '../lib/discover'
+import QuickBar from './QuickBar'
 
 /**
  * En haut de l'accueil : le voyage du moment, en un tap. C'est le chemin le
@@ -51,6 +52,7 @@ export default function CurrentTripCard() {
           : ''
 
   return (
+    <>
     <Link
       to={`/voyages/${trip.id}`}
       className="card-feature group relative isolate mt-8 block overflow-hidden p-6 sm:p-8"
@@ -75,5 +77,7 @@ export default function CurrentTripCard() {
         </div>
       </div>
     </Link>
+    <QuickBar tripId={trip.id} className="mt-3" />
+    </>
   )
 }

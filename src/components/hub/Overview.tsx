@@ -9,6 +9,9 @@ import { modeKey } from './StopForm'
 import DiscoverSection from './DiscoverSection'
 import { DocIcon, RouteIcon, ShareIcon, ShieldIcon, TodoKindIcon, TransportIcon } from './icons'
 import { useScope } from '../../context/TripScope'
+import { useState } from 'react'
+import QuickBar from '../QuickBar'
+import TripCheck from './TripCheck'
 
 export type HubTab = 'overview' | 'day' | 'route' | 'todo' | 'docs' | 'cost' | 'vaccines' | 'countries' | 'ideas' | 'assistant' | 'memories'
 
@@ -84,6 +87,7 @@ export default function Overview({
   }
 
 
+  const [check, setCheck] = useState(false)
   const scope = useScope()
   const tripPlaces = scope.places(places.filter((p) => p.trip_id === trip.id))
   const imageOf = (p: Place) => p.gallery?.find((u) => !u.includes('idea-frames')) || p.image_url || p.gallery?.[0] || null
@@ -96,6 +100,20 @@ export default function Overview({
   }
   return (
     <div className="space-y-9">
+      {/* Acces rapide et verification */}
+      <section className="space-y-3">
+        <QuickBar tripId={trip.id} />
+        <button onClick={() => setCheck(true)} className="card-feature flex w-full items-center gap-3 p-4 text-left active:scale-[0.99]">
+          <span className="text-3xl">✅</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-extrabold">{t('chk.title')}</span>
+            <span className="block text-[12.5px] leading-snug text-text-muted">{t('chk.hint')}</span>
+          </span>
+          <span className="text-accent">›</span>
+        </button>
+      </section>
+      {check && <TripCheck trip={trip} hub={hub} go={go} onClose={() => setCheck(false)} />}
+
       {/* Prochain trajet */}
       {nextTransportStop && (
         <button onClick={() => go('route')} className="card-feature block w-full p-5 text-left sm:p-6">
