@@ -20,6 +20,8 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
   const place = places.find((p) => p.id === placeId)
   const [zoom, setZoom] = useState<{ urls: string[]; i: number } | null>(null)
   const [closing, setClosing] = useState(false)
+  // Une fois la photo passee, les boutons du haut ont un fond plein (lisibles au-dessus du texte)
+  const [scrolled, setScrolled] = useState(false)
 
   const close = () => {
     setClosing(true)
@@ -55,7 +57,11 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
           closing ? 'translate-y-full sm:translate-y-8 sm:opacity-0' : ''
         }`}
       >
-        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3">
+        <div
+          className={`absolute inset-x-0 top-0 z-10 flex items-center justify-between p-3 transition-colors duration-200 ${
+            scrolled ? 'border-b border-line bg-surface-solid' : ''
+          }`}
+        >
           <button
             onClick={() => history.back()}
             className="flex h-10 items-center gap-1.5 rounded-full bg-black/45 px-3.5 text-[14px] font-bold text-white backdrop-blur-md active:scale-95"
@@ -72,7 +78,7 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
             🗺️ {t('ov.seeMap')}
           </button>
         </div>
-        <div className="overflow-y-auto overscroll-contain">
+        <div className="overflow-y-auto overscroll-contain" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 150)}>
           <PlaceHero place={place} onZoom={(urls, i) => setZoom({ urls, i })} />
           {!(place.gallery?.length || place.image_url) && <div className="h-16" />}
           <div className="space-y-4 p-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">

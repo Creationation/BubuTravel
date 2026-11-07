@@ -54,6 +54,8 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
 # Secours via Codex CLI connecte au compte ChatGPT (jamais via une cle API).
 # Luna en effort faible suffit pour les fiches structurees et economise le quota.
 CODEX_MODEL = os.environ.get("CODEX_MODEL", "gpt-6-luna")
+# Recolter des infos et les resumer : Haiku suffit, et il est bien plus rapide
+FAST_MODEL = os.environ.get("CLAUDE_FAST_MODEL", "haiku")
 CLAUDE_RETRY_SECONDS = max(60, int(os.environ.get("CLAUDE_RETRY_MINUTES", "15")) * 60)
 CLAUDE_PAUSED_UNTIL = 0.0
 CLAUDE_STATE_LOCK = threading.Lock()
@@ -564,24 +566,24 @@ class MenuItem(BaseModel):
 
 class PlaceDetails(BaseModel):
     name: str = Field(description="Nom COURT du lieu (40 caracteres max) : son vrai nom propre, ex. « Eagle Nest Bar », « Wat Pho ». Pas de description, pas de parentheses")
-    full_name: str = Field(description="Nom COMPLET et officiel du lieu, tel qu'affiche sur place ou sur Google Maps, ex. « Wat Phra Chetuphon Wimon Mangkhalaram (Wat Pho) »")
+    full_name: str = Field(description="Nom COMPLET et officiel de l'établissement, tel qu'affiché sur place ou sur Google Maps. JAMAIS vide.")
     family: Literal["culture", "nature", "food", "nightlife", "market", "activity", "wellness", "other"] = Field(
         description="Famille : culture (temples, musees, monuments), nature (plages, iles, parcs, points de vue), food (restaurants, cafes, street food), nightlife (bars, rooftops, festivals), market (marches, shopping), activity (excursions, cours, sports), wellness (spa, massage, sante), other"
     )
-    kind: str = Field(description="restaurant, bar, cafe, temple, plage, atelier, spa, marche...")
-    summary: str = Field(description="Ce que c'est et pourquoi y aller, 2 phrases maximum")
-    address: str = Field(description="Adresse complete : numero, rue, quartier, ville")
-    lat: float | None = Field(description="Latitude precise du lieu (5 decimales)")
-    lng: float | None = Field(description="Longitude precise du lieu (5 decimales)")
-    price: str = Field(description="COURT, 60 caracteres max : ex. « 250-400 THB / pers. » ou « 78 € les 2 nuits »")
-    hours: str = Field(description="COURT, 60 caracteres max : ex. « 10 h-22 h, fermé lundi »")
-    menu: list[MenuItem] = Field(description="Pour un lieu ou l'on mange/boit : 3 a 8 plats ou boissons phares avec prix ; sinon les formules / billets")
-    booking: str = Field(description="Une phrase : faut-il reserver, ou, combien de temps avant")
-    booking_url: str = Field(description="Lien de reservation ou site officiel, chaine vide sinon")
-    best_time: str = Field(description="COURT, 70 caracteres max")
-    duration: str = Field(description="COURT, 30 caracteres max : ex. « 2 h »")
-    tips: list[str] = Field(description="3 a 5 conseils concrets, une phrase courte chacun")
-    images: list[str] = Field(description="4 a 8 URL DIRECTES d'images (.jpg/.png/.webp) montrant CE lieu : site officiel, Wikimedia, Tripadvisor, Google... jamais une image d'un autre lieu")
+    kind: str = Field(description="Type en 1 à 3 mots : restaurant, bar, cafe, temple, plage, spa, marche...")
+    summary: str = Field(description="RÉSUMÉ de 2 phrases courtes, 220 caractères MAX : ce que c'est, pour qui, pourquoi y aller. Pas de liste, pas de dates de publication.")
+    address: str = Field(description="Adresse postale COMPLÈTE (numéro, rue, quartier, ville). Si introuvable : au moins le quartier et la ville. JAMAIS vide.")
+    lat: float | None = Field(description="Latitude précise du lieu lui-même (5 décimales)")
+    lng: float | None = Field(description="Longitude précise du lieu lui-même (5 décimales)")
+    price: str = Field(description="40 caractères MAX, ex. « 250-400 THB / pers. », chaine vide si inconnu")
+    hours: str = Field(description="40 caractères MAX, ex. « 10 h-22 h, fermé lundi », chaine vide si inconnu")
+    menu: list[MenuItem] = Field(description="3 à 5 plats/boissons/billets phares avec prix (liste vide si non pertinent)")
+    booking: str = Field(description="100 caractères MAX : faut-il réserver, où, avec quel délai")
+    booking_url: str = Field(description="Site officiel ou lien de réservation, chaine vide sinon")
+    best_time: str = Field(description="50 caractères MAX")
+    duration: str = Field(description="20 caractères MAX, ex. « 2 h »")
+    tips: list[str] = Field(description="2 à 3 conseils, 90 caractères MAX chacun")
+    images: list[str] = Field(description="3 à 6 URL DIRECTES de photos (.jpg/.png/.webp) de CE lieu uniquement (site officiel, Wikimedia, Tripadvisor...)")
     sources: list[Source]
 
 
@@ -597,24 +599,23 @@ def image_ok(url: str) -> bool:
         return False
 
 
-DETAILS_BRIEF = """Fais la fiche pratique complete de ce lieu pour deux voyageurs, en cherchant sur le web
-(WebSearch, WebFetch : site officiel, Google Maps, Tripadvisor, Instagram, articles recents).
-Identifie le lieu exact. L'ADRESSE COMPLETE (numero, rue, quartier, ville) et les coordonnees GPS
-PRECISES du lieu lui-meme sont obligatoires : verifie-les sur Google Maps ou le site officiel.
-Donne de VRAIES infos : prix, horaires, plats ou billets phares avec prix,
-reservation, conseils. Ajoute des URL directes d'images de CE lieu (ouvre les pages pour trouver
-les fichiers images). Pour les images : uniquement des PHOTOS du lieu lui-meme (facade, interieur, vue, plats), jamais une
-miniature Instagram, un logo, une capture avec du texte, une carte ou un lieu voisin. Verifie que
-chaque URL est bien un fichier image de CE lieu avant de la donner.
-N'invente rien : laisse vide ce que tu ne trouves pas.
-{lang}
+DETAILS_BRIEF = """Tu récoltes des informations FIABLES sur un lieu puis tu les RÉSUMES, vite et proprement.
 
-Si le nom donne est vague ou generique (ex. « buffet », « bar sur le toit », « cours de cuisine »),
-trouve le VRAI lieu grace aux notes et a la ville, et donne son vrai nom propre.
+Méthode (5 recherches web au maximum, WebSearch puis WebFetch sur les 1 à 2 meilleures pages) :
+1. IDENTIFIE l'établissement : son vrai nom, son ADRESSE COMPLÈTE et ses coordonnées GPS précises
+   (Google Maps, site officiel). C'est la partie la plus importante : elle ne doit jamais manquer.
+2. Récupère l'essentiel : prix, horaires, plats ou billets phares, réservation, 2 à 3 conseils.
+3. Trouve 3 à 6 URL directes de PHOTOS de ce lieu (pas de logo, pas de capture avec du texte, pas un lieu voisin).
+
+Règles de forme : réponds court. Chaque champ respecte sa limite de longueur ; le résumé fait 2 phrases.
+Ne recopie pas de longs paragraphes, ne répète pas la même info dans deux champs. N'invente RIEN : un champ
+inconnu reste vide (sauf nom, adresse et résumé, toujours remplis).
+Si le nom donné est vague (« buffet », « bar sur le toit »), trouve le vrai lieu grâce aux notes et à la ville.
+{lang}
 
 Lieu : {name}
 Ville : {city}, {country}
-Ce que les voyageurs en ont note : {notes}
+Notes des voyageurs : {notes}
 """
 
 
@@ -802,9 +803,9 @@ def claude_only_json(prompt: str, model: type[BaseModel], *, cwd: Path, tools: l
     cmd = [
         exe, "-p",
         "--output-format", "stream-json", "--verbose",
-        "--model", CLAUDE_MODEL,
+        "--model", getattr(CURRENT, "model", None) or CLAUDE_MODEL,
         "--json-schema", json.dumps(inline_schema(model), ensure_ascii=False),
-        "--max-turns", "40",
+        "--max-turns", str(getattr(CURRENT, "max_turns", None) or 40),
         "--allowedTools", *tools,
     ]
     lo, hi = span
@@ -1229,6 +1230,21 @@ def shortcode(url: str) -> str:
     return url.split("?")[0].rstrip("/")
 
 
+def reverse_osm(lat: float, lng: float) -> str:
+    """Adresse lisible d'un point GPS (OpenStreetMap), chaine vide si introuvable."""
+    try:
+        time.sleep(1.1)
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 18},
+            headers={"User-Agent": "BuBuTravel/1.0 (https://bubu-travel.vercel.app)"},
+            timeout=20,
+        )
+        return (r.json().get("display_name") or "")[:200]
+    except Exception:
+        return ""
+
+
 def geocode_osm(query: str) -> tuple[float, float] | None:
     try:
         time.sleep(1.1)
@@ -1373,6 +1389,8 @@ def process_ai_job(job: dict) -> None:
     req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
     CURRENT.provider = user_provider(job["user_id"])
+    CURRENT.model = FAST_MODEL if job["kind"] == "place_info" else None
+    CURRENT.max_turns = 16 if job["kind"] == "place_info" else None
     CURRENT.codex_allowed = job["kind"] in (
         "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
         "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency", "gap_search",
@@ -1394,8 +1412,23 @@ def process_ai_job(job: dict) -> None:
             images = gather_images(
                 data.get("images", []), data.get("name") or place["name"], place.get("city") or "", place["id"],
                 commons=data.get("family") in ("culture", "nature", "market"),
+                pages=[x.get("url") for x in (data.get("sources") or [])] + [data.get("booking_url")],
             )
             data["images"] = images
+            # Longueurs : on borne, pour que la fiche reste lisible
+            for key, cap in (("summary", 260), ("price", 60), ("hours", 60), ("booking", 120), ("best_time", 70), ("duration", 24), ("kind", 40)):
+                if isinstance(data.get(key), str) and len(data[key]) > cap:
+                    cut = data[key][:cap].rsplit(" ", 1)[0].rstrip(",;: ")
+                    data[key] = cut + "…"
+            data["tips"] = [t[:110] for t in (data.get("tips") or [])[:3]]
+            data["menu"] = (data.get("menu") or [])[:5]
+            # Identite et adresse : toujours presentes
+            if not (data.get("full_name") or "").strip():
+                data["full_name"] = data.get("name") or place["name"]
+            if not (data.get("address") or "").strip():
+                la, ln = data.get("lat"), data.get("lng")
+                if la is not None and ln is not None:
+                    data["address"] = reverse_osm(la, ln)
             patch = {"details": data}
             # Photos verifiees du lieu d'abord ; les images de la video (souvent
             # du texte, des visages, une miniature) passent apres.
@@ -1575,7 +1608,7 @@ def commons_images(query: str, limit: int = 6) -> list[str]:
         return []
 
 
-def gather_images(found: list[str], name: str, city: str, key: str, want: int = 5, commons: bool = True) -> list[str]:
+def gather_images(found: list[str], name: str, city: str, key: str, want: int = 5, commons: bool = True, pages: list[str] | None = None) -> list[str]:
     """Images verifiees et copiees chez nous ; complete par Commons s'il en manque."""
     urls = [u for u in found if isinstance(u, str) and u.startswith("http")]
     # Commons seulement pour les lieux connus (temples, nature, marches) : pour
@@ -1585,14 +1618,21 @@ def gather_images(found: list[str], name: str, city: str, key: str, want: int = 
             urls += [u for u in commons_images(q) if u not in urls]
             if len(urls) >= want + 2:
                 break
-    kept: list[str] = []
-    for i, u in enumerate(urls[:14]):
-        if len(kept) >= 8:
-            break
-        progress(82 + 14 * i / max(1, min(len(urls), 14)), f"images:{len(kept)}")
-        hosted = rehost_image(u, key, len(kept))
-        if hosted:
-            kept.append(hosted)
+    from concurrent.futures import ThreadPoolExecutor
+
+    # Secours : la photo principale (og:image) des pages que l'IA a lues (site officiel, Tripadvisor...)
+    if len(urls) < want and pages:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for meta in pool.map(page_meta, [u for u in pages if isinstance(u, str) and u.startswith("http")][:5]):
+                img = (meta or {}).get("og:image")
+                if img and img.startswith("http") and img not in urls:
+                    urls.append(img)
+    candidates = urls[:9]
+    progress(84, "images:0")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        hosted_list = list(pool.map(lambda iu: rehost_image(iu[1], key, iu[0]), enumerate(candidates)))
+    kept = [h for h in hosted_list if h][:6]
+    progress(96, f"images:{len(kept)}")
     return kept
 
 
@@ -2014,6 +2054,8 @@ def guess_lang(text: str) -> str:
 def backfill_translations(limit: int = 8) -> int:
     """Traduit un lot de fiches qui n'ont pas encore leur version dans l'autre langue."""
     CURRENT.provider = "auto"
+    CURRENT.model = FAST_MODEL
+    CURRENT.max_turns = 6
     rows = sb("GET", "places", params={"details": "not.is.null", "select": "id,name,details", "order": "created_at.asc", "limit": "400"}) or []
     todo = [r for r in rows if isinstance(r.get("details"), dict) and not r["details"].get("alt") and (r["details"].get("summary") or r["name"])][:limit]
     if not todo:

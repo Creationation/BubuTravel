@@ -281,7 +281,7 @@ function Info({ d }: { d: PlaceDetails }) {
         <div>
           <p className="eyebrow mb-2">{t('pd.menu')}</p>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-            {d.menu.slice(0, 8).map((m) => (
+            {d.menu.slice(0, 5).map((m) => (
               <li key={m.name} className="flex items-baseline justify-between gap-3 px-3.5 py-2.5 text-[14px]">
                 <span className="min-w-0 truncate">{m.name}</span>
                 {m.price && <span className="num shrink-0 font-bold text-accent">{m.price}</span>}
@@ -294,7 +294,7 @@ function Info({ d }: { d: PlaceDetails }) {
         <div>
           <p className="eyebrow mb-2">{t('pd.tips')}</p>
           <ul className="space-y-1.5 text-[14px] text-text-soft">
-            {d.tips.slice(0, 5).map((tip) => (
+            {d.tips.slice(0, 3).map((tip) => (
               <li key={tip} className="flex gap-2">
                 <span className="text-accent">•</span>
                 <span className="min-w-0">{tip}</span>
