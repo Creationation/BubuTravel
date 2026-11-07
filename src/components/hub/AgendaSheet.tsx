@@ -1,38 +1,62 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaces } from '../../context/PlacesContext'
+import { useScope } from '../../context/TripScope'
 import { isStay } from '../../lib/schedule'
-import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
+import { shortDate, todayIso } from '../../lib/tripDates'
+import { updateStop } from '../../lib/tripApi'
 import { placeName } from '../../lib/discover'
-import type { Trip } from '../../lib/types'
+import type { Trip, TripStop, TripTodo } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
 import Portal from '../Portal'
 import PlaceSheet from '../PlaceSheet'
+import RouteSheet from '../RouteSheet'
+import type { RoutePoint } from '../RouteSheet'
+import { HostCards } from './HostContacts'
 import GapsPanel from './GapsPanel'
+import type { HubTab } from './Overview'
 
-type Entry = { key: string; time: string; icon: string; title: string; sub?: string; placeId?: string }
+type Entry = {
+  key: string
+  time: string
+  icon: string
+  title: string
+  sub?: string
+  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo'
+  placeId?: string
+  stop?: TripStop
+  todo?: TripTodo
+  day: string
+}
 
 /**
  * L'agenda du voyage, jour par jour, directement dans l'app : arrivees,
- * trajets, activites placees, choses a faire. Un bouton l'envoie aussi vers
- * le calendrier du telephone (fichier .ics).
+ * trajets, activites placees, choses a faire. Chaque ligne s'ouvre (fiche du
+ * lieu, detail de l'etape, du trajet ou de la tache). Un bouton l'envoie
+ * aussi vers le calendrier du telephone.
  */
 export default function AgendaSheet({
   trip,
   hub,
+  go,
   onExport,
   onClose,
 }: {
   trip: Trip
   hub: TripHub
+  go: (tab: HubTab) => void
   onExport: () => void | Promise<void>
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
-  const { places } = usePlaces()
+  const { places: allPlaces } = usePlaces()
+  const scope = useScope()
+  const places = useMemo(() => scope.places(allPlaces), [allPlaces, scope])
   const [openId, setOpenId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<Entry | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -44,31 +68,47 @@ export default function AgendaSheet({
 
   const days = useMemo(() => {
     const map = new Map<string, Entry[]>()
-    const add = (day: string | null | undefined, e: Entry) => {
+    const add = (day: string | null | undefined, e: Omit<Entry, 'day'>) => {
       if (!day) return
-      map.set(day, [...(map.get(day) ?? []), e])
+      map.set(day, [...(map.get(day) ?? []), { ...e, day }])
     }
     for (const s of hub.stops) {
-      add(s.arrive_date, { key: `a${s.id}`, time: '00:00', icon: '📍', title: t('agenda.arrive', { name: s.name }), sub: s.stay_name ?? undefined })
-      add(s.leave_date, { key: `l${s.id}`, time: '23:00', icon: '🧳', title: t('agenda.leave', { name: s.name }) })
+      add(s.arrive_date, { key: `a${s.id}`, time: '00:00', icon: '📍', title: t('agenda.arrive', { name: s.name }), sub: s.stay_name ?? undefined, kind: 'arrive', stop: s })
+      add(s.leave_date, { key: `l${s.id}`, time: '23:00', icon: '🧳', title: t('agenda.leave', { name: s.name }), kind: 'leave', stop: s })
       if (s.transport_departs) {
         const [d, h = '00:00'] = s.transport_departs.split('T')
-        add(d, { key: `t${s.id}`, time: h.slice(0, 5), icon: '🚆', title: s.transport_details || t('agenda.transport'), sub: s.transport_ref ?? undefined })
+        add(d, { key: `t${s.id}`, time: h.slice(0, 5), icon: '🚆', title: s.transport_details || t('agenda.transport'), sub: s.transport_ref ?? undefined, kind: 'transport', stop: s })
       }
     }
     for (const p of places) {
       if (p.trip_id !== trip.id || !p.visit_date || isStay(p)) continue
-      add(p.visit_date, { key: `p${p.id}`, time: p.plan_time ?? '12:00', icon: '🎯', title: placeName(p), sub: p.city ?? undefined, placeId: p.id })
+      add(p.visit_date, { key: `p${p.id}`, time: p.plan_time ?? '12:00', icon: '🎯', title: placeName(p), sub: p.city ?? undefined, kind: 'place', placeId: p.id })
     }
     for (const todo of hub.todos) {
       if (todo.done || !todo.due_at) continue
-      add(todo.due_at.slice(0, 10), { key: `d${todo.id}`, time: todo.has_time ? todo.due_at.slice(11, 16) : '08:00', icon: '✅', title: todo.title })
+      if (scope.country && todo.country && !scope.isIn(todo.country)) continue
+      add(todo.due_at.slice(0, 10), { key: `d${todo.id}`, time: todo.has_time ? todo.due_at.slice(11, 16) : '08:00', icon: '✅', title: todo.title, kind: 'todo', todo })
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, items]) => ({ day, items: items.sort((x, y) => x.time.localeCompare(y.time)) }))
-  }, [hub.stops, hub.todos, places, trip.id, t])
+  }, [hub.stops, hub.todos, places, trip.id, t, scope])
 
   const today = todayIso()
-  const upcoming = days.findIndex((d) => d.day >= today)
+
+  // A l'ouverture seulement : on se place sur le prochain jour. Ensuite l'agenda
+  // ne bouge plus tout seul (avant, chaque mise a jour le renvoyait en haut).
+  const placed = useRef(false)
+  useEffect(() => {
+    if (placed.current || days.length === 0 || !box.current) return
+    placed.current = true
+    const target = days.find((d) => d.day >= today) ?? days[0]
+    const el = box.current.querySelector<HTMLElement>(`[data-day="${target.day}"]`)
+    if (el) box.current.scrollTop = Math.max(0, el.offsetTop - 8)
+  }, [days, today])
+
+  function open(e: Entry) {
+    if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
+    else setDetail(e)
+  }
 
   return (
     <Portal>
@@ -78,21 +118,24 @@ export default function AgendaSheet({
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
             <div className="min-w-0">
               <p className="truncate text-[1.2rem] font-extrabold">📅 {t('agenda.title')}</p>
-              <p className="truncate text-[12px] text-text-muted">{trip.title}</p>
+              <p className="truncate text-[12px] text-text-muted">
+                {trip.title}
+                {scope.country ? ` · ${scope.country}` : ''}
+              </p>
             </div>
             <button onClick={onClose} className="btn btn-quiet btn-xs shrink-0">
               {t('common.close')}
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          <div ref={box} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
             <GapsPanel trip={trip} hub={hub} />
             {days.length === 0 ? (
               <p className="py-10 text-center text-[14px] text-text-muted">{t('agenda.empty')}</p>
             ) : (
               <ol className="space-y-5">
-                {days.map(({ day, items }, i) => (
-                  <li key={day} ref={(el) => { if (el && i === Math.max(0, upcoming)) el.scrollIntoView({ block: 'start' }) }}>
+                {days.map(({ day, items }) => (
+                  <li key={day} data-day={day}>
                     <p className={`mb-2 text-[13px] font-extrabold capitalize ${day === today ? 'text-accent' : ''}`}>
                       {shortDate(day, locale, true)}
                       {day === today && ` · ${t('ov.today')}`}
@@ -101,9 +144,8 @@ export default function AgendaSheet({
                       {items.map((e) => (
                         <li key={e.key}>
                           <button
-                            disabled={!e.placeId}
-                            onClick={() => e.placeId && setOpenId(e.placeId)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5 text-left disabled:cursor-default"
+                            onClick={() => open(e)}
+                            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5 text-left transition-transform active:scale-[0.98]"
                           >
                             <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{e.time === '00:00' || e.time === '23:00' ? '' : e.time}</span>
                             <span className="text-lg">{e.icon}</span>
@@ -111,6 +153,7 @@ export default function AgendaSheet({
                               <span className="block truncate text-[14px] font-semibold">{e.title}</span>
                               {e.sub && <span className="block truncate text-[12px] text-text-muted">{e.sub}</span>}
                             </span>
+                            <span className="text-text-muted">›</span>
                           </button>
                         </li>
                       ))}
@@ -142,9 +185,142 @@ export default function AgendaSheet({
         </div>
       </div>
       {openId && <PlaceSheet placeId={openId} onClose={() => setOpenId(null)} />}
+      {detail && <EntryDetail entry={detail} trip={trip} hub={hub} go={go} onClose={() => setDetail(null)} />}
     </Portal>
   )
 }
 
-/** Debut du voyage : jours sans rien, utile pour savoir ou l'on en est. */
-export const dayAfter = addDaysIso
+/** Detail d'une ligne de l'agenda qui n'est pas un lieu : etape, trajet ou tache. */
+function EntryDetail({
+  entry,
+  trip,
+  hub,
+  go,
+  onClose,
+}: {
+  entry: Entry
+  trip: Trip
+  hub: TripHub
+  go: (tab: HubTab) => void
+  onClose: () => void
+}) {
+  const { t, locale } = useI18n()
+  const [route, setRoute] = useState<RoutePoint | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const s = entry.stop ? (hub.stops.find((x) => x.id === entry.stop!.id) ?? entry.stop) : undefined
+  const todo = entry.todo ? (hub.todos.find((x) => x.id === entry.todo!.id) ?? entry.todo) : undefined
+  const hasPoint = s && s.lat != null && s.lng != null
+  const target: RoutePoint | null = hasPoint ? { lat: s!.lat!, lng: s!.lng!, name: s!.stay_name || s!.name } : null
+
+  return (
+    <div className="fixed inset-0 z-[2600] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-[#120d09]/55" onClick={onClose} />
+      <div className="sheet-in relative max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-surface-solid p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] sm:rounded-[28px]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[1.3rem] font-extrabold leading-tight">
+              {entry.icon} {entry.title}
+            </p>
+            <p className="mt-1 text-[13px] capitalize text-text-muted">
+              {shortDate(entry.day, locale, true)}
+              {entry.time !== '00:00' && entry.time !== '23:00' ? ` · ${entry.time}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} className="btn btn-quiet btn-xs shrink-0">
+            {t('common.close')}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {/* Etape : arrivee ou depart */}
+          {s && (entry.kind === 'arrive' || entry.kind === 'leave') && (
+            <>
+              <div className="rounded-2xl bg-surface-2 p-3.5 text-[13.5px] leading-relaxed">
+                <p className="font-bold">
+                  {s.name}
+                  {s.country ? ` · ${s.country}` : ''}
+                </p>
+                <p className="num text-text-muted">
+                  {[s.arrive_date, s.leave_date].filter(Boolean).map((d) => shortDate(d!, locale)).join(' → ')}
+                </p>
+                {s.stay_name && <p className="mt-2">🏨 {s.stay_name}</p>}
+                {s.stay_address && <p className="text-text-muted">{s.stay_address}</p>}
+                {s.stay_ref && <p className="num text-text-muted">{t('stop.booking')} {s.stay_ref}</p>}
+                {s.stay_url && (
+                  <a href={s.stay_url} target="_blank" rel="noreferrer" className="mt-1 inline-block font-semibold text-accent">
+                    🔗 {t('stop.booking')}
+                  </a>
+                )}
+              </div>
+              <HostCards
+                hosts={s.hosts}
+                compact
+                onSave={async (next) => {
+                  await updateStop(s.id, { hosts: next })
+                  await hub.reload()
+                }}
+              />
+            </>
+          )}
+
+          {/* Trajet */}
+          {s && entry.kind === 'transport' && (
+            <div className="rounded-2xl bg-surface-2 p-3.5 text-[13.5px] leading-relaxed">
+              <p className="font-bold">{s.transport_details || t('agenda.transport')}</p>
+              {s.transport_departs && <p className="num text-text-muted">{t('stop.departs')} {s.transport_departs.replace('T', ' ')}</p>}
+              {s.transport_arrives && <p className="num text-text-muted">{t('stop.arrives')} {s.transport_arrives.replace('T', ' ')}</p>}
+              {s.transport_ref && <p className="num text-text-muted">{t('stop.booking')} {s.transport_ref}</p>}
+            </div>
+          )}
+
+          {/* Chose a faire */}
+          {todo && (
+            <div className="rounded-2xl bg-surface-2 p-3.5 text-[13.5px] leading-relaxed">
+              {todo.notes ? <p className="whitespace-pre-wrap">{todo.notes}</p> : <p className="text-text-muted">{t('agenda.noNotes')}</p>}
+            </div>
+          )}
+
+          {error && <p className="notice notice-bad">{error}</p>}
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            {target && (
+              <button onClick={() => setRoute(target)} className="btn btn-accent btn-xs">
+                🧭 {t('dir.title')}
+              </button>
+            )}
+            {todo && (
+              <button
+                onClick={async () => {
+                  try {
+                    await hub.editTodo(todo.id, { done: true })
+                    onClose()
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : String(err))
+                  }
+                }}
+                className="btn btn-accent btn-xs"
+              >
+                ✅ {t('agenda.markDone')}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                onClose()
+                go(todo ? 'todo' : 'route')
+              }}
+              className="btn btn-xs"
+            >
+              {todo ? t('agenda.seeTodos') : t('agenda.seeRoute')}
+            </button>
+            {s && hasPoint && (
+              <a href={`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`} target="_blank" rel="noreferrer" className="btn btn-xs btn-quiet">
+                📍 Maps
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+      {route && <RouteSheet to={route} tripId={trip.id} onClose={() => setRoute(null)} />}
+    </div>
+  )
+}

@@ -9,6 +9,8 @@ import ClampText from './ClampText'
 import PlanBox from './PlanBox'
 import { ReviewSummary, askReview } from './ReviewSheet'
 import { pickDetails } from '../lib/discover'
+import RouteSheet from './RouteSheet'
+import { placeName } from '../lib/discover'
 
 /** La position du lieu est-elle fiable (et pas le centre de la ville) ? */
 export function isExact(place: Place): boolean {
@@ -120,6 +122,7 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
   const { queue, activeFor, jobs } = useAiJobs()
   const d = pickDetails(place.details)
   const [error, setError] = useState<string | null>(null)
+  const [route, setRoute] = useState(false)
   const running = activeFor('place_info', 'place_id', place.id)
   const failed = jobs.find((j) => j.kind === 'place_info' && j.input?.place_id === place.id && j.status === 'error')
 
@@ -185,10 +188,16 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
           </span>
           <Copy text={`${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}`} />
         </div>
-        <a href={directionsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-xs mt-3">
-          <PinIcon size={12} />
-          {t('pd.route')}
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={() => setRoute(true)} className="btn btn-accent btn-xs">
+            🧭 {t('dir.title')}
+          </button>
+          <a href={directionsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-xs btn-quiet">
+            <PinIcon size={12} />
+            {t('pd.route')}
+          </a>
+        </div>
+        {route && <RouteSheet to={{ lat: place.lat, lng: place.lng, name: placeName(place) }} tripId={place.trip_id} onClose={() => setRoute(false)} />}
       </div>
 
       {/* Remplir les informations : en fond, plusieurs a la fois */}

@@ -63,3 +63,9 @@ export function categoryLabel(name: string | null | undefined): string {
   if (currentLang() === 'fr') return name
   return CATEGORY_EN[countryKey(name)] ?? name
 }
+
+/** Code ISO d'un pays quel que soit son ecriture (« Thaïlande », « Thailand »...). */
+export function countryCode(raw: string | null | undefined): string {
+  if (!raw) return ''
+  return codeMap().get(countryKey(raw)) ?? ''
+}

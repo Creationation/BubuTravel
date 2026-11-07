@@ -32,6 +32,9 @@ import { HostCards } from './HostContacts'
 import { placeName } from '../../lib/discover'
 import { updateStop } from '../../lib/tripApi'
 import EditButton from '../EditButton'
+import { useScope } from '../../context/TripScope'
+import RouteSheet from '../RouteSheet'
+import type { RoutePoint } from '../RouteSheet'
 
 /**
  * L'itineraire : une carte avec le trace des etapes, puis la frise verticale
@@ -63,7 +66,9 @@ export default function RouteTab({
     ? [{ id: 'route', name: trip.title, points: located.map((s, i) => ({ t: i, lat: s.lat!, lng: s.lng! })) }]
     : []
 
-  const tripSights = places.filter((p) => p.trip_id === trip.id)
+  const [dirTo, setDirTo] = useState<RoutePoint | null>(null)
+  const scope = useScope()
+  const tripSights = scope.places(places.filter((p) => p.trip_id === trip.id))
 
   async function sights(stop: TripStop) {
     setSightBusy(stop.id)
@@ -238,6 +243,7 @@ export default function RouteTab({
           </div>
         )
       )}
+      {dirTo && <RouteSheet to={dirTo} tripId={trip.id} onClose={() => setDirTo(null)} />}
     </div>
   )
 
@@ -322,6 +328,11 @@ export default function RouteTab({
             </div>
             <div className="flex w-full flex-wrap gap-1 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
               <EditButton onClick={onEdit} />
+              {stop.lat != null && stop.lng != null && (
+                <button onClick={() => setDirTo({ lat: stop.lat!, lng: stop.lng!, name: stop.stay_name || stop.name })} className="btn btn-accent btn-xs">
+                  🧭 {t('dir.title')}
+                </button>
+              )}
               <a href={mapsLink(stop)} target="_blank" rel="noreferrer" className="btn btn-quiet btn-xs">
                 {t('stop.openMap')}
               </a>
@@ -353,7 +364,7 @@ export default function RouteTab({
         <StopProgramme
           stop={stop}
           stops={stops}
-          places={places.filter((p) => p.trip_id === trip.id)}
+          places={tripSights}
           onOpen={(id) => navigate(`/carte?lieu=${id}`)}
         />
         {stop.notes && (

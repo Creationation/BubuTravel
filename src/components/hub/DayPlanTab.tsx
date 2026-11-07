@@ -11,6 +11,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import AiGauge from '../AiGauge'
 import PlaceSheet from '../PlaceSheet'
 import Portal from '../Portal'
+import { useScope } from '../../context/TripScope'
 
 const GAP = 15 // minutes de trajet entre deux activites
 const QUICK = ['day.ai.relax', 'day.ai.route', 'day.ai.dinner', 'day.ai.later', 'day.ai.rain'] as const
@@ -26,17 +27,19 @@ export default function DayPlanTab({ trip, hub }: { trip: Trip; hub: TripHub }) 
   const { places, edit, add, remove } = usePlaces()
   const { queue, jobs } = useAiJobs()
   const [params, setParams] = useSearchParams()
+  const scope = useScope()
 
   const days = useMemo(() => {
+    if (scope.days) return scope.days
     const start = trip.start_date ?? hub.stops[0]?.arrive_date
     const end = trip.end_date ?? hub.stops[hub.stops.length - 1]?.leave_date ?? start
     if (!start || !end) return []
     const out: string[] = []
     for (let d = start; d <= end && out.length < 120; d = addDaysIso(d, 1)) out.push(d)
     return out
-  }, [trip.start_date, trip.end_date, hub.stops])
+  }, [trip.start_date, trip.end_date, hub.stops, scope.days])
 
-  const tripPlaces = useMemo(() => places.filter((p) => p.trip_id === trip.id), [places, trip.id])
+  const tripPlaces = useMemo(() => scope.places(places.filter((p) => p.trip_id === trip.id)), [places, trip.id, scope])
   const countOn = (d: string) => tripPlaces.filter((p) => p.visit_date === d && !isStay(p)).length
 
   const fallbackDay = () => {

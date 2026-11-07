@@ -9,6 +9,7 @@ import type { Key } from '../../i18n/fr'
 import { BellIcon, CheckIcon, TodoKindIcon, TrashIcon } from './icons'
 import { countryName } from '../../lib/countryName'
 import { TOPICS, topicOf } from '../../lib/discover'
+import { useScope } from '../../context/TripScope'
 
 export const KINDS: TodoKind[] = ['todo', 'booking', 'admin', 'packing']
 const kindKey = (k: TodoKind): Key => `todo.kind.${k}` as Key
@@ -61,10 +62,12 @@ export default function TodoTab({ hub, autoAdd = false }: { hub: TripHub; autoAd
     return list
   }, [hub.stops, hub.todos])
 
+  const scope = useScope()
   const visible = hub.todos.filter(
     (todo) =>
       (filter === 'all' || todo.kind === filter) &&
-      (place === '*' || (todo.country ?? '') === place),
+      (place === '*' || (todo.country ?? '') === place) &&
+      (!scope.country || !todo.country || scope.isIn(todo.country)),
   )
   const grouped = useMemo(() => {
     const map: Record<Group, TripTodo[]> = { late: [], soon: [], later: [], undated: [], done: [] }

@@ -9,6 +9,7 @@ import type { Place, Trip } from '../../lib/types'
 import { useI18n } from '../../i18n/I18nContext'
 import PlaceSheet from '../PlaceSheet'
 import AiGauge from '../AiGauge'
+import { useScope } from '../../context/TripScope'
 
 /**
  * « A decouvrir » : TOUT ce qu'on a envie de faire pendant le voyage, range
@@ -19,14 +20,15 @@ import AiGauge from '../AiGauge'
 export default function DiscoverSection({ trip }: { trip: Trip }) {
   const { t, locale, lang } = useI18n()
   const { places } = usePlaces()
+  const scope = useScope()
   const { queue, activeFor, jobs } = useAiJobs()
   const [family, setFamily] = useState<Family | 'all'>('all')
   const [onlyTodo, setOnlyTodo] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
 
   const all = useMemo(
-    () => places.filter((p) => p.trip_id === trip.id && p.status === 'wishlist' && !isStay(p)),
-    [places, trip.id],
+    () => scope.places(places.filter((p) => p.trip_id === trip.id && p.status === 'wishlist' && !isStay(p))),
+    [places, trip.id, scope],
   )
   const groups = useMemo(() => {
     const map = new Map<Family, Place[]>()

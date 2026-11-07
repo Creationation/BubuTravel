@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import { modeKey } from './StopForm'
 import DiscoverSection from './DiscoverSection'
 import { DocIcon, RouteIcon, ShareIcon, ShieldIcon, TodoKindIcon, TransportIcon } from './icons'
+import { useScope } from '../../context/TripScope'
 
 export type HubTab = 'overview' | 'day' | 'route' | 'todo' | 'docs' | 'cost' | 'vaccines' | 'countries' | 'ideas' | 'assistant' | 'memories'
 
@@ -83,7 +84,8 @@ export default function Overview({
   }
 
 
-  const tripPlaces = places.filter((p) => p.trip_id === trip.id)
+  const scope = useScope()
+  const tripPlaces = scope.places(places.filter((p) => p.trip_id === trip.id))
   const imageOf = (p: Place) => p.gallery?.find((u) => !u.includes('idea-frames')) || p.image_url || p.gallery?.[0] || null
   // Photo d'une etape : le plus beau lieu de la ville (paysage, monument)
   const cityImage = (name: string) => {

@@ -13,6 +13,7 @@ import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import AiGauge from '../AiGauge'
 import Portal from '../Portal'
+import { useScope } from '../../context/TripScope'
 
 type Option = {
   title: string
@@ -49,10 +50,13 @@ const CHIPS: Record<GapType, Key[]> = {
  */
 export default function GapsPanel({ trip, hub }: { trip: Trip; hub: TripHub }) {
   const { t, locale } = useI18n()
-  const { places } = usePlaces()
+  const { places: allPlaces } = usePlaces()
+  const scope = useScope()
+  const places = useMemo(() => scope.places(allPlaces), [allPlaces, scope])
   const [open, setOpen] = useState<Gap | null>(null)
   const [showEmpty, setShowEmpty] = useState(false)
-  const gaps = useMemo(() => detectGaps(trip, hub.stops, places, hub.docs), [trip, hub.stops, hub.docs, places])
+  const scopedTrip = useMemo(() => (scope.range ? { ...trip, start_date: scope.range.from, end_date: scope.range.to } : trip), [trip, scope.range])
+  const gaps = useMemo(() => detectGaps(scopedTrip, hub.stops, places, hub.docs), [scopedTrip, hub.stops, hub.docs, places])
   const important = gaps.filter((g) => g.type !== 'empty')
   const empties = gaps.filter((g) => g.type === 'empty')
   if (gaps.length === 0) return <p className="mb-5 rounded-2xl bg-[rgba(124,135,103,0.14)] px-4 py-3 text-[13.5px] font-semibold">✅ {t('gap.none')}</p>

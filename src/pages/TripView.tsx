@@ -38,6 +38,9 @@ import AgendaSheet from '../components/hub/AgendaSheet'
 import CostTab from '../components/hub/CostTab'
 import { supabase } from '../lib/supabase'
 import VaccinesTab, { useVaccineAutoQueue } from '../components/hub/VaccinesTab'
+import CountryToggle from '../components/hub/CountryToggle'
+import { countryCode } from '../lib/countryName'
+import { TripScopeProvider } from '../context/TripScope'
 
 const TABS: { id: HubTab; label: Key }[] = [
   { id: 'overview', label: 'hub.tab.overview' },
@@ -65,9 +68,37 @@ export default function TripView() {
   const [params, setParams] = useSearchParams()
   const { trips, places: allPlaces, loading } = usePlaces()
   const tripPlaces = useMemo(() => allPlaces.filter((p) => p.trip_id === id), [allPlaces, id])
-  const hub = useTripHub(id)
+  const hubAll = useTripHub(id)
+  // Pays regarde (voyage a plusieurs pays) : « les deux » ou un seul pays
+  const countryList = useMemo(() => {
+    const list: string[] = []
+    for (const s of hubAll.stops) if (s.country && !list.some((c) => countryCode(c) && countryCode(c) === countryCode(s.country)) && !list.includes(s.country)) list.push(s.country)
+    return list
+  }, [hubAll.stops])
+  const [scopeRaw, setScopeRaw] = useState<string | null>(() => {
+    try {
+      return params.get('pays') ?? localStorage.getItem(`bubutravel:scope:${id}`)
+    } catch {
+      return params.get('pays')
+    }
+  })
+  const scopeCountry = countryList.length > 1 && scopeRaw && countryList.includes(scopeRaw) ? scopeRaw : null
+  function chooseCountry(c: string | null) {
+    setScopeRaw(c)
+    try {
+      if (c) localStorage.setItem(`bubutravel:scope:${id}`, c)
+      else localStorage.removeItem(`bubutravel:scope:${id}`)
+    } catch {
+      // stockage indisponible : le choix vaut pour cette visite
+    }
+  }
+  const scopeFilter = useMemo(
+    () => (scopeCountry ? hubAll.stops.filter((s) => countryCode(s.country) === countryCode(scopeCountry) || s.country === scopeCountry) : hubAll.stops),
+    [hubAll.stops, scopeCountry],
+  )
+  const hub = useMemo(() => ({ ...hubAll, stops: scopeFilter }), [hubAll, scopeFilter])
   // Vaccins et ambassades : cherches tout seuls pour chaque pays du voyage
-  useVaccineAutoQueue(trips.find((x) => x.id === id), hub)
+  useVaccineAutoQueue(trips.find((x) => x.id === id), hubAll)
   const [editing, setEditing] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [agenda, setAgenda] = useState(false)
@@ -150,6 +181,7 @@ export default function TripView() {
   }
 
   return (
+    <TripScopeProvider country={scopeCountry} stops={hubAll.stops}>
     <AppShell>
       <TripHero
         trip={trip}
@@ -176,6 +208,9 @@ export default function TripView() {
           <SharePanel trip={trip} hub={hub} onLeft={() => navigate('/voyages')} onClose={() => setSharing(false)} />
         )}
 
+        {/* Pays : les deux, ou un seul (jamais melanges) */}
+        {countryList.length > 1 && <CountryToggle countries={countryList} value={scopeCountry} onChange={chooseCountry} />}
+
         {/* Onglets, colles en haut au defilement */}
         <div className="-mx-5 mt-8 px-5 py-3 sm:sticky sm:top-16 sm:z-[800] sm:-mx-8 sm:px-8">
           <nav className="tabbar w-fit max-w-full">
@@ -200,7 +235,7 @@ export default function TripView() {
           </nav>
         </div>
 
-        <div className="mt-6 fade-in" key={tab}>
+        <div className="mt-6 fade-in" key={`${tab}:${scopeCountry ?? 'all'}`}>
           {tab === 'overview' && (
             <Overview
               trip={trip}
@@ -223,7 +258,7 @@ export default function TripView() {
         </div>
       </div>
 
-      {agenda && <AgendaSheet trip={trip} hub={hub} onExport={exportCalendar} onClose={() => setAgenda(false)} />}
+      {agenda && <AgendaSheet go={(tab) => { setAgenda(false); go(tab) }}  trip={trip} hub={hub} onExport={exportCalendar} onClose={() => setAgenda(false)} />}
       {assistant && (
         <TripAssistant
           trip={trip}
@@ -236,6 +271,7 @@ export default function TripView() {
         />
       )}
     </AppShell>
+    </TripScopeProvider>
   )
 }
 
