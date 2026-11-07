@@ -2019,7 +2019,10 @@ def keep_alive(job_id: str, stop: threading.Event) -> None:
             pass
 
 
-AI_WORKERS = max(2, int(os.environ.get("AI_WORKERS", "2")))
+AI_WORKERS = max(2, int(os.environ.get("AI_WORKERS", "4")))
+# Sondage rapide : si un autre analyseur (ancienne version, autre machine) tourne
+# sur la meme base, celui-ci prend les demandes en premier (la prise est atomique)
+AI_POLL_SECONDS = float(os.environ.get("AI_POLL_SECONDS", "1.0"))
 
 
 # --------------------------------------------------------------------------
@@ -2123,7 +2126,7 @@ def ai_worker(n: int) -> None:
                 backfill_translations()
         except Exception as err:
             log(f"Erreur (assistant {n}) : {str(err)[:200]}")
-        time.sleep(POLL_SECONDS)
+        time.sleep(AI_POLL_SECONDS + 0.3 * n)
 
 
 
@@ -2595,7 +2598,7 @@ def main() -> None:
             return
         except Exception as err:
             log(f"Erreur de boucle : {str(err)[:200]}")
-        time.sleep(POLL_SECONDS)
+        time.sleep(2)
 
 
 if __name__ == "__main__":
