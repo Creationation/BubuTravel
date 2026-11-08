@@ -15,7 +15,7 @@ import AiGauge from '../AiGauge'
 import Portal from '../Portal'
 import { useScope } from '../../context/TripScope'
 
-type Option = {
+export type Option = {
   title: string
   kind: 'stay' | 'transport' | 'activity' | 'stop'
   area: string
@@ -33,7 +33,7 @@ type Option = {
   cons: string[]
   sources: { title: string; url: string }[]
 }
-type Result = { summary: string; options: Option[] }
+export type Result = { summary: string; options: Option[] }
 
 const ICON: Record<GapType, string> = { nostop: '🗺️', nostay: '🏨', notransport: '✈️', empty: '🎯' }
 const CHIPS: Record<GapType, Key[]> = {
@@ -146,41 +146,7 @@ export function GapSearch({ trip, hub, gap, onClose, autoLaunch = false }: { tri
     setBusy(i)
     setError(null)
     try {
-      if (o.kind === 'stay' && gap.stopId) {
-        const stop = hub.stops.find((s) => s.id === gap.stopId)
-        const hosts = [...(stop?.hosts ?? []), { stay: o.title, name: '', phone: '', email: '', note: [o.price_text, o.detail].filter(Boolean).join(' · ') }]
-        await updateStop(gap.stopId, { stay_name: o.title, stay_address: o.address || o.area || null, stay_url: o.url || null, hosts })
-      } else if (o.kind === 'transport' && gap.stopId) {
-        await updateStop(gap.stopId, {
-          transport_mode: o.mode,
-          transport_details: [o.title, o.detail].filter(Boolean).join(' · ').slice(0, 300),
-          transport_departs: `${gap.from}T${o.depart_time || '09:00'}`,
-        })
-        const due = addDaysIso(gap.from, -14)
-        await hub.addTodo({
-          title: t('gap.bookTodo', { name: o.title }), kind: 'booking',
-          due_at: `${due < todayIso() ? todayIso() : due}T09:00:00`, has_time: false,
-          notes: [o.price_text, o.url].filter(Boolean).join('\n') || null,
-        })
-      } else if (o.kind === 'activity') {
-        const stop = hub.stops.find((s) => s.id === gap.stopId)
-        const lat = o.lat ?? stop?.lat
-        const lng = o.lng ?? stop?.lng
-        if (lat == null || lng == null) throw new Error(t('chat.noPlace'))
-        const place = await add({
-          trip_id: trip.id, category_id: null, name: o.title.slice(0, 120), country: gap.country ?? stop?.country ?? '', city: gap.city ?? null, lat, lng,
-          visit_date: gap.from, notes: [o.why, o.url].filter(Boolean).join('\n\n'), status: 'wishlist', planned_order: null, cost: null, currency: 'EUR',
-          price_level: null, promo_code: null, promo_note: null, promo_until: null, rating: null, review: null, plan_time: o.depart_time || null, plan_minutes: null,
-        })
-        void queue('place_info', { place_id: place.id, lang }, trip.id).catch(() => undefined)
-      } else if (o.kind === 'stop') {
-        await hub.addStop({
-          name: o.title, country: gap.country ?? null, lat: o.lat, lng: o.lng, arrive_date: gap.from, leave_date: gap.to,
-          stay_name: null, stay_address: null, stay_ref: null, stay_url: null, hosts: [],
-          transport_mode: null, transport_details: null, transport_departs: null, transport_arrives: null, transport_ref: null,
-          notes: [o.why, o.detail].filter(Boolean).join('\n'),
-        })
-      }
+      await applyGapOption(o, gap, { trip, hub, add, queue, t, lang })
       await hub.reload()
       setApplied((s) => new Set(s).add(i))
     } catch (err) {
@@ -309,4 +275,53 @@ export function GapSearch({ trip, hub, gap, onClose, autoLaunch = false }: { tri
       </div>
     </Portal>
   )
+}
+
+export type ApplyCtx = {
+  trip: Trip
+  hub: TripHub
+  add: ReturnType<typeof usePlaces>['add']
+  queue: ReturnType<typeof useAiJobs>['queue']
+  t: ReturnType<typeof useI18n>['t']
+  lang: string
+}
+
+/** Enregistre une proposition de l'IA dans le voyage (sans recharger : a faire par l'appelant). */
+export async function applyGapOption(o: Option, gap: Gap, c: ApplyCtx) {
+  const { trip, hub, add, queue, t, lang } = c
+  if (o.kind === 'stay' && gap.stopId) {
+    const stop = hub.stops.find((s) => s.id === gap.stopId)
+    const hosts = [...(stop?.hosts ?? []), { stay: o.title, name: '', phone: '', email: '', note: [o.price_text, o.detail].filter(Boolean).join(' · ') }]
+    await updateStop(gap.stopId, { stay_name: o.title, stay_address: o.address || o.area || null, stay_url: o.url || null, hosts })
+  } else if (o.kind === 'transport' && gap.stopId) {
+    await updateStop(gap.stopId, {
+      transport_mode: o.mode,
+      transport_details: [o.title, o.detail].filter(Boolean).join(' · ').slice(0, 300),
+      transport_departs: `${gap.from}T${o.depart_time || '09:00'}`,
+    })
+    const due = addDaysIso(gap.from, -14)
+    await hub.addTodo({
+      title: t('gap.bookTodo', { name: o.title }), kind: 'booking',
+      due_at: `${due < todayIso() ? todayIso() : due}T09:00:00`, has_time: false,
+      notes: [o.price_text, o.url].filter(Boolean).join('\n') || null,
+    })
+  } else if (o.kind === 'activity') {
+    const stop = hub.stops.find((s) => s.id === gap.stopId)
+    const lat = o.lat ?? stop?.lat
+    const lng = o.lng ?? stop?.lng
+    if (lat == null || lng == null) throw new Error(t('chat.noPlace'))
+    const place = await add({
+      trip_id: trip.id, category_id: null, name: o.title.slice(0, 120), country: gap.country ?? stop?.country ?? '', city: gap.city ?? null, lat, lng,
+      visit_date: gap.from, notes: [o.why, o.url].filter(Boolean).join('\n\n'), status: 'wishlist', planned_order: null, cost: null, currency: 'EUR',
+      price_level: null, promo_code: null, promo_note: null, promo_until: null, rating: null, review: null, plan_time: o.depart_time || null, plan_minutes: null,
+    })
+    void queue('place_info', { place_id: place.id, lang }, trip.id).catch(() => undefined)
+  } else if (o.kind === 'stop') {
+    await hub.addStop({
+      name: o.title, country: gap.country ?? null, lat: o.lat, lng: o.lng, arrive_date: gap.from, leave_date: gap.to,
+      stay_name: null, stay_address: null, stay_ref: null, stay_url: null, hosts: [],
+      transport_mode: null, transport_details: null, transport_departs: null, transport_arrives: null, transport_ref: null,
+      notes: [o.why, o.detail].filter(Boolean).join('\n'),
+    })
+  }
 }
