@@ -3,6 +3,7 @@ import { usePlaces } from '../../context/PlacesContext'
 import { useScope } from '../../context/TripScope'
 import { isStay } from '../../lib/schedule'
 import { detectGaps } from '../../lib/gaps'
+import { clearDayDone, fetchDayStatus, setDayDone, watchDayStatus } from '../../lib/dayStatus'
 import type { Gap } from '../../lib/gaps'
 import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import { updateStop } from '../../lib/tripApi'
@@ -78,19 +79,57 @@ export default function AgendaSheet({
       return {}
     }
   })
-  const saveDone = (next: Record<string, string>) => {
-    setDoneDays(next)
+  const saveLocal = (next: Record<string, string>) => {
     try {
       localStorage.setItem(doneKey, JSON.stringify(next))
     } catch {
       /* stockage indisponible */
     }
   }
-  const markDone = (d: string, reason = '') => saveDone({ ...doneDays, [d]: reason })
+  // Partage entre voyageurs : la base fait foi des qu'elle repond ; sinon copie locale.
+  useEffect(() => {
+    let stop = false
+    const pull = async () => {
+      const remote = await fetchDayStatus(trip.id)
+      if (stop || remote === null) return
+      // Ce qui n'existait que sur ce telephone monte une fois dans la base
+      let local: Record<string, string> = {}
+      try {
+        local = JSON.parse(localStorage.getItem(doneKey) ?? '{}') as Record<string, string>
+      } catch {
+        /* rien */
+      }
+      const merged = { ...remote }
+      for (const [d, r] of Object.entries(local)) {
+        if (!(d in remote)) {
+          merged[d] = r
+          void setDayDone(trip.id, d, r)
+        }
+      }
+      setDoneDays(merged)
+      saveLocal(merged)
+    }
+    void pull()
+    const off = watchDayStatus(trip.id, () => void pull())
+    return () => {
+      stop = true
+      off()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip.id])
+  const saveDone = (next: Record<string, string>) => {
+    setDoneDays(next)
+    saveLocal(next)
+  }
+  const markDone = (d: string, reason = '') => {
+    saveDone({ ...doneDays, [d]: reason })
+    void setDayDone(trip.id, d, reason)
+  }
   const reopen = (d: string) => {
     const next = { ...doneDays }
     delete next[d]
     saveDone(next)
+    void clearDayDone(trip.id, d)
   }
   const [reasonDay, setReasonDay] = useState<string | null>(null)
   const [reasonText, setReasonText] = useState('')
