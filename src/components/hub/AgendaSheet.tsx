@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaces } from '../../context/PlacesContext'
 import { useScope } from '../../context/TripScope'
-import { isStay } from '../../lib/schedule'
-import { shortDate, todayIso } from '../../lib/tripDates'
+import { isStay, stopOnDay } from '../../lib/schedule'
+import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import { updateStop } from '../../lib/tripApi'
 import { placeName } from '../../lib/discover'
 import type { Trip, TripStop, TripTodo } from '../../lib/types'
@@ -19,6 +19,7 @@ import { eachTicketDay, loadTickets } from '../../lib/tickets'
 import type { Ticket } from '../../lib/tickets'
 import TicketsSheet, { useTicketViewer } from '../TicketsSheet'
 import TripCheck from './TripCheck'
+import DayPicker from './DayPicker'
 
 type Entry = {
   key: string
@@ -26,7 +27,7 @@ type Entry = {
   icon: string
   title: string
   sub?: string
-  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo' | 'stayin' | 'stayout' | 'ticket'
+  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo' | 'stayin' | 'stayout' | 'ticket' | 'free'
   ticket?: Ticket
   placeId?: string
   stop?: TripStop
@@ -62,6 +63,24 @@ export default function AgendaSheet({
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [showTickets, setShowTickets] = useState(false)
   const [check, setCheck] = useState(false)
+  const [pick, setPick] = useState<string | null>(null)
+  const freeKey = `bubutravel:free:${trip.id}`
+  const [freeDays, setFreeDays] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(freeKey) ?? '[]') as string[]
+    } catch {
+      return []
+    }
+  })
+  const markFree = (d: string) => {
+    const next = [...new Set([...freeDays, d])]
+    setFreeDays(next)
+    try {
+      localStorage.setItem(freeKey, JSON.stringify(next))
+    } catch {
+      /* stockage indisponible */
+    }
+  }
   const viewer = useTicketViewer()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -108,8 +127,21 @@ export default function AgendaSheet({
       if (scope.country && todo.country && !scope.isIn(todo.country)) continue
       add(todo.due_at.slice(0, 10), { key: `d${todo.id}`, time: todo.has_time ? todo.due_at.slice(11, 16) : '08:00', icon: '✅', title: todo.title, kind: 'todo', todo })
     }
+    // Rappel sur chaque jour a venir sans activite : « que voulez-vous faire ? »
+    const from = scope.range?.from ?? trip.start_date
+    const to = scope.range?.to ?? trip.end_date
+    if (from && to) {
+      const now = todayIso()
+      for (let d = from < now ? now : from, n = 0; d <= to && n < 400; d = addDaysIso(d, 1), n++) {
+        if (freeDays.includes(d)) continue
+        const items = map.get(d) ?? []
+        if (items.some((x) => x.kind === 'place' || x.kind === 'ticket')) continue
+        const has = stopOnDay(d, hub.stops)
+        add(d, { key: `free${d}`, time: '23:30', icon: '💡', title: has ? t('agenda.free') : t('agenda.nostop'), sub: has ? t('agenda.freeSub') : t('agenda.nostopSub'), kind: 'free' })
+      }
+    }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, items]) => ({ day, items: items.sort((x, y) => x.time.localeCompare(y.time)) }))
-  }, [hub.stops, hub.todos, places, trip.id, t, scope, tickets, locale])
+  }, [hub.stops, hub.todos, places, trip.id, trip.start_date, trip.end_date, t, scope, tickets, locale, freeDays])
 
   const today = todayIso()
 
@@ -125,7 +157,8 @@ export default function AgendaSheet({
   }, [days, today])
 
   function open(e: Entry) {
-    if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
+    if (e.kind === 'free') setPick(e.day)
+    else if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
     else if (e.kind === 'ticket' && e.ticket) void viewer.open(e.ticket)
     else setDetail(e)
   }
@@ -174,9 +207,9 @@ export default function AgendaSheet({
                         <li key={e.key}>
                           <button
                             onClick={() => open(e)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5 text-left transition-transform active:scale-[0.98]"
+                            className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-transform active:scale-[0.98] ${e.kind === 'free' ? 'border-dashed border-accent/60 bg-[var(--halo)]' : 'border-line bg-surface'}`}
                           >
-                            <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{e.time === '00:00' || e.time === '23:00' ? '' : e.time}</span>
+                            <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{e.time === '00:00' || e.time === '23:00' || e.kind === 'free' ? '' : e.time}</span>
                             <span className="text-lg">{e.icon}</span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[14px] font-semibold">{e.title}</span>
@@ -216,6 +249,7 @@ export default function AgendaSheet({
       {openId && <PlaceSheet placeId={openId} onClose={() => setOpenId(null)} />}
       {viewer.node}
       {showTickets && <TicketsSheet onClose={() => setShowTickets(false)} />}
+      {pick && <DayPicker trip={trip} hub={hub} day={pick} onFree={markFree} onClose={() => setPick(null)} />}
       {check && <TripCheck trip={trip} hub={hub} go={go} onClose={() => setCheck(false)} />}
       {detail && <EntryDetail entry={detail} trip={trip} hub={hub} go={go} onClose={() => setDetail(null)} />}
     </Portal>
