@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaces } from '../../context/PlacesContext'
 import { useScope } from '../../context/TripScope'
-import { isStay, stopOnDay } from '../../lib/schedule'
+import { isStay } from '../../lib/schedule'
+import { detectGaps } from '../../lib/gaps'
+import type { Gap } from '../../lib/gaps'
 import { addDaysIso, shortDate, todayIso } from '../../lib/tripDates'
 import { updateStop } from '../../lib/tripApi'
 import { placeName } from '../../lib/discover'
@@ -13,7 +15,7 @@ import PlaceSheet from '../PlaceSheet'
 import RouteSheet from '../RouteSheet'
 import type { RoutePoint } from '../RouteSheet'
 import { HostCards } from './HostContacts'
-import GapsPanel from './GapsPanel'
+import GapsPanel, { GapSearch } from './GapsPanel'
 import type { HubTab } from './Overview'
 import { eachTicketDay, loadTickets } from '../../lib/tickets'
 import type { Ticket } from '../../lib/tickets'
@@ -21,14 +23,18 @@ import TicketsSheet, { useTicketViewer } from '../TicketsSheet'
 import TripCheck from './TripCheck'
 import DayPicker from './DayPicker'
 
+type Missing = { type: 'nostop' | 'nostay' | 'notransport' | 'activity'; gap?: Gap }
+
 type Entry = {
   key: string
   time: string
   icon: string
   title: string
   sub?: string
-  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo' | 'stayin' | 'stayout' | 'ticket' | 'free'
+  kind: 'place' | 'arrive' | 'leave' | 'transport' | 'todo' | 'stayin' | 'stayout' | 'ticket' | 'missing' | 'done'
   ticket?: Ticket
+  missing?: Missing[]
+  reason?: string
   placeId?: string
   stop?: TripStop
   todo?: TripTodo
@@ -64,23 +70,31 @@ export default function AgendaSheet({
   const [showTickets, setShowTickets] = useState(false)
   const [check, setCheck] = useState(false)
   const [pick, setPick] = useState<string | null>(null)
-  const freeKey = `bubutravel:free:${trip.id}`
-  const [freeDays, setFreeDays] = useState<string[]>(() => {
+  const doneKey = `bubutravel:doneDays:${trip.id}`
+  const [doneDays, setDoneDays] = useState<Record<string, string>>(() => {
     try {
-      return JSON.parse(localStorage.getItem(freeKey) ?? '[]') as string[]
+      return JSON.parse(localStorage.getItem(doneKey) ?? '{}') as Record<string, string>
     } catch {
-      return []
+      return {}
     }
   })
-  const markFree = (d: string) => {
-    const next = [...new Set([...freeDays, d])]
-    setFreeDays(next)
+  const saveDone = (next: Record<string, string>) => {
+    setDoneDays(next)
     try {
-      localStorage.setItem(freeKey, JSON.stringify(next))
+      localStorage.setItem(doneKey, JSON.stringify(next))
     } catch {
       /* stockage indisponible */
     }
   }
+  const markDone = (d: string, reason = '') => saveDone({ ...doneDays, [d]: reason })
+  const reopen = (d: string) => {
+    const next = { ...doneDays }
+    delete next[d]
+    saveDone(next)
+  }
+  const [reasonDay, setReasonDay] = useState<string | null>(null)
+  const [reasonText, setReasonText] = useState('')
+  const [gapOpen, setGapOpen] = useState<Gap | null>(null)
   const viewer = useTicketViewer()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -127,21 +141,34 @@ export default function AgendaSheet({
       if (scope.country && todo.country && !scope.isIn(todo.country)) continue
       add(todo.due_at.slice(0, 10), { key: `d${todo.id}`, time: todo.has_time ? todo.due_at.slice(11, 16) : '08:00', icon: '✅', title: todo.title, kind: 'todo', todo })
     }
-    // Rappel sur chaque jour a venir sans activite : « que voulez-vous faire ? »
+    // Chaque jour a venir : ce qui manque, ligne par ligne (destination, logement, transport, activite)
     const from = scope.range?.from ?? trip.start_date
     const to = scope.range?.to ?? trip.end_date
     if (from && to) {
       const now = todayIso()
+      const scoped = scope.range ? { ...trip, start_date: scope.range.from, end_date: scope.range.to } : trip
+      const gaps = detectGaps(scoped, hub.stops, places, hub.docs)
       for (let d = from < now ? now : from, n = 0; d <= to && n < 400; d = addDaysIso(d, 1), n++) {
-        if (freeDays.includes(d)) continue
+        if (d in doneDays) {
+          add(d, { key: `done${d}`, time: '23:30', icon: '✅', title: t('agenda.dayDone'), sub: doneDays[d] || undefined, kind: 'done' })
+          continue
+        }
+        const miss: Missing[] = []
+        const nostop = gaps.find((g) => g.type === 'nostop' && g.from <= d && d <= g.to)
+        if (nostop) miss.push({ type: 'nostop', gap: { ...nostop, id: `nostop:${d}`, from: d, to: d, days: 1 } })
+        const nostay = gaps.find((g) => g.type === 'nostay' && g.from <= d && d < g.to)
+        if (nostay) miss.push({ type: 'nostay', gap: nostay })
+        const notr = gaps.find((g) => g.type === 'notransport' && (g.from === d || g.to === d))
+        if (notr) miss.push({ type: 'notransport', gap: notr })
         const items = map.get(d) ?? []
-        if (items.some((x) => x.kind === 'place' || x.kind === 'ticket')) continue
-        const has = stopOnDay(d, hub.stops)
-        add(d, { key: `free${d}`, time: '23:30', icon: '💡', title: has ? t('agenda.free') : t('agenda.nostop'), sub: has ? t('agenda.freeSub') : t('agenda.nostopSub'), kind: 'free' })
+        if (!items.some((x) => x.kind === 'place' || x.kind === 'ticket') && !nostop) miss.push({ type: 'activity' })
+        if (miss.length === 0 && items.length > 0) continue
+        if (miss.length === 0) miss.push({ type: 'nostop', gap: { id: `nostop:${d}`, type: 'nostop', from: d, to: d, days: 1 } })
+        add(d, { key: `miss${d}`, time: '23:30', icon: '⚠️', title: t('agenda.missing'), kind: 'missing', missing: miss })
       }
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, items]) => ({ day, items: items.sort((x, y) => x.time.localeCompare(y.time)) }))
-  }, [hub.stops, hub.todos, places, trip.id, trip.start_date, trip.end_date, t, scope, tickets, locale, freeDays])
+  }, [hub.stops, hub.todos, hub.docs, places, trip, t, scope, tickets, locale, doneDays])
 
   const today = todayIso()
 
@@ -157,8 +184,8 @@ export default function AgendaSheet({
   }, [days, today])
 
   function open(e: Entry) {
-    if (e.kind === 'free') setPick(e.day)
-    else if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
+    if (e.kind === 'missing' || e.kind === 'done') return
+    if (e.kind === 'place' && e.placeId) setOpenId(e.placeId)
     else if (e.kind === 'ticket' && e.ticket) void viewer.open(e.ticket)
     else setDetail(e)
   }
@@ -203,13 +230,69 @@ export default function AgendaSheet({
                       {day === today && ` · ${t('ov.today')}`}
                     </p>
                     <ul className="space-y-1.5">
-                      {items.map((e) => (
+                      {items.map((e) =>
+                        e.kind === 'missing' ? (
+                          <li key={e.key} className="rounded-2xl border border-dashed border-[#b4533f]/60 bg-surface px-3 py-3">
+                            <p className="mb-2 text-[12px] font-extrabold uppercase tracking-[0.08em] text-[#b4533f]">⚠️ {e.title}</p>
+                            <ul className="space-y-1.5">
+                              {e.missing!.map((m) => (
+                                <li key={m.type} className="flex items-center gap-2.5">
+                                  <span className="text-lg">{{ nostop: '🗺️', nostay: '🏨', notransport: '✈️', activity: '🎯' }[m.type]}</span>
+                                  <span className="min-w-0 flex-1 text-[13.5px] font-semibold leading-snug">
+                                    {m.type === 'nostop' ? t('agenda.m.nostop') : m.type === 'nostay' ? t('agenda.m.nostay', { city: m.gap?.city ?? '' }) : m.type === 'notransport' ? t('agenda.m.notransport', { a: m.gap?.city ?? '', b: m.gap?.toCity ?? '' }) : t('agenda.m.activity')}
+                                  </span>
+                                  <button
+                                    onClick={() => (m.type === 'activity' ? setPick(e.day) : setGapOpen(m.gap!))}
+                                    className="shrink-0 rounded-full bg-accent px-3 py-1.5 text-[12px] font-extrabold text-accent-ink active:scale-95"
+                                  >
+                                    ✨ {m.type === 'activity' ? t('agenda.choose') : t('gap.search')}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {reasonDay === e.day ? (
+                              <div className="mt-3 space-y-2">
+                                <input className="field" value={reasonText} onChange={(ev) => setReasonText(ev.target.value)} placeholder={t('agenda.reasonPh')} autoFocus />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      markDone(e.day, reasonText.trim())
+                                      setReasonDay(null)
+                                      setReasonText('')
+                                    }}
+                                    className="btn btn-accent btn-xs flex-1"
+                                  >
+                                    ✅ {t('agenda.markComplete')}
+                                  </button>
+                                  <button onClick={() => setReasonDay(null)} className="btn btn-quiet btn-xs">
+                                    {t('common.cancel')}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setReasonDay(e.day); setReasonText('') }} className="mt-3 w-full rounded-xl bg-surface-2 py-2 text-[12.5px] font-bold text-text-soft active:scale-[0.98]">
+                                ✅ {t('agenda.complete')}
+                              </button>
+                            )}
+                          </li>
+                        ) : e.kind === 'done' ? (
+                          <li key={e.key} className="flex items-center gap-3 rounded-2xl bg-[rgba(124,135,103,0.14)] px-3 py-2.5">
+                            <span className="text-lg">✅</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13.5px] font-semibold">{e.title}</span>
+                              {e.sub && <span className="block truncate text-[12px] text-text-muted">{e.sub}</span>}
+                            </span>
+                            <button onClick={() => reopen(e.day)} className="shrink-0 text-[12px] font-bold text-accent">
+                              {t('agenda.reopen')}
+                            </button>
+                          </li>
+                        ) : (
                         <li key={e.key}>
                           <button
                             onClick={() => open(e)}
-                            className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-transform active:scale-[0.98] ${e.kind === 'free' ? 'border-dashed border-accent/60 bg-[var(--halo)]' : 'border-line bg-surface'}`}
+                            className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-transform active:scale-[0.98] ${'border-line bg-surface'}`}
                           >
-                            <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{e.time === '00:00' || e.time === '23:00' || e.kind === 'free' ? '' : e.time}</span>
+                            <span className="num w-11 shrink-0 text-[12px] font-bold text-accent">{e.time === '00:00' || e.time === '23:00' || e.time}</span>
                             <span className="text-lg">{e.icon}</span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[14px] font-semibold">{e.title}</span>
@@ -218,7 +301,8 @@ export default function AgendaSheet({
                             <span className="text-text-muted">›</span>
                           </button>
                         </li>
-                      ))}
+                      )
+                      )}
                     </ul>
                   </li>
                 ))}
@@ -249,7 +333,8 @@ export default function AgendaSheet({
       {openId && <PlaceSheet placeId={openId} onClose={() => setOpenId(null)} />}
       {viewer.node}
       {showTickets && <TicketsSheet onClose={() => setShowTickets(false)} />}
-      {pick && <DayPicker trip={trip} hub={hub} day={pick} onFree={markFree} onClose={() => setPick(null)} />}
+      {gapOpen && <GapSearch trip={trip} hub={hub} gap={gapOpen} autoLaunch onClose={() => setGapOpen(null)} />}
+      {pick && <DayPicker trip={trip} hub={hub} day={pick} onFree={(d) => markDone(d, '')} onClose={() => setPick(null)} />}
       {check && <TripCheck trip={trip} hub={hub} go={go} onClose={() => setCheck(false)} />}
       {detail && <EntryDetail entry={detail} trip={trip} hub={hub} go={go} onClose={() => setDetail(null)} />}
     </Portal>
