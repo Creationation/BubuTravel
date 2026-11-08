@@ -877,6 +877,7 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'tk.empty': "No tickets yet. Add them in the vault (Tickets category) with their QR code.",
   'tk.show': "Show",
   'tk.vault': "Open the vault",
+  'tk.events': "Tickets and bookings",
   'qb.tickets': "Tickets",
   'qb.stay': "Where I sleep",
   'qb.sos': "Emergency",

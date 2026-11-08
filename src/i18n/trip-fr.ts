@@ -892,6 +892,7 @@ export const tripFr = {
   'tk.empty': "Aucun billet pour l'instant. Ajoutez-les dans le coffre (catégorie Billets) avec leur QR code.",
   'tk.show': "Afficher",
   'tk.vault': "Ouvrir le coffre",
+  'tk.events': "Billets et réservations",
   'qb.tickets': "Billets",
   'qb.stay': "Où je dors",
   'qb.sos': "Urgences",

@@ -52,11 +52,16 @@ export function ticketDays(notes: string | null, expires: string | null): { from
   return expires ? { from: expires, to: expires } : null
 }
 
-export async function loadTickets(): Promise<Ticket[]> {
+/** Confirmations de commande, recus, factures : des infos, pas des billets a presenter. */
+export const isConfirmation = (title: string) => /confirmation|commande|order|re[cç]u|receipt|facture|invoice|paiement|payment/i.test(title)
+
+/** Billets a presenter (avec fichier, hors confirmations). `all` : tout, pour la page Evenements. */
+export async function loadTickets(all = false): Promise<Ticket[]> {
   const items = await fetchVault()
   const out: Ticket[] = []
   for (const it of items) {
     if (it.kind !== 'ticket') continue
+    if (!all && (it.files.length === 0 || isConfirmation(it.title))) continue
     const days = ticketDays(it.notes, it.expires)
     if (!days) continue
     out.push({ id: it.id, title: it.title, holder: it.holder, number: it.number, from: days.from, to: days.to, files: it.files, notes: it.notes, url: it.url, item: it })

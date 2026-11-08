@@ -11,6 +11,7 @@ import EventForm from '../components/EventForm'
 import { useI18n, useT } from '../i18n/I18nContext'
 import { categoryLabel } from '../lib/countryName'
 import EditButton from '../components/EditButton'
+import TicketEvents from '../components/TicketEvents'
 
 export default function EventsPage() {
   const t = useT()
@@ -51,6 +52,8 @@ export default function EventsPage() {
             <p className="lede mt-5 max-w-xl">{t('events.intro')}</p>
           </Reveal>
         </section>
+
+        <TicketEvents />
 
         {error && <p className="notice notice-bad mt-6">{error}</p>}
 

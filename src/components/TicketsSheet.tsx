@@ -81,7 +81,6 @@ export default function TicketsSheet({ onClose }: { onClose: () => void }) {
                   <span className="min-w-0 flex-1">
                     <span className="block text-[15.5px] font-extrabold leading-snug">{tk.title}</span>
                     <span className="num mt-0.5 block text-[12.5px] capitalize text-text-muted">{range}</span>
-                    {tk.number && <span className="num block truncate font-mono text-[12px] text-text-muted">{tk.number}</span>}
                   </span>
                   <span className="shrink-0 rounded-full bg-accent px-3 py-1.5 text-[12px] font-extrabold text-accent-ink">{viewer.busy ? '…' : t('tk.show')}</span>
                 </button>

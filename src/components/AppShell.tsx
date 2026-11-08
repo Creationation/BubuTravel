@@ -19,10 +19,10 @@ const NAV: { to: string; label: Key; end?: boolean; advanced?: boolean }[] = [
   { to: '/idees', label: 'nav.ideas' },
   { to: '/coffre', label: 'nav.vault' },
   { to: '/hebergements', label: 'nav.stays' },
+  { to: '/evenements', label: 'nav.events' },
   { to: '/parcours', label: 'nav.route' },
   { to: '/depenses', label: 'nav.expenses' },
   { to: '/planificateur', label: 'nav.planner', advanced: true },
-  { to: '/evenements', label: 'nav.events', advanced: true },
   { to: '/galerie', label: 'nav.gallery', advanced: true },
 ]
 
