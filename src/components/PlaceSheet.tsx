@@ -44,6 +44,13 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
 
+  // Lieu supprime depuis sa propre fiche : on ferme la fiche
+  const gone = !place
+  useEffect(() => {
+    if (gone) onClose()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gone])
+
   if (!place) return null
 
   return createPortal(

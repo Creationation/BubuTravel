@@ -384,7 +384,7 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'pd.approx': "Approximate position",
   'pd.copy': "Copy",
   'pd.copied': "Copied",
-  'pd.route': "Directions",
+  'pd.route': "Google Maps",
   'pd.locate': "Find the exact address",
   'common.showMore': "Show more",
   'common.showLess': "Show less",

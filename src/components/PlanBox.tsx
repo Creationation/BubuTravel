@@ -27,7 +27,8 @@ const DURATIONS = [30, 60, 90, 120, 180, 240, 480]
  */
 export default function PlanBox({ place }: { place: Place }) {
   const { t, locale } = useI18n()
-  const { places, edit } = usePlaces()
+  const { places, edit, remove } = usePlaces()
+  const [confirmDel, setConfirmDel] = useState(false)
   const [stops, setStops] = useState<TripStop[]>([])
   const [open, setOpen] = useState(false)
   const [day, setDay] = useState<string>(place.visit_date ?? '')
@@ -140,6 +141,17 @@ export default function PlanBox({ place }: { place: Place }) {
         <button onClick={() => setOpen(true)} className="btn btn-xs">
           {t('plan.change')}
         </button>
+        <div className="grid w-full grid-cols-2 gap-2">
+          <button onClick={() => void unplan()} className="btn btn-xs">
+            ↩︎ {t('act.unplace')}
+          </button>
+          <button
+            onClick={() => (confirmDel ? void remove(place) : setConfirmDel(true))}
+            className={`btn btn-xs ${confirmDel ? '!bg-[#b4533f] !text-white' : 'btn-quiet'}`}
+          >
+            🗑️ {confirmDel ? t('act.confirmDelete') : t('act.delete')}
+          </button>
+        </div>
       </div>
     )
   }

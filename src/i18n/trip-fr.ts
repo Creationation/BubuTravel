@@ -399,7 +399,7 @@ export const tripFr = {
   'pd.approx': "Position approximative",
   'pd.copy': "Copier",
   'pd.copied': "Copié",
-  'pd.route': "Itinéraire",
+  'pd.route': "Google Maps",
   'pd.locate': "Trouver l'adresse exacte",
   'common.showMore': "Voir plus",
   'common.showLess': "Voir moins",
