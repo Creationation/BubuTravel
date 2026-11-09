@@ -13,7 +13,7 @@ export function greetingKey(date = new Date()) {
 
 /**
  * Accueil a l'ouverture de l'app : la photo ronde et « Bonjour, Diego ».
- * Une fois par ouverture (pas a chaque page), disparait seul ou au toucher.
+ * Une fois par jour (pas a chaque ouverture ni a chaque page), disparait seul ou au toucher.
  * `preview` force l'affichage depuis le profil.
  */
 export default function Greeting({ preview, onEnd }: { preview?: 'big' | 'small'; onEnd?: () => void }) {
@@ -29,8 +29,11 @@ export default function Greeting({ preview, onEnd }: { preview?: 'big' | 'small'
     }
     if (!user || !profile || style === 'off') return
     try {
-      if (sessionStorage.getItem(SEEN)) return
-      sessionStorage.setItem(SEEN, '1')
+      // Une seule fois par jour (date locale), meme si l'app est fermee puis rouverte
+      const d = new Date()
+      const today = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+      if (localStorage.getItem(SEEN) === `${user.id}:${today}`) return
+      localStorage.setItem(SEEN, `${user.id}:${today}`)
     } catch {
       // sans stockage de session : on salue quand meme
     }
