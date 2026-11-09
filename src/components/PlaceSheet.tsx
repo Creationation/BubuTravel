@@ -47,7 +47,7 @@ export default function PlaceSheet({ placeId, onClose }: { placeId: string; onCl
   if (!place) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[2500] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[2800] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
       <div
         onClick={() => history.back()}
         className={`absolute inset-0 bg-[#120d09]/50 transition-opacity duration-300 ${closing ? 'opacity-0' : 'opacity-100'}`}

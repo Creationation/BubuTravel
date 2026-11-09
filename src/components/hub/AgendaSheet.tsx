@@ -74,7 +74,6 @@ export default function AgendaSheet({
   const [check, setCheck] = useState(false)
   const [pick, setPick] = useState<string | null>(null)
   const [editPlace, setEditPlace] = useState<Place | null>(null)
-  const [addDay, setAddDay] = useState<string | null>(null)
   const [editTodo, setEditTodo] = useState<TripTodo | null>(null)
   const doneKey = `bubutravel:doneDays:${trip.id}`
   const [doneDays, setDoneDays] = useState<Record<string, string>>(() => {
@@ -275,7 +274,7 @@ export default function AgendaSheet({
                         {shortDate(day, locale, true)}
                         {day === today && ` · ${t('ov.today')}`}
                       </p>
-                      <button onClick={() => setAddDay(day)} className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-[12px] font-bold text-text-soft active:scale-95">
+                      <button onClick={() => setPick(day)} className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-[12px] font-bold text-text-soft active:scale-95">
                         ＋ {t('act.add')}
                       </button>
                     </div>
@@ -400,7 +399,6 @@ export default function AgendaSheet({
       {viewer.node}
       {showTickets && <TicketsSheet onClose={() => setShowTickets(false)} />}
       {gapOpen && <GapSearch trip={trip} hub={hub} gap={gapOpen} autoLaunch onClose={() => setGapOpen(null)} />}
-      {addDay && <ActivityDialog trip={trip} hub={hub} day={addDay} onClose={() => setAddDay(null)} />}
       {editPlace && <ActivityDialog trip={trip} hub={hub} day={editPlace.visit_date ?? today} place={editPlace} onClose={() => setEditPlace(null)} />}
       {editTodo && <TodoDialog todo={editTodo} hub={hub} onClose={() => setEditTodo(null)} />}
       {pick && <DayPicker trip={trip} hub={hub} day={pick} onFree={(d) => markDone(d, '')} onClose={() => setPick(null)} />}
