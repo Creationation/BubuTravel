@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePlaces } from '../../context/PlacesContext'
+import { useFeedback } from '../../context/FeedbackContext'
 import { errorMessage } from '../../lib/errors'
 import { stopOnDay } from '../../lib/schedule'
 import { shortDate } from '../../lib/tripDates'
@@ -46,6 +47,7 @@ function Sheet({ title, sub, onClose, children }: { title: string; sub?: string;
 export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip; hub: TripHub; day: string; place?: Place; onClose: () => void }) {
   const { t, locale } = useI18n()
   const { add, edit, remove } = usePlaces()
+  const fb = useFeedback()
   const [name, setName] = useState(place?.name ?? '')
   const [date, setDate] = useState(place?.visit_date ?? day)
   const [time, setTime] = useState(place?.plan_time ?? '')
@@ -54,7 +56,6 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
   const [currency, setCurrency] = useState(place?.currency ?? 'EUR')
   const [notes, setNotes] = useState(place?.notes ?? '')
   const [busy, setBusy] = useState(false)
-  const [confirm, setConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function save() {
@@ -90,9 +91,13 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
 
   async function unplace() {
     if (!place) return
+    const before = { visit_date: place.visit_date, plan_time: place.plan_time }
+    const ok = await fb.confirm({ title: t('fb.unplaceTitle'), subject: place.name, message: t('fb.unplaceMsg'), confirmLabel: t('fb.unplaceBtn'), danger: false, icon: '↩︎' })
+    if (!ok) return
     setBusy(true)
     try {
       await edit(place.id, { visit_date: null, plan_time: null })
+      fb.toast(t('fb.unplaced'), { icon: '↩︎', action: { label: t('fb.undo'), run: async () => { await edit(place.id, before); fb.toast(t('fb.restored')) } } })
       onClose()
     } catch (err) {
       setError(errorMessage(err))
@@ -102,18 +107,10 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
 
   async function del() {
     if (!place) return
-    if (!confirm) {
-      setConfirm(true)
-      return
-    }
     setBusy(true)
-    try {
-      await remove(place)
-      onClose()
-    } catch (err) {
-      setError(errorMessage(err))
-      setBusy(false)
-    }
+    const done = await fb.confirmDelete({ title: t('fb.delActTitle'), subject: place.name, message: t('fb.delActMsg'), done: t('fb.actDeleted'), run: () => remove(place) })
+    if (done) onClose()
+    else setBusy(false)
   }
 
   return (
@@ -167,8 +164,8 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
           <button onClick={() => void unplace()} disabled={busy} className="btn btn-xs">
             ↩︎ {t('act.unplace')}
           </button>
-          <button onClick={() => void del()} disabled={busy} className={`btn btn-xs ${confirm ? '!bg-[#b4533f] !text-white' : 'btn-quiet'}`}>
-            🗑️ {confirm ? t('act.confirmDelete') : t('act.delete')}
+          <button onClick={() => void del()} disabled={busy} className="btn btn-quiet btn-xs">
+            🗑️ {t('act.delete')}
           </button>
         </div>
       )}
@@ -179,14 +176,21 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
 /** Modifier une chose a faire depuis l'agenda : titre, jour, heure, notes, fait, supprimer. */
 export function TodoDialog({ todo, hub, onClose }: { todo: TripTodo; hub: TripHub; onClose: () => void }) {
   const { t, locale } = useI18n()
+  const fb = useFeedback()
   const cur = hub.todos.find((x) => x.id === todo.id) ?? todo
   const [title, setTitle] = useState(cur.title)
   const [date, setDate] = useState(cur.due_at?.slice(0, 10) ?? '')
   const [time, setTime] = useState(cur.has_time && cur.due_at ? cur.due_at.slice(11, 16) : '')
   const [notes, setNotes] = useState(cur.notes ?? '')
   const [busy, setBusy] = useState(false)
-  const [confirm, setConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function delTodo() {
+    setBusy(true)
+    const done = await fb.confirmDelete({ title: t('fb.delTodoTitle'), subject: cur.title, done: t('fb.todoDeleted'), run: () => hub.removeTodo(cur.id) })
+    if (done) onClose()
+    else setBusy(false)
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true)
@@ -240,11 +244,11 @@ export function TodoDialog({ todo, hub, onClose }: { todo: TripTodo; hub: TripHu
           ✔︎ {t('agenda.markDone')}
         </button>
         <button
-          onClick={() => (confirm ? void run(() => hub.removeTodo(cur.id)) : setConfirm(true))}
+          onClick={() => void delTodo()}
           disabled={busy}
-          className={`btn btn-xs ${confirm ? '!bg-[#b4533f] !text-white' : 'btn-quiet'}`}
+          className="btn btn-quiet btn-xs"
         >
-          🗑️ {confirm ? t('act.confirmDelete') : t('act.delete')}
+          🗑️ {t('act.delete')}
         </button>
       </div>
     </Sheet>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { deletePhoto, fetchPhotos, signPhotoUrls, uploadPhoto } from '../lib/api'
 import type { Photo, Place } from '../lib/types'
 import { usePlaces } from '../context/PlacesContext'
+import { useFeedback } from '../context/FeedbackContext'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../lib/stats'
 import Lightbox from './Lightbox'
@@ -34,7 +35,7 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState<number | null>(null)
   const [heroZoom, setHeroZoom] = useState<{ urls: string[]; index: number } | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const fb = useFeedback()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
     name: place.name,
@@ -59,7 +60,6 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
     setError(null)
     setPhotos([])
     setUrls({})
-    setConfirmDelete(false)
     setEditing(false)
     setForm({
       name: place.name,
@@ -163,18 +163,10 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
   }
 
   async function onDeletePlace() {
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
     setBusy(true)
-    try {
-      await remove(place)
-      onClose()
-    } catch (err) {
-      setError(errorMessage(err))
-      setBusy(false)
-    }
+    const done = await fb.confirmDelete({ title: t('fb.delActTitle'), subject: place.name, message: t('fb.delActMsg'), done: t('fb.actDeleted'), run: () => remove(place) })
+    if (done) onClose()
+    else setBusy(false)
   }
 
   const gallery = photos.map((p) => urls[p.url]).filter(Boolean)
@@ -521,9 +513,9 @@ export default function PlaceSidebar({ place, onClose, onBack }: Props) {
         <button
           onClick={() => void onDeletePlace()}
           disabled={busy}
-          className={`btn btn-xs w-full ${confirmDelete ? 'border-red-500/60 text-red-400' : 'btn-quiet'}`}
+          className="btn btn-quiet btn-xs w-full"
         >
-          {confirmDelete ? t('place.deleteConfirm') : t('place.deleteAction')}
+          {t('place.deleteAction')}
         </button>
       </footer>
 

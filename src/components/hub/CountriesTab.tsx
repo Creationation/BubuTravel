@@ -5,6 +5,7 @@ import { useAnalyzerOnline } from '../../lib/ideas'
 import { shortDate, todayIso } from '../../lib/tripDates'
 import type { CountryGuide, CountryGuideRow, Trip, TripTodo } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
+import { useFeedback } from '../../context/FeedbackContext'
 import { useI18n } from '../../i18n/I18nContext'
 import type { Key } from '../../i18n/fr'
 import { CheckIcon, PlusIcon, SparkIcon, TodoKindIcon, TrashIcon, WalletIcon } from './icons'
@@ -300,6 +301,7 @@ function Checklist({
   suggestions?: CountryGuide['checklist']
 }) {
   const { t } = useI18n()
+  const fb = useFeedback()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const items = hub.todos.filter((x) => (x.country ?? null) === country)
@@ -349,7 +351,7 @@ function Checklist({
                   {item.title}
                 </span>
                 <button
-                  onClick={() => void hub.removeTodo(item.id)}
+                  onClick={() => void fb.confirmDelete({ title: t('fb.delTodoTitle'), subject: item.title, done: t('fb.todoDeleted'), run: () => hub.removeTodo(item.id) })}
                   className="btn btn-quiet btn-icon opacity-50 group-hover:opacity-100"
                   aria-label={t('common.remove')}
                 >

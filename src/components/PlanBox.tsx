@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePlaces } from '../context/PlacesContext'
+import { useFeedback } from '../context/FeedbackContext'
 import { fetchStops } from '../lib/tripApi'
 import {
   conflictsFor,
@@ -28,7 +29,7 @@ const DURATIONS = [30, 60, 90, 120, 180, 240, 480]
 export default function PlanBox({ place }: { place: Place }) {
   const { t, locale } = useI18n()
   const { places, edit, remove } = usePlaces()
-  const [confirmDel, setConfirmDel] = useState(false)
+  const fb = useFeedback()
   const [stops, setStops] = useState<TripStop[]>([])
   const [open, setOpen] = useState(false)
   const [day, setDay] = useState<string>(place.visit_date ?? '')
@@ -125,9 +126,17 @@ export default function PlanBox({ place }: { place: Place }) {
   ) : null
 
   async function unplan() {
+    const before = { visit_date: place.visit_date, plan_time: place.plan_time, plan_minutes: place.plan_minutes }
+    const ok = await fb.confirm({ title: t('fb.unplaceTitle'), subject: place.name, message: t('fb.unplaceMsg'), confirmLabel: t('fb.unplaceBtn'), danger: false, icon: '↩︎' })
+    if (!ok) return
     await edit(place.id, { visit_date: null, plan_time: null, plan_minutes: null })
     setDay('')
     setTime('')
+    fb.toast(t('fb.unplaced'), { icon: '↩︎', action: { label: t('fb.undo'), run: async () => { await edit(place.id, before); fb.toast(t('fb.restored')) } } })
+  }
+
+  async function del() {
+    await fb.confirmDelete({ title: t('fb.delActTitle'), subject: place.name, message: t('fb.delActMsg'), done: t('fb.actDeleted'), run: () => remove(place) })
   }
 
   // Deja prevu : resume en une ligne
@@ -146,10 +155,10 @@ export default function PlanBox({ place }: { place: Place }) {
             ↩︎ {t('act.unplace')}
           </button>
           <button
-            onClick={() => (confirmDel ? void remove(place) : setConfirmDel(true))}
-            className={`btn btn-xs ${confirmDel ? '!bg-[#b4533f] !text-white' : 'btn-quiet'}`}
+            onClick={() => void del()}
+            className="btn btn-quiet btn-xs"
           >
-            🗑️ {confirmDel ? t('act.confirmDelete') : t('act.delete')}
+            🗑️ {t('act.delete')}
           </button>
         </div>
       </div>

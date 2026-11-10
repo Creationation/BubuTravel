@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PlacesProvider } from './context/PlacesContext'
+import { FeedbackProvider } from './context/FeedbackContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ModeProvider } from './context/ModeContext'
 import { I18nProvider } from './i18n/I18nContext'
@@ -61,6 +62,7 @@ export default function App() {
           {/* Sous AuthProvider : la langue est lue dans le profil du compte */}
           <I18nProvider>
             {/* L'invite de mise a jour traduit, elle doit vivre sous I18nProvider */}
+            <FeedbackProvider>
             <UpdatePrompt />
             <Greeting />
             <Routes>
@@ -184,6 +186,7 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </FeedbackProvider>
           </I18nProvider>
         </AuthProvider>
       </BrowserRouter>
