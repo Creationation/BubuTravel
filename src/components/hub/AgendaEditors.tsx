@@ -82,7 +82,20 @@ export function ActivityDialog({ trip, hub, day, place, onClose }: { trip: Trip;
         })
       }
       await hub.reload()
-      onClose()
+      if (place) {
+        fb.toast(t('fb.saved'))
+        onClose()
+        return
+      }
+      const again = await fb.added({ subject: fields.name, sub: shortDate(date || day, locale, true) })
+      if (again) {
+        setName('')
+        setTime('')
+        setMinutes(null)
+        setCost('')
+        setNotes('')
+        setBusy(false)
+      } else onClose()
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)

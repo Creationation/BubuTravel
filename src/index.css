@@ -1180,3 +1180,19 @@ body {
     animation: none;
   }
 }
+
+/* Confirmation animee « ajoute a l'agenda » */
+@keyframes added-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes added-ring {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+.added-check { animation: added-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.added-ring { animation: added-ring 0.9s ease-out 0.15s both; }
+@media (prefers-reduced-motion: reduce) {
+  .added-check, .added-ring { animation: none; }
+}

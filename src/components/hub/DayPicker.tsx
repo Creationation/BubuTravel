@@ -10,6 +10,7 @@ import { pickDetails, placeName } from '../../lib/discover'
 import type { Place, Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
+import { useFeedback } from '../../context/FeedbackContext'
 import Portal from '../Portal'
 import PlaceSheet from '../PlaceSheet'
 import { ActivityDialog } from './AgendaEditors'
@@ -127,7 +128,7 @@ export default function DayPicker({ trip, hub, day, onFree, onClose }: { trip: T
           </div>
         </div>
       </div>
-      {viewed && <IdeaView place={viewed} day={day} trip={trip} hub={hub} origin={origin} onClose={() => setView(null)} onAdded={() => { setView(null) }} />}
+      {viewed && <IdeaView place={viewed} day={day} trip={trip} hub={hub} origin={origin} onClose={() => setView(null)} onAdded={(again) => { setView(null); if (!again) onClose() }} />}
       {gap && <GapSearch trip={trip} hub={hub} gap={gap} autoLaunch onClose={() => setGap(null)} />}
       {manual && <ActivityDialog trip={trip} hub={hub} day={day} onClose={() => { setManual(false); onClose() }} />}
     </Portal>
@@ -135,9 +136,10 @@ export default function DayPicker({ trip, hub, day, onFree, onClose }: { trip: T
 }
 
 /** Une idee en grand : photo, resume, adresse, et trois choix (ajouter au jour, autre idee autour, fiche complete). */
-function IdeaView({ place, day, trip, hub, origin, onClose, onAdded }: { place: Place; day: string; trip: Trip; hub: TripHub; origin: { lat: number; lng: number } | null; onClose: () => void; onAdded: () => void }) {
+function IdeaView({ place, day, trip, hub, origin, onClose, onAdded }: { place: Place; day: string; trip: Trip; hub: TripHub; origin: { lat: number; lng: number } | null; onClose: () => void; onAdded: (again: boolean) => void }) {
   const { t, locale } = useI18n()
   const { edit } = usePlaces()
+  const fb = useFeedback()
   const [time, setTime] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -153,7 +155,8 @@ function IdeaView({ place, day, trip, hub, origin, onClose, onAdded }: { place: 
     try {
       await edit(place.id, { visit_date: day, plan_time: time || null })
       await hub.reload()
-      onAdded()
+      const again = await fb.added({ subject: placeName(place), sub: shortDate(day, locale, true) })
+      onAdded(again)
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)

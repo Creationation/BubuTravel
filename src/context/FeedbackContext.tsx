@@ -23,6 +23,8 @@ export type ToastOptions = {
 type Feedback = {
   confirm: (o: ConfirmOptions) => Promise<boolean>
   toast: (message: string, o?: ToastOptions) => void
+  /** Dialogue anime « ajoute au jour » : renvoie true si on veut en ajouter un autre */
+  added: (o: { subject: string; sub?: string }) => Promise<boolean>
   /** Confirme, execute, puis affiche un toast de reussite (ou d'erreur) */
   confirmDelete: (o: ConfirmOptions & { done: string; run: () => Promise<unknown>; undo?: () => Promise<unknown> }) => Promise<boolean>
 }
@@ -43,6 +45,13 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [ask, setAsk] = useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(null)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const seq = useRef(0)
+
+  const [done, setDone] = useState<{ subject: string; sub?: string; resolve: (again: boolean) => void } | null>(null)
+  const added = useCallback((o: { subject: string; sub?: string }) => new Promise<boolean>((resolve) => setDone({ ...o, resolve })), [])
+  function finish(again: boolean) {
+    done?.resolve(again)
+    setDone(null)
+  }
 
   const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((resolve) => setAsk({ ...o, resolve })), [])
 
@@ -67,7 +76,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     [confirm, toast, t],
   )
 
-  const value = useMemo(() => ({ confirm, toast, confirmDelete }), [confirm, toast, confirmDelete])
+  const value = useMemo(() => ({ confirm, toast, confirmDelete, added }), [confirm, toast, confirmDelete, added])
 
   function answer(ok: boolean) {
     ask?.resolve(ok)
@@ -75,16 +84,20 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    if (!ask) return
+    if (!ask && !done) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key !== 'Escape') return
+      if (ask) {
         ask.resolve(false)
         setAsk(null)
+      } else if (done) {
+        done.resolve(false)
+        setDone(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [ask])
+  }, [ask, done])
 
   const danger = ask?.danger !== false
 
@@ -106,6 +119,30 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                 </button>
                 <button onClick={() => answer(true)} className={`btn ${danger ? '!bg-[#b4533f] !text-white' : 'btn-accent'}`}>
                   {ask.confirmLabel ?? (danger ? t('act.delete') : t('common.confirm'))}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+      {done && (
+        <Portal>
+          <div className="fixed inset-0 z-[3050] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-[#120d09]/65" onClick={() => finish(false)} />
+            <div className="sheet-in relative w-full max-w-sm rounded-[28px] bg-surface-solid p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-center shadow-[var(--shadow-lg)] sm:pb-6">
+              <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+                <span className="added-ring absolute inset-0 rounded-full bg-accent/40" />
+                <span className="added-check relative flex h-20 w-20 items-center justify-center rounded-full bg-accent text-4xl text-accent-ink">✓</span>
+              </div>
+              <p className="mt-4 text-[1.25rem] font-extrabold leading-tight">{t('fb.addedTitle')}</p>
+              <p className="mx-auto mt-2 max-w-full break-words rounded-xl bg-surface-2 px-3 py-2 text-[14px] font-bold">{done.subject}</p>
+              {done.sub && <p className="mt-2 text-[13.5px] capitalize text-text-muted">{done.sub}</p>}
+              <div className="mt-5 grid gap-2.5">
+                <button onClick={() => finish(true)} className="btn btn-accent" autoFocus>
+                  ＋ {t('fb.addAnother')}
+                </button>
+                <button onClick={() => finish(false)} className="btn btn-quiet">
+                  {t('fb.done')}
                 </button>
               </div>
             </div>
