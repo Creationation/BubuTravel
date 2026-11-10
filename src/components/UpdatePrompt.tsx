@@ -14,7 +14,8 @@ export default function UpdatePrompt() {
     onRegisteredSW(_url, registration) {
       if (!registration) return
       const check = () => {
-        if (navigator.onLine) void registration.update()
+        // Apres un court delai : au retour sur l'app, rien ne doit ralentir l'affichage
+        if (navigator.onLine) window.setTimeout(() => void registration.update(), 4000)
       }
       window.setInterval(check, 5 * 60 * 1000)
       document.addEventListener('visibilitychange', () => {

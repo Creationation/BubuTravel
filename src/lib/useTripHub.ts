@@ -72,9 +72,26 @@ export function useTripHub(tripId: string | undefined) {
 
   // Retour sur l'onglet : on relit, l'autre voyageur a pu ajouter des choses
   useEffect(() => {
-    const onFocus = () => void reload()
+    // Au retour d'arriere-plan l'ecran s'affiche d'abord avec ce qu'on a deja ;
+    // on relit apres un court instant et pas plus d'une fois par 30 s (le
+    // temps reel couvre le reste), pour que l'ouverture reste instantanee.
+    let last = Date.now()
+    let timer: number | undefined
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 30_000) return
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        last = Date.now()
+        void reload()
+      }, 600)
+    }
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [reload])
 
   // Temps reel : un changement sur l'une des tables du voyage declenche une

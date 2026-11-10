@@ -76,8 +76,8 @@ export function AiJobsProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_jobs', filter: `user_id=eq.${user.id}` }, () => void load())
       .subscribe()
     // Filet de securite si le temps reel ne passe pas
-    const poll = window.setInterval(() => void load(), 8000)
-    const onVisible = () => document.visibilityState === 'visible' && void load()
+    const poll = window.setInterval(() => document.visibilityState === 'visible' && void load(), 8000)
+    const onVisible = () => document.visibilityState === 'visible' && void window.setTimeout(() => void load(), 500)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       window.clearInterval(poll)
