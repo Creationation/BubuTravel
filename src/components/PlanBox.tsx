@@ -171,7 +171,7 @@ export default function PlanBox({ place }: { place: Place }) {
         {aiCard}
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => setOpen(true)} className="btn">
-            📅 {t('plan.title')}
+            {t('plan.title')}
           </button>
           <button onClick={() => void askAi()} disabled={Boolean(aiBusy)} className="btn btn-accent">
             ✨ {t('plan.aiAsk')}

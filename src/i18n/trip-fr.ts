@@ -373,7 +373,7 @@ export const tripFr = {
   'map.countryCount': "{n} activités",
   'map.countryMarkDone': "Marquer comme fait",
   'map.countryMarkTodo': "Remettre à faire",
-  'pd.maps': "Ouvrir dans Google Maps",
+  'pd.maps': "Google Maps",
   'pd.price': "💰 Prix",
   'pd.hours': "🕒 Horaires",
   'pd.duration': "⏱️ Temps à prévoir",

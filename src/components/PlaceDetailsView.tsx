@@ -148,8 +148,8 @@ export default function PlaceDetailsView({ place }: { place: Place }) {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap gap-2">
-        <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-accent min-w-[14rem] flex-1">
+      <div className={`grid gap-2 ${video ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <a href={googleMapsUrl(place)} target="_blank" rel="noreferrer" className="btn btn-accent">
           <PinIcon size={15} />
           {t('pd.maps')}
         </a>

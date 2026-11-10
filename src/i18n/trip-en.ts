@@ -358,7 +358,7 @@ export const tripEn: Record<keyof typeof tripFr, string> = {
   'map.countryCount': "{n} activities",
   'map.countryMarkDone': "Mark as done",
   'map.countryMarkTodo': "Back to to-do",
-  'pd.maps': "Open in Google Maps",
+  'pd.maps': "Google Maps",
   'pd.price': "💰 Price",
   'pd.hours': "🕒 Opening hours",
   'pd.duration': "⏱️ Time needed",
