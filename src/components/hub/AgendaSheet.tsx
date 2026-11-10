@@ -472,6 +472,7 @@ function EntryDetail({
               </div>
               <HostCards
                 hosts={s.hosts}
+                stop={s}
                 compact
                 onSave={async (next) => {
                   await updateStop(s.id, { hosts: next })

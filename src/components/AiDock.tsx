@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAiJobs } from '../context/AiJobsContext'
 import type { AiJob } from '../context/AiJobsContext'
-import { usePlaces } from '../context/PlacesContext'
 import { useI18n } from '../i18n/I18nContext'
-import type { Key } from '../i18n/fr'
 import AiGauge from './AiGauge'
+import TaskCenter, { canRetry, useJobGo, useJobLabel } from './TaskCenter'
 
 const running = (j: AiJob) => j.status === 'pending' || j.status === 'processing'
 
@@ -15,9 +13,9 @@ const running = (j: AiJob) => j.status === 'pending' || j.status === 'processing
  */
 export default function AiDock() {
   const { jobs, dismiss } = useAiJobs()
-  const { places, trips } = usePlaces()
   const { t } = useI18n()
-  const navigate = useNavigate()
+  const { retry } = useAiJobs()
+  const [center, setCenter] = useState(false)
   const [open, setOpen] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
@@ -36,27 +34,15 @@ export default function AiDock() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastDone])
 
-  if (active.length === 0 && done.length === 0) return null
 
-  function label(j: AiJob): string {
-    const place = places.find((p) => p.id === j.input?.place_id)
-    const trip = trips.find((x) => x.id === j.trip_id)
-    const name = place?.name ?? (j.input?.day as string) ?? trip?.title ?? ''
-    return t(`ai.kind.${j.kind}` as Key, { name })
-  }
-
-  function go(j: AiJob) {
-    setOpen(false)
-    const placeId = j.input?.place_id as string | undefined
-    if (placeId) navigate(`/carte?lieu=${placeId}`)
-    else if (j.kind === 'chat' && j.trip_id) navigate(`/voyages/${j.trip_id}?onglet=assistant`)
-    else if (j.kind === 'day_plan' && j.trip_id) navigate(`/voyages/${j.trip_id}?onglet=day&jour=${j.input?.day ?? ''}`)
-    else if (j.trip_id) navigate(`/voyages/${j.trip_id}?onglet=route`)
-  }
+  const label = useJobLabel()
+  const go = useJobGo(() => setOpen(false))
 
   const flashed = jobs.find((j) => j.id === flash)
 
   return (
+    <>
+    {center && <TaskCenter onClose={() => setCenter(false)} />}
     <div className="pointer-events-none fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[1200] flex flex-col items-end gap-2 sm:bottom-5 sm:right-5">
       {flashed && !open && (
         <button
@@ -85,6 +71,11 @@ export default function AiDock() {
                     <span className="block truncate text-[11px] text-text-muted">{j.status === 'error' ? j.error : t('ai.done')}</span>
                   )}
                 </button>
+                {canRetry(j) && (
+                  <button onClick={() => void retry(j)} className="shrink-0 rounded-lg px-1.5 py-1 text-[12px] font-extrabold text-accent" aria-label={t('tc.retry')}>
+                    ↻
+                  </button>
+                )}
                 {!running(j) && (
                   <button onClick={() => dismiss(j.id)} className="shrink-0 text-[12px] text-text-muted" aria-label={t('common.close')}>
                     ✕
@@ -93,7 +84,16 @@ export default function AiDock() {
               </li>
             ))}
           </ul>
-          <p className="px-4 py-2.5 text-[11px] text-text-muted">{t('ai.dockHint')}</p>
+          <button
+            onClick={() => {
+              setOpen(false)
+              setCenter(true)
+            }}
+            className="w-full border-t border-line px-4 py-3 text-left text-[13px] font-extrabold text-accent"
+          >
+            📋 {t('tc.open')}
+          </button>
+          <p className="px-4 pb-2.5 text-[11px] text-text-muted">{t('ai.dockHint')}</p>
         </div>
       )}
 
@@ -102,8 +102,9 @@ export default function AiDock() {
         className="pointer-events-auto flex h-12 items-center gap-2 rounded-full border border-line bg-surface-solid px-4 text-[14px] font-extrabold shadow-[var(--shadow-md)] transition-transform active:scale-95"
       >
         <span className={active.length ? 'ai-spin inline-block' : ''}>{active.length ? '✨' : '🤖'}</span>
-        {active.length ? t('ai.running', { n: active.length }) : t('ai.finished')}
+        {active.length ? t('ai.running', { n: active.length }) : done.some((j) => j.status === 'error') ? `⚠️ ${t('tc.short')}` : t('ai.finished')}
       </button>
     </div>
+    </>
   )
 }

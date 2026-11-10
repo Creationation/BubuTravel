@@ -178,7 +178,7 @@ export default function StaysPage() {
                   ))}
                 </div>
 
-                <HostCards hosts={s.hosts} onSave={(next) => saveHosts(s, next)} />
+                <HostCards hosts={s.hosts} stop={s} onSave={(next) => saveHosts(s, next)} />
               </li>
             )
           })}

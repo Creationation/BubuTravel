@@ -1389,11 +1389,11 @@ def process_ai_job(job: dict) -> None:
     req = job.get("input") or {}
     CURRENT.job_id, CURRENT.kind, CURRENT.pct, CURRENT.at, CURRENT.step = job["id"], job["kind"], 0, 0, None
     CURRENT.provider = user_provider(job["user_id"])
-    CURRENT.model = FAST_MODEL if job["kind"] == "place_info" else None
-    CURRENT.max_turns = 16 if job["kind"] == "place_info" else None
+    CURRENT.model = FAST_MODEL if job["kind"] in ("place_info", "host_search") else None
+    CURRENT.max_turns = 16 if job["kind"] in ("place_info", "host_search") else None
     CURRENT.codex_allowed = job["kind"] in (
         "place_info", "schedule_place", "arrange_trip", "day_plan", "chat",
-        "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency", "gap_search",
+        "stop_places", "country_guide", "itinerary", "receipt_scan", "vaccines", "emergency", "gap_search", "host_search",
     ) or bool(req.get("preview"))
     tmp = Path(tempfile.mkdtemp(prefix="bubu-ai-"))
     try:
@@ -1497,6 +1497,11 @@ def process_ai_job(job: dict) -> None:
             data = job_gap_search(job, req, tmp)
             update_ai_job(job["id"], status="ready", result=data, error=None)
             log(f"  trou ({(req.get('gap') or {}).get('type')}) : {len(data['options'])} options")
+            return
+        if job["kind"] == "host_search":
+            data = job_host_search(job, req, tmp)
+            update_ai_job(job["id"], status="ready", result=data, error=None)
+            log(f"  hote ({data.get('stay')}) : {'trouve' if data.get('found') else 'rien de fiable'}, applique {data.get('applied')}")
             return
         if job["kind"] == "emergency":
             data = job_emergency(job, req, tmp)
@@ -2219,6 +2224,86 @@ def job_vaccines(job: dict, req: dict, tmp: Path) -> dict:
         }, prefer="return=minimal")
         added += 1
     return {"summary": data["summary"], "added": added, "country": country}
+
+
+
+# --------------------------------------------------------------------------
+# Recherche de l'hote / de l'hotel : coordonnees publiques de l'hebergement.
+# Modele rapide (Haiku). Le resultat est range directement dans l'etape
+# (seulement les champs encore vides), donc ca marche appli fermee.
+# --------------------------------------------------------------------------
+
+class HostFound(BaseModel):
+    found: bool = Field(description="true seulement si au moins une coordonnée fiable a été trouvée")
+    kind: str = Field(description="hotel, apartment, guesthouse, hostel, resort ou unknown")
+    host_name: str = Field(description="Nom de l'hôte, de la réception ou du gestionnaire, vide si inconnu")
+    phone: str = Field(description="Téléphone avec indicatif international (+66...), vide si inconnu")
+    email: str = Field(description="Email de contact, vide si inconnu")
+    website: str = Field(description="Site officiel ou page de réservation, vide si inconnu")
+    address: str = Field(description="Adresse complète si trouvée, vide sinon")
+    checkin: str = Field(description="Heures d'arrivée / départ (ex. arrivée 14h, départ 12h), vide si inconnu")
+    summary: str = Field(description="Une phrase : ce qui a été trouvé et le degré de confiance")
+    sources: list[Source]
+
+
+HOST_BRIEF = """Trouve les coordonnées de contact d'un hébergement de voyage, avec WebSearch et WebFetch.
+Cherche le site officiel, Google Maps / Booking / Airbnb, les annuaires fiables. Donne le téléphone
+(format international), l'email, le site, l'adresse et les heures d'arrivée et de départ.
+RÈGLES STRICTES : n'invente RIEN. Si une information n'est pas trouvée dans une source, laisse le champ vide.
+Pour un appartement ou une location type Airbnb, le contact de l'hôte est privé : laisse vide le nom, le
+téléphone et l'email (le contact est dans l'application de réservation), mais donne l'adresse, le site et
+les consignes d'arrivée si elles sont publiques. Pas de numéro d'un autre établissement.
+{lang}
+
+Hébergement : {stay}
+Ville : {city}
+Pays : {country}
+Adresse connue : {address}
+Dates du séjour : {dates}
+Lien connu : {url}
+Notes : {note}
+"""
+
+
+def job_host_search(job: dict, req: dict, tmp: Path) -> dict:
+    stop_id = req.get("stop_id")
+    stop = (sb("GET", "trip_stops", params={"id": f"eq.{stop_id}", "select": "*"}) or [None])[0]
+    if not stop:
+        raise RuntimeError("Étape introuvable")
+    hosts = list(stop.get("hosts") or [])
+    stay = (req.get("stay") or "").strip()
+    idx = req.get("index")
+    if not isinstance(idx, int) or idx >= len(hosts) or (stay and (hosts[idx].get("stay") or "").strip() != stay):
+        idx = next((i for i, h in enumerate(hosts) if (h.get("stay") or "").strip() == stay), None) if stay else None
+    cur = hosts[idx] if idx is not None else {}
+    stay = stay or (cur.get("stay") or stop.get("stay_name") or "").strip()
+    if not stay:
+        raise RuntimeError("Nom de l'hébergement manquant")
+    prompt = HOST_BRIEF.format(
+        lang=lang_line(req.get("lang", "fr")), stay=stay, city=stop.get("name") or "", country=stop.get("country") or "",
+        address=stop.get("stay_address") or "inconnue", dates=f"{stop.get('arrive_date') or '?'} -> {stop.get('leave_date') or '?'}",
+        url=stop.get("stay_url") or "aucun", note=(cur.get("note") or "")[:300],
+    )
+    data = claude_json(prompt, HostFound, cwd=tmp, tools=["WebSearch", "WebFetch"], timeout=600)
+    applied: list[str] = []
+    if data.get("found") and idx is not None:
+        # On relit juste avant d'ecrire : l'utilisateur a pu modifier entre-temps
+        fresh = (sb("GET", "trip_stops", params={"id": f"eq.{stop_id}", "select": "hosts"}) or [{}])[0].get("hosts") or []
+        j = next((i for i, h in enumerate(fresh) if (h.get("stay") or "").strip() == stay), None)
+        if j is not None:
+            h = dict(fresh[j])
+            for key, val in (("name", data.get("host_name")), ("phone", data.get("phone")), ("email", data.get("email"))):
+                if val and not (h.get(key) or "").strip():
+                    h[key] = val.strip()
+                    applied.append(key)
+            extra = " · ".join(x for x in [data.get("checkin"), data.get("website")] if x)
+            if extra and not (h.get("note") or "").strip():
+                h["note"] = extra[:240]
+                applied.append("note")
+            if applied:
+                fresh[j] = h
+                sb("PATCH", "trip_stops", params={"id": f"eq.{stop_id}"}, body={"hosts": fresh}, prefer="return=minimal")
+    return {**data, "applied": applied, "stay": stay, "stop_id": stop_id}
 
 
 

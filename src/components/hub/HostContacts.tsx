@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { StopHost } from '../../lib/types'
-import { useT } from '../../i18n/I18nContext'
+import { useAiJobs } from '../../context/AiJobsContext'
+import { useFeedback } from '../../context/FeedbackContext'
+import { useI18n, useT } from '../../i18n/I18nContext'
 import EditButton from '../EditButton'
 
 export const EMPTY_HOST: StopHost = { stay: '', name: '', phone: '', email: '', note: '' }
@@ -16,12 +18,18 @@ export function HostCards({
   hosts,
   compact = false,
   onSave,
+  stop,
 }: {
   hosts: StopHost[] | null | undefined
   compact?: boolean
   onSave?: (next: StopHost[]) => Promise<void>
+  /** Etape concernee : active la recherche des coordonnees avec l'IA (Haiku, en arriere-plan) */
+  stop?: { id: string; trip_id: string }
 }) {
   const t = useT()
+  const { lang } = useI18n()
+  const { jobs, queue, retry } = useAiJobs()
+  const fb = useFeedback()
   const all = hosts ?? []
   const [editing, setEditing] = useState<number | null>(null)
   const [draft, setDraft] = useState<StopHost>(EMPTY_HOST)
@@ -30,6 +38,55 @@ export function HostCards({
 
   const shown = all.map((h, index) => ({ h, index })).filter(({ h }) => h.stay || h.name || h.phone || h.email)
   if (shown.length === 0) return null
+
+  /** Derniere recherche de cet hebergement (en cours, terminee ou echouee) */
+  function searchOf(h: StopHost) {
+    if (!stop || !h.stay) return undefined
+    return jobs.find((j) => j.kind === 'host_search' && j.input?.stop_id === stop.id && j.input?.stay === h.stay)
+  }
+
+  async function search(index: number, h: StopHost) {
+    if (!stop) return
+    try {
+      await queue('host_search', { stop_id: stop.id, index, stay: h.stay, lang }, stop.trip_id)
+      fb.toast(t('host.searchLaunched'), { icon: '🔎' })
+    } catch (err) {
+      fb.toast(err instanceof Error ? err.message : String(err), { icon: '⚠️', tone: 'bad' })
+    }
+  }
+
+  function searchUi(h: StopHost, index: number) {
+    if (!stop || !onSave || !h.stay.trim()) return null
+    const job = searchOf(h)
+    const running = job && (job.status === 'pending' || job.status === 'processing')
+    const res = job?.status === 'ready' ? (job.result as { found?: boolean; applied?: string[]; summary?: string } | null) : null
+    return (
+      <div className="mt-2.5 space-y-1.5">
+        {running ? (
+          <p className="rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] font-semibold text-text-soft">
+            <span className="ai-spin inline-block">🔎</span> {t('host.searching')}
+          </p>
+        ) : job?.status === 'error' ? (
+          <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
+            <p className="min-w-0 flex-1 text-[12.5px] font-semibold text-[#b4533f]">⚠️ {t('host.failed')}</p>
+            <button onClick={() => void retry(job).catch(() => undefined)} className="btn btn-xs btn-accent">
+              ↻ {t('tc.retry')}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => void search(index, h)} className={`btn btn-xs w-full ${h.phone || h.email ? 'btn-quiet' : 'btn-accent'}`}>
+            🔎 {job ? t('host.searchAgain') : t('host.search')}
+          </button>
+        )}
+        {res && (
+          <p className="text-[12px] leading-snug text-text-muted">
+            {res.found && res.applied?.length ? `✅ ${t('host.found', { n: res.applied.length })} · ` : res.found ? '' : `ℹ️ ${t('host.notFound')} · `}
+            {res.summary}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   function edit(index: number) {
     setDraft({ ...EMPTY_HOST, ...all[index] })
@@ -133,6 +190,7 @@ export function HostCards({
               </div>
             )}
             {(h.phone || h.email) && <p className="num mt-2 text-[12px] text-text-muted">{[h.phone, h.email].filter(Boolean).join(' · ')}</p>}
+            {searchUi(h, index)}
           </div>
         )
       })}

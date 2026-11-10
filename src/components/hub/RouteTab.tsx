@@ -346,7 +346,7 @@ export default function RouteTab({
           </div>
         )}
 
-        <HostCards hosts={stop.hosts} onSave={async (next) => { await updateStop(stop.id, { hosts: next }); await hub.reload() }} />
+        <HostCards hosts={stop.hosts} stop={stop} onSave={async (next) => { await updateStop(stop.id, { hosts: next }); await hub.reload() }} />
 
         {sightBusy === stop.id && <p className="mt-4 text-[13px] text-text-muted">{t('stop.sightsBusy')}</p>}
         {sightsOf(stop, places).length > 0 && (

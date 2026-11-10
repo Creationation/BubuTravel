@@ -33,11 +33,13 @@ type Value = {
   /** Demande en cours pour ce lieu (remplissage, date proposee...). */
   activeFor: (kind: string, key: string, value: string) => AiJob | undefined
   dismiss: (id: string) => void
+  /** Relance une demande echouee (meme type, memes donnees) et retire l'ancienne. */
+  retry: (job: AiJob) => Promise<AiJob>
 }
 
 const Ctx = createContext<Value | null>(null)
 const RECENT_MS = 30 * 60 * 1000
-const CHANGES_PLACES = new Set(['place_info', 'arrange_trip', 'day_plan', 'stop_places'])
+const CHANGES_PLACES = new Set(['place_info', 'arrange_trip', 'day_plan', 'stop_places', 'host_search'])
 
 export function AiJobsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -102,6 +104,17 @@ export function AiJobsProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const retry = useCallback(
+    async (job: AiJob) => {
+      const next = await queue(job.kind, job.input, job.trip_id)
+      // L'ancienne ligne en erreur disparait de la liste (si la suppression n'est pas permise, elle est juste masquee)
+      void supabase.from('ai_jobs').delete().eq('id', job.id).then(() => undefined)
+      setHidden((s) => new Set(s).add(job.id))
+      return next
+    },
+    [queue],
+  )
+
   const value = useMemo<Value>(
     () => ({
       jobs: jobs.filter((j) => !hidden.has(j.id)),
@@ -109,8 +122,9 @@ export function AiJobsProvider({ children }: { children: ReactNode }) {
       activeFor: (kind, key, v) =>
         jobs.find((j) => j.kind === kind && (j.status === 'pending' || j.status === 'processing') && String(j.input?.[key]) === v),
       dismiss: (id) => setHidden((s) => new Set(s).add(id)),
+      retry,
     }),
-    [jobs, hidden, queue],
+    [jobs, hidden, queue, retry],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
