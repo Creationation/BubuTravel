@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import Reveal from '../components/Reveal'
-import IdeaCard from '../components/hub/IdeaCard'
+import IdeasByDay from '../components/hub/IdeasByDay'
 import IdeaComposer from '../components/hub/IdeaComposer'
 import { addIdea, extractUrl, useIdeas } from '../lib/ideas'
 import { errorMessage } from '../lib/errors'
@@ -53,11 +53,7 @@ export default function IdeasPage() {
               <p className="lede mx-auto mt-3 max-w-lg text-[15px]">{t('idea.emptyHint')}</p>
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {ideas.map((idea) => (
-                <IdeaCard key={idea.id} idea={idea} />
-              ))}
-            </div>
+            <IdeasByDay ideas={ideas} />
           )}
         </div>
       </div>

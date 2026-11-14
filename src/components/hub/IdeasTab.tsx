@@ -2,8 +2,8 @@ import { useIdeas } from '../../lib/ideas'
 import type { Trip } from '../../lib/types'
 import type { TripHub } from '../../lib/useTripHub'
 import { useI18n } from '../../i18n/I18nContext'
-import IdeaCard from './IdeaCard'
 import IdeaComposer from './IdeaComposer'
+import IdeasByDay from './IdeasByDay'
 
 /** Les idees rattachees a ce voyage : liens analyses et a analyser. */
 export default function IdeasTab({ trip }: { trip: Trip; hub: TripHub }) {
@@ -20,11 +20,7 @@ export default function IdeasTab({ trip }: { trip: Trip; hub: TripHub }) {
       {!loading && ideas.length === 0 ? (
         <p className="py-6 text-center text-text-muted">{t('idea.emptyHint')}</p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {ideas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} defaultTripId={trip.id} />
-          ))}
-        </div>
+        <IdeasByDay ideas={ideas} defaultTripId={trip.id} />
       )}
     </div>
   )

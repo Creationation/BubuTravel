@@ -2435,12 +2435,29 @@ def job_emergency(job: dict, req: dict, tmp: Path) -> dict:
 IDEA_SKIPPED: set[str] = set()
 
 
+def upcoming_trip_id(uid: str) -> str | None:
+    """Voyage (le sien ou partage) en cours ou a venir le plus proche."""
+    today = date.today().isoformat()
+    own = sb("GET", "trips", params={"user_id": f"eq.{uid}", "select": "id,start_date,end_date"}) or []
+    member_ids = [m["trip_id"] for m in (sb("GET", "trip_members", params={"user_id": f"eq.{uid}", "select": "trip_id"}) or [])]
+    shared = (sb("GET", "trips", params={"id": f"in.({','.join(member_ids)})", "select": "id,start_date,end_date"}) if member_ids else []) or []
+    trips = [t for t in own + shared if not t.get("end_date") or t["end_date"] >= today]
+    trips.sort(key=lambda t: t.get("start_date") or "9999")
+    return trips[0]["id"] if trips else None
+
+
 def auto_place_idea(idea: dict) -> str:
     """Pose l'idee sur la carte, puis l'archive. Renvoie placed, no-coords ou skip."""
     a = idea.get("analysis") or {}
     if not a or idea.get("status") != "ready":
         return "skip"
     trip_id = idea.get("trip_id")
+    if not trip_id:
+        # Envoyee hors d'un voyage : on la rattache au voyage en cours / a venir (sinon le lieu reste prive a l'envoyeur)
+        trip_id = upcoming_trip_id(idea["user_id"])
+        if trip_id:
+            idea["trip_id"] = trip_id
+            sb("PATCH", "link_ideas", params={"id": f"eq.{idea['id']}"}, body={"trip_id": trip_id}, prefer="return=minimal")
     code = shortcode(idea["url"])
     params = {"notes": f"ilike.*{code}*", "select": "id", "limit": "1"}
     params["trip_id" if trip_id else "user_id"] = f"eq.{trip_id or idea['user_id']}"
